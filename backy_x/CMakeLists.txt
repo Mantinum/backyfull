@@ -102,7 +102,7 @@ add_executable(test_scheduler tests/test_scheduler.cpp)
 target_link_libraries(test_scheduler PRIVATE
     backy_x_core  # Contains Scheduler, links Qt6::Core
     gtest_main    # For GoogleTest
-    # Qt6::Test   # QSignalSpy is in Core, but if using QTest macros, add this
+    Qt6::Test   # QSignalSpy is in Core, but if using QTest macros, add this
 )
 # Add test to CTest
 add_test(NAME SchedulerTests COMMAND test_scheduler)
