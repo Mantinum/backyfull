@@ -224,6 +224,3 @@ TEST_F(SchedulerTest, DISABLED_BackupSignalEmission) {
 // with QApplication might be needed.
 // For now, this structure assumes basic GTest execution. If timer tests are added,
 // the test execution setup might need QTestLib integration.
-
-```
-Some minor adjustments were made to the static `argc_` and `argv_` initialization in `SchedulerTest::SetUpTestSuite` to provide a dummy application name, as some Qt versions or contexts might expect `argv[0]` to be a valid string. Also added `#include <QFile>` for `QFile::remove`. The rest of the logic is as provided.
