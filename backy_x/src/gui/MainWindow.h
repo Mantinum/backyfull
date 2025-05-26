@@ -4,14 +4,12 @@
 #include <QMainWindow>
 #include <QString>
 
-// Forward declarations for Qt classes to reduce header includes
-QT_BEGIN_NAMESPACE
-class QLineEdit;
-class QPushButton;
-class QTextEdit;
-class QTimeEdit;
-class QFileDialog;
-QT_END_NAMESPACE
+// Qt class includes (replacing forward declarations)
+#include <QLineEdit>
+#include <QPushButton>
+#include <QTextEdit>
+#include <QTimeEdit>
+#include <QFileDialog>
 
 // Forward declaration for our Scheduler
 class Scheduler; 

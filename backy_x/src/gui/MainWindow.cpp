@@ -39,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
         QCoreApplication::setApplicationName("BackyFull");
     }
 
-    scheduler_ = new Scheduler(this); // Scheduler is a child of MainWindow
+    scheduler_ = new Scheduler(QString(), this); // Scheduler is a child of MainWindow
 
     setupUI();
     loadSettings(); // Load window geometry and other UI settings
