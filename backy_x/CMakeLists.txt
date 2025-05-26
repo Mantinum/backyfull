@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent Core Gui)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test)
 # Gui is often a transitive dependency of Widgets but explicitly listing it is safer.
 
 # --- Global Settings ---
