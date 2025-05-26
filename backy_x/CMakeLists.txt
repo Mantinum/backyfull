@@ -77,6 +77,7 @@ target_link_libraries(backy_full_gui PRIVATE
     backy_x_core    
     LocalTarget_lib 
 )
+target_include_directories(backy_full_gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # For Windows, to make it a GUI application without a console window
 if(WIN32)
