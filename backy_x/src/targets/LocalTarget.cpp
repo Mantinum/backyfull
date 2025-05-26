@@ -7,6 +7,10 @@
 LocalTarget::LocalTarget(const std::string& destinationPath)
     : destinationPath_(destinationPath) {}
 
+std::string LocalTarget::destinationPathStdStr() const {
+    return destinationPath_;
+}
+
 bool LocalTarget::beginSession() {
     try {
         // Ensure the base destination directory exists

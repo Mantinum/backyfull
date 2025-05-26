@@ -15,6 +15,9 @@ public:
     bool deleteFile(const std::string& relativePath) override; 
     bool endSession() override;
 
+    // Getter for the destination path
+    std::string destinationPathStdStr() const;
+
 private:
     std::string destinationPath_;
     std::string currentBasePath_; // To store the base path for the current session
