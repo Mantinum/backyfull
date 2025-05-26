@@ -1,0 +1,59 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+        # Optional: specify compiler if needed, though CMake usually finds defaults
+        # include:
+        #   - os: ubuntu-24.04
+        #     cpp_compiler: gcc
+        #   - os: macos-14
+        #     cpp_compiler: clang
+        #   - os: windows-2022
+        #     cpp_compiler: msvc
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get CMake
+        uses: lukka/get-cmake@v3.29.0 # Using a more specific version
+
+      # Optional: Install C++ compiler if specific versions are needed
+      # - name: Setup C++ compiler (Compiler specific steps)
+      #   if: matrix.cpp_compiler == 'gcc' && runner.os == 'Linux'
+      #     run: sudo apt-get update && sudo apt-get install -y g++-11 # Example
+      #   # Add similar steps for clang on macOS or msvc on Windows if needed
+
+      - name: Configure CMake
+        # Using Debug build type for CI to enable assertions and potentially more checks
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug 
+        # For Windows, specify generator if not default (e.g. Visual Studio)
+        # if: runner.os == 'Windows'
+        #   run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -G "Visual Studio 17 2022" 
+        # else
+        #   run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build project
+        run: cmake --build build --parallel
+
+      - name: Run Tests
+        # Run CTest from the directory where CMakeCache.txt is located (the build directory)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Upload Build Artifact (Optional)
+        if: always() # To capture build logs/artifacts even on failure
+        uses: actions/upload-artifact@v4
+        with:
+          name: backy_x-${{ matrix.os }}-build-output
+          path: |
+            build/
+            # Add specific paths to executables or logs if desired
+            # build/backy_x_cli 
+            # build/test_local_target
+            # build/**/test_output # If tests generate specific log files in build dir
+          retention-days: 7 # Keep artifacts for a week
