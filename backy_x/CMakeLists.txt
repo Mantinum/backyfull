@@ -37,6 +37,7 @@ FetchContent_MakeAvailable(googletest)
 # Core library
 add_library(backy_x_core STATIC 
     src/core/Scheduler.cpp
+    include/core/Scheduler.h 
     # Add other future core .cpp files here, e.g. BackupEngine.cpp
 )
 target_include_directories(backy_x_core PUBLIC include) # PUBLIC so consumers get include paths
