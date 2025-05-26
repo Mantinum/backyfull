@@ -15,6 +15,8 @@
 #include <QStandardPaths> // For default dialog paths
 #include <QSettings> // For window settings
 #include <QCoreApplication> // For QSettings org/app name
+#include <filesystem> // For recursive directory iteration and path manipulation
+#include <functional> // For std::function (if using a lambda helper)
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -182,60 +184,99 @@ void MainWindow::runBackupNow() {
 void MainWindow::performBackup(const QString& sourcePath, const QString& destinationPath) {
     updateLog(QString("Performing backup: Source: %1, Destination: %2").arg(sourcePath, destinationPath));
 
-    if (localTarget_ && localTarget_->destinationPathStdStr() != destinationPath.toStdString()) {
+    std::filesystem::path fsSourcePath(sourcePath.toStdString());
+    QString sourceFolderName = QString::fromStdString(fsSourcePath.filename().string());
+    if (sourceFolderName.isEmpty() || sourceFolderName == "." || sourceFolderName == "..") {
+        // This case should ideally be handled by input validation before calling performBackup,
+        // or use a default name like "root_backup" if sourcePath is "/"
+        updateLog(QString("Error: Could not determine a valid source folder name from '%1'.").arg(sourcePath));
+        QMessageBox::critical(this, tr("Backup Failed"), tr("Invalid source path. Cannot determine source folder name."));
+        return;
+    }
+    if (!std::filesystem::is_directory(fsSourcePath)) {
+         updateLog(QString("Error: Source path '%1' is not a directory.").arg(sourcePath));
+         QMessageBox::critical(this, tr("Backup Failed"), tr("Source path is not a directory."));
+         return;
+    }
+
+
+    std::filesystem::path fsDestinationPathFromUI(destinationPath.toStdString());
+    std::filesystem::path backupRootForTarget = fsDestinationPathFromUI / fsSourcePath.filename();
+    std::string backupRootStdStr = backupRootForTarget.string();
+
+    if (localTarget_ && localTarget_->destinationPathStdStr() != backupRootStdStr) {
         delete localTarget_;
         localTarget_ = nullptr;
     }
     if (!localTarget_) {
-        // Ensure LocalTarget has a way to get its configured destination path, e.g., destinationPathStdStr()
-        // For now, we assume its constructor sets it and it can be compared.
-        // If LocalTarget doesn't store its path in a comparable way, this logic might be flawed.
-        // Let's add a getter in LocalTarget: std::string destinationPathStdStr() const { return destinationPath_; }
-        localTarget_ = new LocalTarget(destinationPath.toStdString()); 
+        localTarget_ = new LocalTarget(backupRootStdStr);
     }
     
     if (!localTarget_->beginSession()) {
-        updateLog("Error: Could not begin backup session with LocalTarget.");
+        updateLog(QString("Error: Could not begin backup session with LocalTarget at '%1'.").arg(QString::fromStdString(backupRootStdStr)));
         QMessageBox::critical(this, tr("Backup Failed"), tr("Could not begin backup session. Check logs."));
         return;
     }
 
-    QDir dir(sourcePath);
-    if (!dir.exists()) {
+    if (!std::filesystem::exists(fsSourcePath)) {
         updateLog(QString("Error: Source directory '%1' does not exist.").arg(sourcePath));
         localTarget_->endSession();
         QMessageBox::critical(this, tr("Backup Failed"), tr("Source directory not found."));
         return;
     }
-
-    dir.setFilter(QDir::Files | QDir::NoSymLinks | QDir::Readable);
-    QFileInfoList list = dir.entryInfoList();
-    updateLog(QString("Found %1 file(s) in the root of source directory for backup.").arg(list.size()));
-
+    
+    updateLog(QString("Starting recursive scan of source directory: %1").arg(sourcePath));
     bool all_ok = true;
-    for (const QFileInfo &fileInfo : list) {
-        std::string sourceFilePath = fileInfo.absoluteFilePath().toStdString();
-        if (localTarget_->sendFile(sourceFilePath, "")) { // Metadata is empty string for M1
-            updateLog(QString("Backed up: %1").arg(fileInfo.fileName()));
-        } else {
-            updateLog(QString("Error backing up: %1").arg(fileInfo.fileName()));
+    int files_processed_count = 0;
+
+    std::function<void(const std::filesystem::path&)> recursiveCopy;
+    recursiveCopy = 
+       [&](const std::filesystem::path& currentPathInSource) {
+       try {
+           for (const auto& entry : std::filesystem::directory_iterator(currentPathInSource)) {
+               std::filesystem::path fullEntryPath = entry.path();
+               std::filesystem::path relativePath = std::filesystem::relative(fullEntryPath, fsSourcePath);
+               std::string relativePathStr = relativePath.generic_string(); // Use generic_string for platform-independent slashes
+
+               if (entry.is_directory()) {
+                   updateLog(QString("Scanning subdirectory: %1").arg(QString::fromStdString(relativePathStr)));
+                   recursiveCopy(fullEntryPath); // Recurse
+               } else if (entry.is_regular_file()) {
+                   files_processed_count++;
+                   // For M2, LocalTarget::sendFile expects the full path of the source file
+                   // and the relative path for constructing the destination.
+                   if (localTarget_->sendFile(fullEntryPath.string(), relativePathStr)) {
+                       updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
+                   } else {
+                       updateLog(QString("Error backing up: %1").arg(QString::fromStdString(relativePathStr)));
+                       all_ok = false; 
+                   }
+               }
+           }
+       } catch (const std::filesystem::filesystem_error& e) {
+            updateLog(QString("Error accessing path %1: %2").arg(QString::fromStdString(currentPathInSource.string()), QString::fromStdString(e.what())));
             all_ok = false;
-        }
-    }
+       }
+    };
+
+    recursiveCopy(fsSourcePath); // Initial call to start the recursion
 
     if (!localTarget_->endSession()) {
         updateLog("Error: Could not properly end backup session with LocalTarget.");
+        all_ok = false; // Consider this a failure as well
     }
 
-    if (all_ok && list.isEmpty() && !dir.exists()) { // Check if source became invalid during op
-         updateLog("Backup may have issues: Source directory seems empty or became inaccessible.");
-         QMessageBox::warning(this, tr("Backup Note"), tr("Backup process ran, but source directory is empty or no files were processed."));
-    } else if (all_ok) {
-        updateLog("Backup process completed successfully.");
-        QMessageBox::information(this, tr("Backup Complete"), tr("Backup completed successfully."));
+    if (all_ok) {
+        if (files_processed_count == 0) {
+            updateLog(QString("Backup completed. No files were found to back up in '%1'.").arg(sourcePath));
+            QMessageBox::information(this, tr("Backup Complete"), tr("Backup completed. No files were found in the source directory."));
+        } else {
+            updateLog(QString("Backup process completed successfully. %1 files processed.").arg(files_processed_count));
+            QMessageBox::information(this, tr("Backup Complete"), tr("Backup completed successfully."));
+        }
     } else {
         updateLog("Backup process completed with some errors. Please check the log.");
-        QMessageBox::warning(this, tr("Backup Complete"), tr("Backup completed with some errors."));
+        QMessageBox::warning(this, tr("Backup Complete (with errors)"), tr("Backup completed with some errors. Please check the log."));
     }
 }
 
