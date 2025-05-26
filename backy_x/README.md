@@ -1,10 +1,10 @@
-# Backy X
+# BackyFull
 
-Backy X is a multi-platform backup software (macOS, Windows, Linux).
+BackyFull is a multi-platform backup software (macOS, Windows, Linux).
 
 ## Build Instructions
 
-CMake is required to build Backy X.
+CMake is required to build BackyFull.
 
 Configure the project:
 ```bash

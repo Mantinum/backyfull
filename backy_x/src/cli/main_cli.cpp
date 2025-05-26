@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::cout << "Backy X CLI - M0 One-Shot Backup" << std::endl;
+    std::cout << "BackyFull CLI - M0 One-Shot Backup" << std::endl;
     std::cout << "Source: " << sourcePath << std::endl;
     std::cout << "Destination: " << destinationPath << std::endl;
 
