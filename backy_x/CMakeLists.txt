@@ -19,7 +19,13 @@ find_package(CURL REQUIRED)
 # otherwise use CURL_LIBRARIES and CURL_INCLUDE_DIRS.
 
 # Find LibSSH2
-find_package(LibSSH2 REQUIRED)
+find_package(LibSSH2)
+if(NOT LibSSH2_FOUND)
+    message(WARNING "LibSSH2 not found. SFTP features will be disabled. "
+                    "Please install libssh2 development package (e.g., libssh2-1-dev on Debian/Ubuntu, "
+                    "libssh2-devel on Fedora, brew install libssh2 on macOS) "
+                    "and ensure it's in CMake's search path (or set LibSSH2_DIR).")
+endif()
 # Usage: Link against LibSSH2::libssh2 if available,
 # otherwise use LIBSSH2_LIBRARIES and LIBSSH2_INCLUDE_DIRS.
 
