@@ -71,13 +71,37 @@ add_library(LocalTarget_lib STATIC
 target_link_libraries(LocalTarget_lib PUBLIC backy_x_core) # LocalTarget might use IStorageTarget from core
 target_include_directories(LocalTarget_lib PUBLIC include) # So users of LocalTarget_lib find its headers and IStorageTarget
 
-# CredentialManager library (will also hold platform-specific implementations)
-add_library(CredentialManager_lib STATIC
-    src/util/CredentialManager.cpp
-    # Platform-specific .cpp/.mm files will be added here later
-)
-target_include_directories(CredentialManager_lib PUBLIC include) # For consumers to find CredentialManager.h
-target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core)   # Because CredentialManager.h uses QString
+# CredentialManager library
+set(CREDMAN_SOURCES src/util/CredentialManager.cpp) # Common base .cpp
+
+if(APPLE)
+    list(APPEND CREDMAN_SOURCES src/util/CredentialManager_mac.mm)
+elif(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
+    list(APPEND CREDMAN_SOURCES src/util/CredentialManager_linux.cpp)
+elif(WIN32)
+    list(APPEND CREDMAN_SOURCES src/util/CredentialManager_win.cpp)
+endif()
+
+add_library(CredentialManager_lib STATIC ${CREDMAN_SOURCES})
+target_include_directories(CredentialManager_lib PUBLIC include)
+target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core) # For QString etc. in the interface
+
+# Now, add platform-specific libraries to CredentialManager_lib
+if(APPLE)
+    # For Keychain services. Security.framework is the one.
+    target_link_libraries(CredentialManager_lib PRIVATE Security) 
+elif(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
+    if(LIBSECRET_FOUND) # Check if pkg_check_modules found it
+        target_link_libraries(CredentialManager_lib PRIVATE ${LIBSECRET_LIBRARIES})
+        target_include_directories(CredentialManager_lib PRIVATE ${LIBSECRET_INCLUDE_DIRS}) # If it has specific includes
+    else()
+        message(WARNING "Libsecret not found. CredentialManager on Linux will be a stub.")
+    endif()
+elif(WIN32)
+    # For CredEnumerate, CredRead, CredWrite, CredDelete functions
+    # They are in Advapi32.dll, and linked via Advapi32.lib
+    target_link_libraries(CredentialManager_lib PRIVATE Advapi32.lib)
+endif()
 
 # --- Executables ---
 
