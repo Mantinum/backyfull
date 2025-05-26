@@ -5,6 +5,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF) # Disable compiler-specific extensions for better portability
 
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent Core Gui)
+# Gui is often a transitive dependency of Widgets but explicitly listing it is safer.
+
 # --- Global Settings ---
 # Define an include directory for cleaner #include paths
 include_directories(include)
@@ -27,10 +34,14 @@ FetchContent_MakeAvailable(googletest)
 
 # --- Project Libraries ---
 
-# Core library (placeholder for now, will grow)
-add_library(backy_x_core INTERFACE) # Interface library for headers only, or add sources later
-target_include_directories(backy_x_core INTERFACE include)
-# Add source files to backy_x_core if/when they are created in src/core
+# Core library
+add_library(backy_x_core STATIC 
+    src/core/Scheduler.cpp
+    # Add other future core .cpp files here, e.g. BackupEngine.cpp
+)
+target_include_directories(backy_x_core PUBLIC include) # PUBLIC so consumers get include paths
+target_link_libraries(backy_x_core PUBLIC Qt6::Core) # PUBLIC if consumers need Qt types from core headers, PRIVATE otherwise.
+                                                     # Let's use PUBLIC for now as Scheduler signals might be used by GUI.
 
 # LocalTarget library
 add_library(LocalTarget_lib STATIC 
@@ -55,6 +66,23 @@ elseif(MSVC)
     # MSVC usually links std::filesystem automatically with /std:c++17
 endif()
 
+# GUI Application
+add_executable(backy_full_gui
+    src/gui/main_gui.cpp
+    src/gui/MainWindow.cpp
+)
+target_link_libraries(backy_full_gui PRIVATE
+    Qt6::Widgets 
+    Qt6::Concurrent 
+    backy_x_core    
+    LocalTarget_lib 
+)
+
+# For Windows, to make it a GUI application without a console window
+if(WIN32)
+    set_target_properties(backy_full_gui PROPERTIES WIN32_EXECUTABLE ON)
+endif()
+
 
 # --- Tests ---
 # Enable testing for the project
@@ -67,10 +95,20 @@ target_link_libraries(test_local_target PRIVATE LocalTarget_lib gtest_main) # gt
 # Note: GoogleTest discovers tests automatically if linked with gtest_main
 add_test(NAME LocalTargetTests COMMAND test_local_target)
 
+# Scheduler Tests
+add_executable(test_scheduler tests/test_scheduler.cpp)
+target_link_libraries(test_scheduler PRIVATE
+    backy_x_core  # Contains Scheduler, links Qt6::Core
+    gtest_main    # For GoogleTest
+    # Qt6::Test   # QSignalSpy is in Core, but if using QTest macros, add this
+)
+# Add test to CTest
+add_test(NAME SchedulerTests COMMAND test_scheduler)
+
 
 # --- Installation (Placeholder for M0) ---
 # This will be expanded for CPack later
-install(TARGETS backy_x_cli DESTINATION bin) 
+install(TARGETS backy_x_cli backy_full_gui DESTINATION bin) 
 # install(FILES include/core/IStorageTarget.h DESTINATION include/core)
 # install(FILES include/targets/LocalTarget.h DESTINATION include/targets)
 
