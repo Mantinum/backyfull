@@ -12,6 +12,25 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test)
 # Gui is often a transitive dependency of Widgets but explicitly listing it is safer.
 
+# --- External Libraries ---
+# Find CURL
+find_package(CURL REQUIRED)
+# Usage: Link against CURL::libcurl if available (CMake >= 3.12), 
+# otherwise use CURL_LIBRARIES and CURL_INCLUDE_DIRS.
+
+# Find LibSSH2
+find_package(LibSSH2 REQUIRED)
+# Usage: Link against LibSSH2::libssh2 if available,
+# otherwise use LIBSSH2_LIBRARIES and LIBSSH2_INCLUDE_DIRS.
+
+# Find Libsecret (Linux only)
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBSECRET REQUIRED libsecret-1)
+    # Usage: Link against LIBSECRET_LIBRARIES and include LIBSECRET_INCLUDE_DIRS.
+    # PkgConfig typically sets these variables.
+endif()
+
 # --- Global Settings ---
 # Define an include directory for cleaner #include paths
 include_directories(include)
@@ -51,6 +70,14 @@ add_library(LocalTarget_lib STATIC
 )
 target_link_libraries(LocalTarget_lib PUBLIC backy_x_core) # LocalTarget might use IStorageTarget from core
 target_include_directories(LocalTarget_lib PUBLIC include) # So users of LocalTarget_lib find its headers and IStorageTarget
+
+# CredentialManager library (will also hold platform-specific implementations)
+add_library(CredentialManager_lib STATIC
+    src/util/CredentialManager.cpp
+    # Platform-specific .cpp/.mm files will be added here later
+)
+target_include_directories(CredentialManager_lib PUBLIC include) # For consumers to find CredentialManager.h
+target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core)   # Because CredentialManager.h uses QString
 
 # --- Executables ---
 
