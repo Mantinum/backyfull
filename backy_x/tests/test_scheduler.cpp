@@ -95,7 +95,7 @@ TEST_F(SchedulerTest, SetAndGetTaskProperties) {
 
     QSignalSpy taskChangedSpy(scheduler_, &Scheduler::taskChanged);
 
-    scheduler_->setDailyBackupTask(src, dst, time, enabled);
+    scheduler_->setDailyBackupTask(src, dst, time, enabled, false, QString(), 0, QString(), QString());
 
     EXPECT_EQ(scheduler_->sourcePath(), src);
     EXPECT_EQ(scheduler_->destinationPath(), dst);
@@ -121,7 +121,7 @@ TEST_F(SchedulerTest, SaveAndLoadTask) {
     QTime time(14, 45);
     bool enabled = true;
 
-    scheduler_->setDailyBackupTask(src, dst, time, enabled);
+    scheduler_->setDailyBackupTask(src, dst, time, enabled, false, QString(), 0, QString(), QString());
     // Task is saved by setDailyBackupTask.
 
     // Create a new Scheduler instance using the same settings file
@@ -139,10 +139,10 @@ TEST_F(SchedulerTest, DisableTask) {
     QString dst = "/path/dst";
     QTime time(12, 00);
 
-    scheduler_->setDailyBackupTask(src, dst, time, true); // Enable first
+    scheduler_->setDailyBackupTask(src, dst, time, true, false, QString(), 0, QString(), QString()); // Enable first
     ASSERT_TRUE(scheduler_->isEnabled());
 
-    scheduler_->setDailyBackupTask(src, dst, time, false); // Then disable
+    scheduler_->setDailyBackupTask(src, dst, time, false, false, QString(), 0, QString(), QString()); // Then disable
     EXPECT_FALSE(scheduler_->isEnabled());
 
     // Verify persistence of disabled state
@@ -153,7 +153,7 @@ TEST_F(SchedulerTest, DisableTask) {
 
 TEST_F(SchedulerTest, HandlesEmptyPathsOnSet) {
     // Setting empty paths should be stored as such
-    scheduler_->setDailyBackupTask("", "", QTime(1,1), true);
+    scheduler_->setDailyBackupTask("", "", QTime(1,1), true, false, QString(), 0, QString(), QString());
     EXPECT_EQ(scheduler_->sourcePath(), QString(""));
     EXPECT_EQ(scheduler_->destinationPath(), QString(""));
 

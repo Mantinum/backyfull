@@ -83,7 +83,7 @@ add_library(SftpTarget_lib STATIC
 )
 target_link_libraries(SftpTarget_lib 
     PUBLIC backy_x_core       # For IStorageTarget
-    PRIVATE CredentialManager_lib # For createPlatformCredentialManager in SftpTarget.cpp
+    PUBLIC CredentialManager_lib # Changed from PRIVATE to PUBLIC
 )
 target_include_directories(SftpTarget_lib PUBLIC include)
 
