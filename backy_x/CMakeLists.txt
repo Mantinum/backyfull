@@ -160,6 +160,10 @@ target_link_libraries(backy_full_gui PRIVATE
 )
 target_include_directories(backy_full_gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+if(APPLE)
+    target_link_libraries(backy_full_gui PRIVATE Security)
+endif()
+
 # For Windows, to make it a GUI application without a console window
 if(WIN32)
     set_target_properties(backy_full_gui PROPERTIES WIN32_EXECUTABLE ON)
@@ -200,6 +204,9 @@ target_link_libraries(test_sftp_target PRIVATE
     # Let's assume SftpTarget_lib correctly pulls in what it needs from CredentialManager.
     # If linking fails for Qt types, add Qt6::Core here.
 )
+if(APPLE)
+    target_link_libraries(test_sftp_target PRIVATE Security)
+endif()
 # Add test to CTest
 add_test(NAME SftpTargetTests COMMAND test_sftp_target)
 
