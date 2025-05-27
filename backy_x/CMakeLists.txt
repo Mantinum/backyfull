@@ -120,9 +120,8 @@ target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core) # For QString etc.
 
 # Now, add platform-specific libraries to CredentialManager_lib
 if(APPLE)
-    # For Keychain services. Security.framework is the one.
-    target_link_libraries(CredentialManager_lib PRIVATE "-framework Security" "-framework CoreFoundation")
-
+    # For Keychain services and CoreFoundation APIs.
+    target_link_libraries(CredentialManager_lib PRIVATE "-framework Security" "-framework CoreFoundation") 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
     if(LIBSECRET_FOUND) # Check if pkg_check_modules found it
         target_link_libraries(CredentialManager_lib PRIVATE ${LIBSECRET_LIBRARIES})
@@ -162,7 +161,11 @@ target_link_libraries(backy_full_gui PRIVATE
 target_include_directories(backy_full_gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 if(APPLE)
-    target_link_libraries(backy_full_gui PRIVATE "-framework Security")
+    # Ensure GUI also links Security if it uses CredentialManager directly in a way that requires it,
+    # or if CredentialManager_lib doesn't make the linkage public effectively.
+    # However, CredentialManager_lib links Security framework, and GUI links CredentialManager_lib.
+    # Transitive linking should handle this. If linker errors appear for Sec* symbols in GUI, uncomment:
+    # target_link_libraries(backy_full_gui PRIVATE "-framework Security" "-framework CoreFoundation")
 endif()
 
 # For Windows, to make it a GUI application without a console window
@@ -176,17 +179,16 @@ endif()
 enable_testing()
 
 add_executable(test_local_target tests/test_local_target.cpp)
-target_link_libraries(test_local_target PRIVATE LocalTarget_lib gtest_main) # gtest_main includes GTest::gtest and GTest::gmock
+target_link_libraries(test_local_target PRIVATE LocalTarget_lib GTest::gtest_main)
 
 # Add test to CTest
-# Note: GoogleTest discovers tests automatically if linked with gtest_main
 add_test(NAME LocalTargetTests COMMAND test_local_target)
 
 # Scheduler Tests
 add_executable(test_scheduler tests/test_scheduler.cpp)
 target_link_libraries(test_scheduler PRIVATE
     backy_x_core  # Contains Scheduler, links Qt6::Core
-    gtest_main    # For GoogleTest
+    GTest::gtest_main    # For GoogleTest
     Qt6::Test   # QSignalSpy is in Core, but if using QTest macros, add this
 )
 # Add test to CTest
@@ -196,17 +198,13 @@ add_test(NAME SchedulerTests COMMAND test_scheduler)
 add_executable(test_sftp_target tests/test_sftp_target.cpp)
 target_link_libraries(test_sftp_target PRIVATE
     SftpTarget_lib  # The library we are testing
-    gtest_main      # For GoogleTest
-    # CURL::libcurl and LibSSH2::libssh2 are linked by SftpTarget_lib
-    # Qt6::Core might be needed if SftpTarget or CredentialManager uses Qt types directly in headers
-    # SftpTarget uses CredentialManager, which uses Qt6::Core. SftpTarget_lib links backy_x_core, which links Qt6::Core.
-    # CredentialManager_lib is also linked to SftpTarget (implicitly via SftpTarget's own .cpp including CredentialManager.h & create function)
-    # or should be explicitly if SftpTarget_lib doesn't build CredentialManager itself.
-    # Let's assume SftpTarget_lib correctly pulls in what it needs from CredentialManager.
-    # If linking fails for Qt types, add Qt6::Core here.
+    GTest::gtest_main      # For GoogleTest
 )
 if(APPLE)
-    target_link_libraries(test_sftp_target PRIVATE "-framework Security")
+    # SftpTarget_lib links CredentialManager_lib, which links Security and CoreFoundation.
+    # This should be sufficient. If linker errors for Sec* or CF* symbols appear for test_sftp_target,
+    # then uncomment the following:
+    # target_link_libraries(test_sftp_target PRIVATE "-framework Security" "-framework CoreFoundation")
 endif()
 # Add test to CTest
 add_test(NAME SftpTargetTests COMMAND test_sftp_target)
