@@ -9,8 +9,7 @@
 
 #include "util/CredentialManager.h" // For CredentialManager
 
-// Forward declaration for CURL handle
-struct CURL;
+#include <curl/curl.h> // For CURL handle type definition
 
 class SftpTarget : public IStorageTarget {
 public:
