@@ -24,109 +24,186 @@ public:
     }
 
     bool storeSecret(const QString& service, const QString& username, const QString& secret) override {
-        QByteArray serviceBytes, usernameBytes, secretBytes;
-        OSStatus status = SecKeychainAddGenericPassword(
-            nullptr, // Default keychain
-            static_cast<UInt32>(service.length()), // serviceNameLength
-            qsToCString(service, serviceBytes),    // serviceName
-            static_cast<UInt32>(username.length()),// accountNameLength
-            qsToCString(username, usernameBytes),  // accountName
-            static_cast<UInt32>(secret.toUtf8().length()), // passwordLength (use toUtf8 for byte length)
-            secret.toUtf8().constData(),           // passwordData
-            nullptr                                // itemRef (optional)
-        );
+        CFStringRef cfService = service.toCFString();
+        CFStringRef cfUsername = username.toCFString();
+        QByteArray secretUtf8 = secret.toUtf8();
+        CFDataRef cfSecret = CFDataCreate(kCFAllocatorDefault, (const UInt8*)secretUtf8.constData(), secretUtf8.length());
+
+        if (!cfService || !cfUsername || !cfSecret) {
+            qWarning() << "MacOSCredentialManager: Failed to create CoreFoundation objects.";
+            if (cfService) CFRelease(cfService);
+            if (cfUsername) CFRelease(cfUsername);
+            if (cfSecret) CFRelease(cfSecret);
+            return false;
+        }
+
+        CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        if (!query) {
+            qWarning() << "MacOSCredentialManager: Failed to create query dictionary.";
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            CFRelease(cfSecret);
+            return false;
+        }
+
+        CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
+        CFDictionarySetValue(query, kSecAttrService, cfService);
+        CFDictionarySetValue(query, kSecAttrAccount, cfUsername);
+        CFDictionarySetValue(query, kSecValueData, cfSecret);
+
+        OSStatus status = SecItemAdd(query, nullptr);
 
         if (status == errSecSuccess) {
             qDebug() << "MacOSCredentialManager: Secret stored successfully for service" << service << "user" << username;
+            CFRelease(query);
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            CFRelease(cfSecret);
             return true;
         } else if (status == errSecDuplicateItem) {
-            // Item already exists, try to update it by deleting and re-adding (simplest update)
-            // A more robust update would use SecKeychainItemModifyAttributesAndData
             qDebug() << "MacOSCredentialManager: Secret already exists for service" << service << "user" << username << ". Attempting to update.";
-            if (deleteSecret(service, username)) { // Delete existing
-                // Re-populate QByteArrays as they might have gone out of scope or their data moved
-                // if deleteSecret was called in a way that created new ones.
-                // For safety, always re-convert before a new API call.
-                QByteArray serviceBytesUpdate, usernameBytesUpdate, secretBytesUpdate;
-                status = SecKeychainAddGenericPassword(
-                    nullptr,
-                    static_cast<UInt32>(service.length()), qsToCString(service, serviceBytesUpdate),
-                    static_cast<UInt32>(username.length()), qsToCString(username, usernameBytesUpdate),
-                    static_cast<UInt32>(secret.toUtf8().length()), secret.toUtf8().constData(), // secret.toUtf8() is safe here
-                    nullptr);
+            
+            // Create a query for deletion (without kSecValueData)
+            CFMutableDictionaryRef deleteQuery = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+            if (!deleteQuery) {
+                qWarning() << "MacOSCredentialManager: Failed to create delete query dictionary.";
+                CFRelease(query); // Original query
+                CFRelease(cfService);
+                CFRelease(cfUsername);
+                CFRelease(cfSecret);
+                return false;
+            }
+            CFDictionarySetValue(deleteQuery, kSecClass, kSecClassGenericPassword);
+            CFDictionarySetValue(deleteQuery, kSecAttrService, cfService);
+            CFDictionarySetValue(deleteQuery, kSecAttrAccount, cfUsername);
+
+            OSStatus deleteStatus = SecItemDelete(deleteQuery);
+            CFRelease(deleteQuery);
+
+            if (deleteStatus == errSecSuccess || deleteStatus == errSecItemNotFound) {
+                qDebug() << "MacOSCredentialManager: Existing item deleted or not found. Attempting to re-add.";
+                // Attempt to add the item again
+                status = SecItemAdd(query, nullptr); // query still holds all necessary data including kSecValueData
                 if (status == errSecSuccess) {
                     qDebug() << "MacOSCredentialManager: Secret updated successfully.";
+                    CFRelease(query);
+                    CFRelease(cfService);
+                    CFRelease(cfUsername);
+                    CFRelease(cfSecret);
                     return true;
                 }
             }
-            qWarning() << "MacOSCredentialManager: Failed to update secret. Status:" << status << GetMacOSStatusErrorString(status);
+            qWarning() << "MacOSCredentialManager: Failed to update secret. Delete status:" << GetMacOSStatusErrorString(deleteStatus) << "Add status:" << GetMacOSStatusErrorString(status);
+            CFRelease(query);
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            CFRelease(cfSecret);
             return false;
         } else {
             qWarning() << "MacOSCredentialManager: Failed to store secret. Status:" << status << GetMacOSStatusErrorString(status);
+            CFRelease(query);
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            CFRelease(cfSecret);
             return false;
         }
     }
 
     std::optional<QString> retrieveSecret(const QString& service, const QString& username) override {
-        QByteArray serviceBytes, usernameBytes;
-        void *passwordData = nullptr;
-        UInt32 passwordLength = 0;
+        CFStringRef cfService = service.toCFString();
+        CFStringRef cfUsername = username.toCFString();
 
-        OSStatus status = SecKeychainFindGenericPassword(
-            nullptr,                               // Default keychain
-            static_cast<UInt32>(service.length()), // serviceNameLength
-            qsToCString(service, serviceBytes),    // serviceName
-            static_cast<UInt32>(username.length()),// accountNameLength
-            qsToCString(username, usernameBytes),  // accountName
-            &passwordLength,                       // passwordLength (out)
-            &passwordData,                         // passwordData (out)
-            nullptr                                // itemRef (out, optional)
-        );
+        if (!cfService || !cfUsername) {
+            qWarning() << "MacOSCredentialManager: Failed to create CFStringRef for service or username.";
+            if (cfService) CFRelease(cfService);
+            if (cfUsername) CFRelease(cfUsername);
+            return std::nullopt;
+        }
+
+        CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        if (!query) {
+            qWarning() << "MacOSCredentialManager: Failed to create query dictionary for retrieveSecret.";
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            return std::nullopt;
+        }
+
+        CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
+        CFDictionarySetValue(query, kSecAttrService, cfService);
+        CFDictionarySetValue(query, kSecAttrAccount, cfUsername);
+        CFDictionarySetValue(query, kSecMatchLimit, kSecMatchLimitOne);
+        CFDictionarySetValue(query, kSecReturnData, kCFBooleanTrue);
+
+        CFTypeRef resultDataRef = nullptr;
+        OSStatus status = SecItemCopyMatching(query, &resultDataRef);
+
+        CFRelease(query);
+        CFRelease(cfService);
+        CFRelease(cfUsername);
 
         if (status == errSecSuccess) {
-            qDebug() << "MacOSCredentialManager: Secret retrieved successfully for service" << service << "user" << username;
-            QString secret = QString::fromUtf8(static_cast<const char*>(passwordData), static_cast<int>(passwordLength));
-            SecKeychainItemFreeContent(nullptr, passwordData); // Free data buffer
-            return secret;
+            if (resultDataRef != nullptr && CFGetTypeID(resultDataRef) == CFDataGetTypeID()) {
+                CFDataRef cfData = (CFDataRef)resultDataRef;
+                QString secret = QString::fromUtf8(
+                    reinterpret_cast<const char*>(CFDataGetBytePtr(cfData)),
+                    static_cast<int>(CFDataGetLength(cfData))
+                );
+                CFRelease(cfData); // resultDataRef is the same as cfData, so release it here
+                qDebug() << "MacOSCredentialManager: Secret retrieved successfully for service" << service << "user" << username;
+                return secret;
+            } else {
+                qWarning() << "MacOSCredentialManager: SecItemCopyMatching returned success but data is not CFDataRef or is null.";
+                if (resultDataRef) CFRelease(resultDataRef); // Release if it's not null but not CFDataRef
+                return std::nullopt;
+            }
         } else if (status == errSecItemNotFound) {
             qDebug() << "MacOSCredentialManager: Secret not found for service" << service << "user" << username;
+            // No data to release for errSecItemNotFound according to docs for SecItemCopyMatching
             return std::nullopt;
         } else {
             qWarning() << "MacOSCredentialManager: Failed to retrieve secret. Status:" << status << GetMacOSStatusErrorString(status);
+            // No data to release on other errors according to docs for SecItemCopyMatching
             return std::nullopt;
         }
     }
 
     bool deleteSecret(const QString& service, const QString& username) override {
-        QByteArray serviceBytes, usernameBytes;
-        SecKeychainItemRef itemRef = nullptr;
-        OSStatus status;
+        CFStringRef cfService = service.toCFString();
+        CFStringRef cfUsername = username.toCFString();
 
-        // First, find the item to get its reference (needed for delete)
-        status = SecKeychainFindGenericPassword(
-            nullptr,
-            static_cast<UInt32>(service.length()), qsToCString(service, serviceBytes),
-            static_cast<UInt32>(username.length()), qsToCString(username, usernameBytes),
-            nullptr, nullptr, // We don't need password data here
-            &itemRef);
+        if (!cfService || !cfUsername) {
+            qWarning() << "MacOSCredentialManager: Failed to create CFStringRef for service or username in deleteSecret.";
+            if (cfService) CFRelease(cfService);
+            if (cfUsername) CFRelease(cfUsername);
+            return false;
+        }
 
-        if (status == errSecSuccess && itemRef != nullptr) {
-            status = SecKeychainItemDelete(itemRef);
-            CFRelease(itemRef); // Release the itemRef whether delete succeeded or not, as we obtained it.
-            if (status == errSecSuccess) {
-                qDebug() << "MacOSCredentialManager: Secret deleted successfully for service" << service << "user" << username;
-                return true;
-            } else {
-                qWarning() << "MacOSCredentialManager: Failed to delete secret. Status:" << status << GetMacOSStatusErrorString(status);
-                return false;
-            }
+        CFMutableDictionaryRef query = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        if (!query) {
+            qWarning() << "MacOSCredentialManager: Failed to create query dictionary for deleteSecret.";
+            CFRelease(cfService);
+            CFRelease(cfUsername);
+            return false;
+        }
+
+        CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
+        CFDictionarySetValue(query, kSecAttrService, cfService);
+        CFDictionarySetValue(query, kSecAttrAccount, cfUsername);
+
+        OSStatus status = SecItemDelete(query);
+
+        CFRelease(query);
+        CFRelease(cfService);
+        CFRelease(cfUsername);
+
+        if (status == errSecSuccess) {
+            qDebug() << "MacOSCredentialManager: Secret deleted successfully for service" << service << "user" << username;
+            return true;
         } else if (status == errSecItemNotFound) {
             qDebug() << "MacOSCredentialManager: Secret to delete not found for service" << service << "user" << username << "(considered success).";
-            if (itemRef) CFRelease(itemRef); // Still release if somehow itemRef was set but status was errSecItemNotFound
-            return true; // Standard behavior: deleting a non-existent item is often a success.
+            return true; // Deleting a non-existent item is often considered a success.
         } else {
-            qWarning() << "MacOSCredentialManager: Failed to find secret for deletion. Status:" << status << GetMacOSStatusErrorString(status);
-            if (itemRef) CFRelease(itemRef); // Ensure release on other errors too
+            qWarning() << "MacOSCredentialManager: Failed to delete secret. Status:" << status << GetMacOSStatusErrorString(status);
             return false;
         }
     }
@@ -140,8 +217,8 @@ private:
         #if MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
         CFStringRef errorStringRef = SecCopyErrorMessageString(macStatus, NULL);
         if (errorStringRef != NULL) {
-            // QString::fromCFString is deprecated. Use QString::CFStringRefToString.
-            QString errorString = QString::CFStringRefToString(errorStringRef);
+            // Correct way to convert CFStringRef to QString
+            QString errorString = QString::fromCFString(errorStringRef);
             CFRelease(errorStringRef);
             return errorString;
         }
