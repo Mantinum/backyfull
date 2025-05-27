@@ -31,7 +31,7 @@ class SftpTarget; // Forward declare SftpTarget
 // class QVBoxLayout;
 
 
-class MainWindow : QMainWindow {
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -49,6 +49,7 @@ private slots:
     void updateLog(const QString& message); // Slot to receive log messages
     void onTaskChanged(); // Slot to react to Scheduler's taskChanged signal
     void onBackupModeChanged(int index); // Slot for backup mode change
+    void handleScheduledBackup(const QString& sourcePath, const QString& destinationOrIdentifier); // Slot for scheduled backups
 
 private:
     void setupUI(); // Helper to create and layout widgets
@@ -68,7 +69,8 @@ private:
     // Backup Mode Selection
     QComboBox *backupModeComboBox_;
 
-    // Local Backup Settings (existing widgets, maybe group them later)
+    // Local Backup Settings
+    QGroupBox *m_localDestinationGroupBox; // Declaration for the local destination group box
     // QLabel *destinationDirLabel_; // Will be changed based on mode
 
     // SFTP Settings
