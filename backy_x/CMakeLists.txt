@@ -121,7 +121,8 @@ target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core) # For QString etc.
 # Now, add platform-specific libraries to CredentialManager_lib
 if(APPLE)
     # For Keychain services. Security.framework is the one.
-    target_link_libraries(CredentialManager_lib PRIVATE "-framework Security") 
+    target_link_libraries(CredentialManager_lib PRIVATE "-framework Security" "-framework CoreFoundation")
+
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
     if(LIBSECRET_FOUND) # Check if pkg_check_modules found it
         target_link_libraries(CredentialManager_lib PRIVATE ${LIBSECRET_LIBRARIES})
