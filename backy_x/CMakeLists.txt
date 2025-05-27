@@ -81,7 +81,10 @@ target_include_directories(LocalTarget_lib PUBLIC include) # So users of LocalTa
 add_library(SftpTarget_lib STATIC
     src/targets/SftpTarget.cpp
 )
-target_link_libraries(SftpTarget_lib PUBLIC backy_x_core) # SftpTarget will use IStorageTarget from core
+target_link_libraries(SftpTarget_lib 
+    PUBLIC backy_x_core       # For IStorageTarget
+    PRIVATE CredentialManager_lib # For createPlatformCredentialManager in SftpTarget.cpp
+)
 target_include_directories(SftpTarget_lib PUBLIC include)
 
 # Link SftpTarget_lib with CURL and LibSSH2
@@ -152,6 +155,8 @@ target_link_libraries(backy_full_gui PRIVATE
     Qt6::Concurrent 
     backy_x_core    
     LocalTarget_lib 
+    SftpTarget_lib      
+    CredentialManager_lib 
 )
 target_include_directories(backy_full_gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
