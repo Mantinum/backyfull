@@ -1,0 +1,5 @@
+add_test([=[LocalTargetTest.CopySingleFileToRoot]=]  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_local_target [==[--gtest_filter=LocalTargetTest.CopySingleFileToRoot]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[LocalTargetTest.CopySingleFileToRoot]=]  PROPERTIES WORKING_DIRECTORY /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+add_test([=[LocalTargetTest.CopyFileToSubDirectory]=]  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_local_target [==[--gtest_filter=LocalTargetTest.CopyFileToSubDirectory]==] --gtest_also_run_disabled_tests)
+set_tests_properties([=[LocalTargetTest.CopyFileToSubDirectory]=]  PROPERTIES WORKING_DIRECTORY /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
+set(  test_local_target_TESTS LocalTargetTest.CopySingleFileToRoot LocalTargetTest.CopyFileToSubDirectory)

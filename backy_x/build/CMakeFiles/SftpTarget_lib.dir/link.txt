@@ -1,0 +1,2 @@
+/usr/bin/ar qc libSftpTarget_lib.a CMakeFiles/SftpTarget_lib.dir/SftpTarget_lib_autogen/mocs_compilation.cpp.o CMakeFiles/SftpTarget_lib.dir/src/targets/SftpTarget.cpp.o
+/usr/bin/ranlib libSftpTarget_lib.a

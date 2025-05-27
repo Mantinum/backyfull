@@ -1,0 +1,2 @@
+/usr/bin/ar qc libCredentialManager_lib.a CMakeFiles/CredentialManager_lib.dir/CredentialManager_lib_autogen/mocs_compilation.cpp.o CMakeFiles/CredentialManager_lib.dir/src/util/CredentialManager.cpp.o CMakeFiles/CredentialManager_lib.dir/src/util/CredentialManager_mac.mm.o
+/usr/bin/ranlib libCredentialManager_lib.a

@@ -1,0 +1,2 @@
+/usr/bin/ar qc libbacky_x_core.a CMakeFiles/backy_x_core.dir/backy_x_core_autogen/mocs_compilation.cpp.o CMakeFiles/backy_x_core.dir/src/core/Scheduler.cpp.o
+/usr/bin/ranlib libbacky_x_core.a

@@ -1,0 +1,5 @@
+if(EXISTS "/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_scheduler[1]_tests.cmake")
+  include("/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_scheduler[1]_tests.cmake")
+else()
+  add_test(test_scheduler_NOT_BUILT test_scheduler_NOT_BUILT)
+endif()

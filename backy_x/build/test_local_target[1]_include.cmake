@@ -1,0 +1,5 @@
+if(EXISTS "/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_local_target[1]_tests.cmake")
+  include("/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_local_target[1]_tests.cmake")
+else()
+  add_test(test_local_target_NOT_BUILT test_local_target_NOT_BUILT)
+endif()

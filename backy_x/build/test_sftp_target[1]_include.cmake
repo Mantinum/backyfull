@@ -1,0 +1,5 @@
+if(EXISTS "/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_sftp_target[1]_tests.cmake")
+  include("/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_sftp_target[1]_tests.cmake")
+else()
+  add_test(test_sftp_target_NOT_BUILT test_sftp_target_NOT_BUILT)
+endif()

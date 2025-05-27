@@ -1,0 +1,2 @@
+/usr/bin/ar qc libLocalTarget_lib.a CMakeFiles/LocalTarget_lib.dir/LocalTarget_lib_autogen/mocs_compilation.cpp.o CMakeFiles/LocalTarget_lib.dir/src/targets/LocalTarget.cpp.o
+/usr/bin/ranlib libLocalTarget_lib.a
