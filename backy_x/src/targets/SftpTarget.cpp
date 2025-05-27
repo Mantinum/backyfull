@@ -5,6 +5,7 @@
 #include <vector>   // For directory creation components
 
 #include <QString> // For service name and password with CredentialManager
+#include "util/CredentialManager.h" // For createPlatformCredentialManager and CredentialManager class
 
 // For libcurl (SFTP operations)
 // Ensure libcurl is installed (e.g., sudo apt-get install libcurl4-openssl-dev)
@@ -109,16 +110,6 @@ SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
         std::cout << "SftpTarget: 'remoteBasePath' not found, defaulting to '/'." << std::endl;
     }
     
-    auto itPort = config.find("port");
-    if (itPort != config.end()) {
-        try {
-            m_port = std::stoi(itPort->second);
-        } catch (const std::exception& e) {
-            std::cerr << "SftpTarget: Invalid port number '" << itPort->second << "'. Using default 22. Error: " << e.what() << std::endl;
-            m_port = 22;
-        }
-    }
-
     // Initialize CURL globally if not already done (for thread safety, once per app)
     // curl_global_init(CURL_GLOBAL_ALL); // This should ideally be in main() or app startup
     std::cout << "SftpTarget configured for host: " << m_host << ", user: " << m_username << ", path: " << m_remoteBasePath << ", port: " << m_port << std::endl;

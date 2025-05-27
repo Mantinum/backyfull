@@ -4,6 +4,10 @@
 #include <QString> // For service, username, secret
 #include <optional>  // For retrieveSecret return type
 
+// Forward declaration of the factory function implemented in platform-specific files
+class CredentialManager; // Forward declare the class itself for the function signature
+CredentialManager* createPlatformCredentialManager();
+
 class CredentialManager {
 public:
     // Virtual destructor is important for base classes
