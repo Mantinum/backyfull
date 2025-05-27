@@ -77,6 +77,29 @@ add_library(LocalTarget_lib STATIC
 target_link_libraries(LocalTarget_lib PUBLIC backy_x_core) # LocalTarget might use IStorageTarget from core
 target_include_directories(LocalTarget_lib PUBLIC include) # So users of LocalTarget_lib find its headers and IStorageTarget
 
+# SftpTarget library
+add_library(SftpTarget_lib STATIC
+    src/targets/SftpTarget.cpp
+)
+target_link_libraries(SftpTarget_lib PUBLIC backy_x_core) # SftpTarget will use IStorageTarget from core
+target_include_directories(SftpTarget_lib PUBLIC include)
+
+# Link SftpTarget_lib with CURL and LibSSH2
+# CURL::libcurl and LibSSH2::libssh2 are modern CMake targets if find_package works well.
+# The existing CMakeLists.txt already calls find_package for CURL and LibSSH2.
+if(CURL_FOUND)
+    target_link_libraries(SftpTarget_lib PRIVATE CURL::libcurl)
+else()
+    message(WARNING "CURL not found. SftpTarget_lib will not have CURL functionality.")
+endif()
+
+if(LibSSH2_FOUND)
+    target_link_libraries(SftpTarget_lib PRIVATE LibSSH2::libssh2)
+else()
+    message(WARNING "LibSSH2 not found. SftpTarget_lib may have limited SFTP functionality if CURL relies on it and it's missing.")
+endif()
+
+
 # CredentialManager library
 set(CREDMAN_SOURCES src/util/CredentialManager.cpp) # Common base .cpp
 
@@ -115,14 +138,9 @@ endif()
 add_executable(backy_x_cli src/cli/main_cli.cpp)
 target_link_libraries(backy_x_cli PRIVATE LocalTarget_lib)
 # Add other necessary libraries like std::filesystem if needed explicitly on some compilers/platforms
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    # For GCC and Clang, std::filesystem might require linking -lstdc++fs or similar if not C++17 default
-    # However, with C++17 set, it should generally link automatically.
-    # If link errors occur, specific linker flags might be needed here.
-    # For M0, let's assume it links fine with CMAKE_CXX_STANDARD 17.
-elseif(MSVC)
-    # MSVC usually links std::filesystem automatically with /std:c++17
-endif()
+# For M0, let's assume it links fine with CMAKE_CXX_STANDARD 17.
+# Note: SftpTarget_lib is not directly added to backy_x_cli or backy_full_gui yet.
+# This will be done when it's ready to be used.
 
 # GUI Application
 add_executable(backy_full_gui
@@ -163,6 +181,22 @@ target_link_libraries(test_scheduler PRIVATE
 )
 # Add test to CTest
 add_test(NAME SchedulerTests COMMAND test_scheduler)
+
+# SftpTarget Tests
+add_executable(test_sftp_target tests/test_sftp_target.cpp)
+target_link_libraries(test_sftp_target PRIVATE
+    SftpTarget_lib  # The library we are testing
+    gtest_main      # For GoogleTest
+    # CURL::libcurl and LibSSH2::libssh2 are linked by SftpTarget_lib
+    # Qt6::Core might be needed if SftpTarget or CredentialManager uses Qt types directly in headers
+    # SftpTarget uses CredentialManager, which uses Qt6::Core. SftpTarget_lib links backy_x_core, which links Qt6::Core.
+    # CredentialManager_lib is also linked to SftpTarget (implicitly via SftpTarget's own .cpp including CredentialManager.h & create function)
+    # or should be explicitly if SftpTarget_lib doesn't build CredentialManager itself.
+    # Let's assume SftpTarget_lib correctly pulls in what it needs from CredentialManager.
+    # If linking fails for Qt types, add Qt6::Core here.
+)
+# Add test to CTest
+add_test(NAME SftpTargetTests COMMAND test_sftp_target)
 
 
 # --- Installation (Placeholder for M0) ---

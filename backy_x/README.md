@@ -12,8 +12,10 @@ BackyFull is a multi-platform backup software (macOS, Windows, Linux) designed f
     *   View basic logs of backup operations and application events.
 *   **Command Line Interface (CLI):**
     *   Perform one-shot backups of a single file or files in the root of a directory.
-*   **Persistence:** Backup schedules (source, destination, time) configured via the GUI are saved and reloaded when the application starts.
-*   **Local Storage Target:** Initial support for backing up to a local directory.
+*   **Persistence:** Backup schedules (source, destination/SFTP configuration, time) configured via the GUI are saved and reloaded when the application starts.
+*   **Multiple Backup Targets:**
+    *   **Local Storage Target:** Support for backing up to a local directory.
+    *   **SFTP Target:** Support for backing up to a remote server via SFTP, with secure credential storage.
 
 ## Build Instructions
 
@@ -30,6 +32,7 @@ CMake is required to build BackyFull.
     ```bash
     cmake -S . -B build
     ```
+    **Dependencies for SFTP:** To build with SFTP support, `libcurl` (with SSL support, e.g., `libcurl4-openssl-dev` on Debian/Ubuntu) and `libssh2` (e.g., `libssh2-1-dev` on Debian/Ubuntu) development packages must be installed. CMake will warn if these are not found, and SFTP features might be disabled or limited.
 
 2.  **Build the project:**
     After configuration, build the executables:
@@ -38,7 +41,40 @@ CMake is required to build BackyFull.
     ```
     This will compile the CLI, GUI, and test executables.
 
-## How to Run
+## Configuration and Usage
+
+BackyFull supports different backup targets and scheduling.
+
+### Backup Mode Selection
+In the GUI, you can choose your desired backup mode:
+*   **Local Backup:** Saves backups to a local directory.
+*   **SFTP Backup:** Saves backups to a remote server using SFTP.
+
+### Local Backup Setup
+*   **Source Directory:** Select the directory you want to back up.
+*   **Destination Directory (Local):** Choose a local folder where backups will be stored. The source directory's contents will be backed up into a subfolder named after the source directory within this destination.
+
+### SFTP Backup Setup
+When "SFTP Backup" mode is selected, the following fields need to be configured:
+*   **SFTP Host:** The hostname or IP address of the SFTP server (e.g., `sftp.example.com`).
+*   **SFTP Port:** The port number for the SFTP server. Defaults to `22`.
+*   **SFTP Username:** Your username for the SFTP server.
+*   **SFTP Password:** Your password for the SFTP server.
+*   **SFTP Remote Path:** The absolute path on the remote server where the backup (within a subfolder named after your source directory) will be stored (e.g., `/home/user/backups/` or `/backups/`).
+*   **Save password securely:**
+    *   If checked, the entered SFTP password will be stored securely in the system's credential manager (e.g., macOS Keychain, Windows Credential Manager, libsecret on Linux).
+    *   If unchecked, the password will be used for the current session only and for any immediate scheduled task setup, but will not be stored persistently by BackyFull's credential manager. If a previously stored password exists for the host/user combination, unchecking this box will cause it to be deleted from the system's credential manager upon saving settings or applying the schedule.
+    *   For subsequent sessions or scheduled backups (if saved), `SftpTarget` will attempt to retrieve the password from the credential manager if the password field is left empty.
+
+### Scheduling Backups
+*   **Daily Backup Time:** Set the time for the automated daily backup.
+*   **Apply Schedule:** Click this button to save the current configuration (source, destination/SFTP settings, time) and activate the schedule. Scheduled SFTP backups will use securely stored credentials if saved.
+
+### Running Backups
+*   **Run Backup Now:** Click this button to perform an immediate backup with the currently configured settings (source, and active destination/SFTP target).
+*   Scheduled backups will run automatically at the set time.
+
+## How to Run (Launching the Application)
 
 ### GUI Application
 After building, you can run the GUI application from the build directory:
@@ -66,6 +102,9 @@ ctest --output-on-failure
 This will run all registered tests, including:
 *   `LocalTargetTests`: Tests for the local storage target functionality.
 *   `SchedulerTests`: Tests for the backup scheduling logic and persistence.
+*   `SftpTargetTests`: Tests for the SFTP storage target.
+    *   Offline tests run by default.
+    *   Online tests require a live SFTP server and specific environment variables to be set: `SFTP_TEST_HOST`, `SFTP_TEST_PORT`, `SFTP_TEST_USER`, `SFTP_TEST_PASSWORD`, `SFTP_TEST_REMOTE_BASE_PATH`. If these are not set, the online tests will be skipped.
 
 ## Contributing
 (Placeholder for future contribution guidelines)

@@ -1,44 +1,65 @@
 #include "core/Scheduler.h"
-#include <QDebug> // For logging/debug output
-#include <QCoreApplication> // For QSettings organization/app name if not already set
-#include <QDateTime> // Required for scheduleNextCheck logic
+#include <QDebug>
+#include <QCoreApplication>
+#include <QDateTime>
 
 Scheduler::Scheduler(const QString& settingsFilePath, QObject *parent)
     : QObject(parent),
-      taskEnabled_(false),
-      dailyTimer_(new QTimer(this)),
-      settings_(nullptr)
+      m_taskEnabled(false), // Renamed variables
+      m_isSftpMode(false),  // Initialize new SFTP flag
+      m_sftpPort(22),       // Default SFTP port
+      m_dailyTimer(new QTimer(this)), // Renamed
+      m_settings(nullptr)      // Renamed
 {
     if (settingsFilePath.isEmpty()) {
-        // Default behavior: use standard app/org settings
         if (QCoreApplication::organizationName().isEmpty()) {
-            QCoreApplication::setOrganizationName("BackyFullOrgTestDefault"); // Default for safety
+            QCoreApplication::setOrganizationName("BackyFullOrgTestDefault");
         }
         if (QCoreApplication::applicationName().isEmpty()) {
-            QCoreApplication::setApplicationName("BackyFullTestDefault");    // Default for safety
+            QCoreApplication::setApplicationName("BackyFullTestDefault");
         }
-        settings_ = new QSettings(QSettings::IniFormat, QSettings::UserScope,
-                                  QCoreApplication::organizationName(),
-                                  QCoreApplication::applicationName(), this);
+        m_settings = new QSettings(QSettings::IniFormat, QSettings::UserScope,
+                                   QCoreApplication::organizationName(),
+                                   QCoreApplication::applicationName(), this);
     } else {
-        // Use provided settings file path (typically for testing)
-        settings_ = new QSettings(settingsFilePath, QSettings::IniFormat, this);
+        m_settings = new QSettings(settingsFilePath, QSettings::IniFormat, this);
     }
     
-    connect(dailyTimer_, &QTimer::timeout, this, &Scheduler::checkScheduledTime);
-    loadTask(); // Load task settings on startup using the initialized settings_
+    connect(m_dailyTimer, &QTimer::timeout, this, &Scheduler::checkScheduledTime);
+    loadTask(); 
 }
 
 Scheduler::~Scheduler() {
-    // dailyTimer_ is a child of Scheduler, QObject parent-child cleanup handles it.
-    // settings_ is also a child.
+    // m_dailyTimer and m_settings are children, Qt handles cleanup.
 }
 
-void Scheduler::setDailyBackupTask(const QString& sourcePath, const QString& destinationPath, const QTime& scheduledTime, bool enabled) {
-    currentSourcePath_ = sourcePath;
-    currentDestinationPath_ = destinationPath;
-    currentScheduledTime_ = scheduledTime;
-    taskEnabled_ = enabled;
+void Scheduler::setDailyBackupTask(const QString& sourcePath, 
+                                   const QString& destinationPathOrIdentifier, 
+                                   const QTime& scheduledTime, 
+                                   bool enabled, 
+                                   bool isSftpMode,
+                                   const QString& sftpHost,
+                                   int sftpPort,
+                                   const QString& sftpUsername,
+                                   const QString& sftpRemotePath) {
+    m_currentSourcePath = sourcePath;
+    m_currentDestinationPath = destinationPathOrIdentifier; // Store identifier or local path
+    m_currentScheduledTime = scheduledTime;
+    m_taskEnabled = enabled;
+    m_isSftpMode = isSftpMode;
+
+    if (m_isSftpMode) {
+        m_sftpHost = sftpHost;
+        m_sftpPort = sftpPort;
+        m_sftpUsername = sftpUsername;
+        m_sftpRemotePath = sftpRemotePath;
+    } else {
+        // Clear SFTP details if not in SFTP mode to avoid confusion
+        m_sftpHost.clear();
+        m_sftpPort = 22; // Reset to default
+        m_sftpUsername.clear();
+        m_sftpRemotePath.clear();
+    }
 
     saveTask();
     scheduleNextCheck();
@@ -46,108 +67,148 @@ void Scheduler::setDailyBackupTask(const QString& sourcePath, const QString& des
 }
 
 void Scheduler::loadTask() {
-    settings_->beginGroup(SETTINGS_GROUP);
-    currentSourcePath_ = settings_->value(KEY_SOURCE_PATH, "").toString();
-    currentDestinationPath_ = settings_->value(KEY_DEST_PATH, "").toString();
-    currentScheduledTime_ = settings_->value(KEY_SCHEDULED_TIME, QTime(23, 0)).toTime(); // Default to 11 PM
-    taskEnabled_ = settings_->value(KEY_TASK_ENABLED, false).toBool();
-    settings_->endGroup();
+    m_settings->beginGroup(SETTINGS_GROUP);
+    m_currentSourcePath = m_settings->value(KEY_SOURCE_PATH, "").toString();
+    m_currentDestinationPath = m_settings->value(KEY_DEST_PATH, "").toString();
+    m_currentScheduledTime = m_settings->value(KEY_SCHEDULED_TIME, QTime(23, 0)).toTime();
+    m_taskEnabled = m_settings->value(KEY_TASK_ENABLED, false).toBool();
+    m_isSftpMode = m_settings->value(KEY_IS_SFTP_MODE, false).toBool();
+
+    if (m_isSftpMode) {
+        m_sftpHost = m_settings->value(KEY_SFTP_HOST, "").toString();
+        m_sftpPort = m_settings->value(KEY_SFTP_PORT, 22).toInt();
+        m_sftpUsername = m_settings->value(KEY_SFTP_USERNAME, "").toString();
+        m_sftpRemotePath = m_settings->value(KEY_SFTP_REMOTE_PATH, "").toString();
+    }
+    m_settings->endGroup();
 
     qDebug() << "Scheduler: Loaded task -"
-             << "Source:" << currentSourcePath_
-             << "Dest:" << currentDestinationPath_
-             << "Time:" << currentScheduledTime_.toString("HH:mm")
-             << "Enabled:" << taskEnabled_;
+             << "Source:" << m_currentSourcePath
+             << "Dest/ID:" << m_currentDestinationPath
+             << "Time:" << m_currentScheduledTime.toString("HH:mm")
+             << "Enabled:" << m_taskEnabled
+             << "SFTP Mode:" << m_isSftpMode;
+    if (m_isSftpMode) {
+        qDebug() << "SFTP Details - Host:" << m_sftpHost << "Port:" << m_sftpPort << "User:" << m_sftpUsername << "Path:" << m_sftpRemotePath;
+    }
 
     scheduleNextCheck();
     emit taskChanged();
 }
 
 void Scheduler::saveTask() {
-    settings_->beginGroup(SETTINGS_GROUP);
-    settings_->setValue(KEY_SOURCE_PATH, currentSourcePath_);
-    settings_->setValue(KEY_DEST_PATH, currentDestinationPath_);
-    settings_->setValue(KEY_SCHEDULED_TIME, currentScheduledTime_);
-    settings_->setValue(KEY_TASK_ENABLED, taskEnabled_);
-    settings_->endGroup();
-    settings_->sync(); // Ensure data is written
+    m_settings->beginGroup(SETTINGS_GROUP);
+    m_settings->setValue(KEY_SOURCE_PATH, m_currentSourcePath);
+    m_settings->setValue(KEY_DEST_PATH, m_currentDestinationPath);
+    m_settings->setValue(KEY_SCHEDULED_TIME, m_currentScheduledTime);
+    m_settings->setValue(KEY_TASK_ENABLED, m_taskEnabled);
+    m_settings->setValue(KEY_IS_SFTP_MODE, m_isSftpMode);
+
+    if (m_isSftpMode) {
+        m_settings->setValue(KEY_SFTP_HOST, m_sftpHost);
+        m_settings->setValue(KEY_SFTP_PORT, m_sftpPort);
+        m_settings->setValue(KEY_SFTP_USERNAME, m_sftpUsername);
+        m_settings->setValue(KEY_SFTP_REMOTE_PATH, m_sftpRemotePath);
+    } else {
+        // Remove SFTP keys if not in SFTP mode to keep settings clean
+        m_settings->remove(KEY_SFTP_HOST);
+        m_settings->remove(KEY_SFTP_PORT);
+        m_settings->remove(KEY_SFTP_USERNAME);
+        m_settings->remove(KEY_SFTP_REMOTE_PATH);
+    }
+    m_settings->endGroup();
+    m_settings->sync(); 
 
     qDebug() << "Scheduler: Saved task -"
-             << "Source:" << currentSourcePath_
-             << "Dest:" << currentDestinationPath_
-             << "Time:" << currentScheduledTime_.toString("HH:mm")
-             << "Enabled:" << taskEnabled_;
+             << "Source:" << m_currentSourcePath
+             << "Dest/ID:" << m_currentDestinationPath
+             << "Time:" << m_currentScheduledTime.toString("HH:mm")
+             << "Enabled:" << m_taskEnabled
+             << "SFTP Mode:" << m_isSftpMode;
+     if (m_isSftpMode) {
+        qDebug() << "SFTP Details - Host:" << m_sftpHost << "Port:" << m_sftpPort << "User:" << m_sftpUsername << "Path:" << m_sftpRemotePath;
+    }
 }
 
 void Scheduler::scheduleNextCheck() {
-    dailyTimer_->stop();
-    if (!taskEnabled_ || !currentScheduledTime_.isValid() || currentSourcePath_.isEmpty() || currentDestinationPath_.isEmpty()) {
-        qDebug() << "Scheduler: Task disabled or invalid, not scheduling.";
+    m_dailyTimer->stop(); // Renamed variable
+    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || 
+        (m_isSftpMode ? (m_sftpHost.isEmpty() || m_sftpUsername.isEmpty() || m_sftpRemotePath.isEmpty()) : m_currentDestinationPath.isEmpty())) {
+        qDebug() << "Scheduler: Task disabled or not fully configured for the current mode, not scheduling.";
         return;
     }
 
     QDateTime currentDateTime = QDateTime::currentDateTime();
-    QDateTime scheduledDateTime(currentDateTime.date(), currentScheduledTime_);
+    QDateTime scheduledDateTime(currentDateTime.date(), m_currentScheduledTime); // Renamed variable
 
     if (scheduledDateTime < currentDateTime) {
-        // If scheduled time for today has already passed, schedule for tomorrow
         scheduledDateTime = scheduledDateTime.addDays(1);
     }
 
     qint64 msecsUntilScheduled = currentDateTime.msecsTo(scheduledDateTime);
-    if (msecsUntilScheduled < 0) { // Should not happen if logic above is correct
+    if (msecsUntilScheduled < 0) { 
         msecsUntilScheduled = 0; 
     }
     
-    // For testing, one might use a shorter interval. For production, this is fine.
-    // The timer will fire once at the scheduled time.
-    // Then checkScheduledTime will re-arm it for the next day.
-    dailyTimer_->setSingleShot(true); // Ensures it fires once, then we reschedule
-    dailyTimer_->start(msecsUntilScheduled);
+    m_dailyTimer->setSingleShot(true); // Renamed variable
+    m_dailyTimer->start(msecsUntilScheduled); // Renamed variable
 
     qDebug() << "Scheduler: Next check scheduled for:" << scheduledDateTime.toString("yyyy-MM-dd HH:mm:ss")
              << "in" << msecsUntilScheduled / 1000.0 << "seconds.";
 }
 
 void Scheduler::checkScheduledTime() {
-    if (!taskEnabled_ || !currentScheduledTime_.isValid() || currentSourcePath_.isEmpty() || currentDestinationPath_.isEmpty()) {
-        qDebug() << "Scheduler: Check time called, but task is not active or fully configured.";
-        scheduleNextCheck(); // Reschedule even if not active, in case it becomes active later
+    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() ||
+        (m_isSftpMode ? (m_sftpHost.isEmpty() || m_sftpUsername.isEmpty() || m_sftpRemotePath.isEmpty()) : m_currentDestinationPath.isEmpty())) {
+        qDebug() << "Scheduler: Check time called, but task is not active or fully configured for the current mode.";
+        scheduleNextCheck(); 
         return;
     }
 
     QTime currentTime = QTime::currentTime();
-    // Check if current time is "close enough" to scheduled time.
-    // QTimer might not be perfectly exact to the millisecond.
-    // A common approach is to check if current time is >= scheduled time and < scheduled time + a small delta (e.g., 1 minute)
-    // Or, since this timer is a single-shot specifically set for the scheduled time,
-    // we can assume if it fires, it's time.
-
     qDebug() << "Scheduler: Timer fired! Current time:" << currentTime.toString("HH:mm:ss")
-             << "Scheduled:" << currentScheduledTime_.toString("HH:mm");
+             << "Scheduled:" << m_currentScheduledTime.toString("HH:mm"); // Renamed variable
 
-    // Emit signal to trigger the backup
-    emit backupTaskTriggered(currentSourcePath_, currentDestinationPath_);
+    emit backupTaskTriggered(m_currentSourcePath, m_currentDestinationPath); // Renamed variables
     
-    // Reschedule for the next day
     scheduleNextCheck();
 }
 
 // --- Getter methods ---
 QString Scheduler::sourcePath() const {
-    return currentSourcePath_;
+    return m_currentSourcePath; // Renamed variable
 }
 
 QString Scheduler::destinationPath() const {
-    return currentDestinationPath_;
+    return m_currentDestinationPath; // Renamed variable (this is dest path for local, or identifier for SFTP)
 }
 
 QTime Scheduler::scheduledTime() const {
-    return currentScheduledTime_;
+    return m_currentScheduledTime; // Renamed variable
 }
 
 bool Scheduler::isEnabled() const {
-    return taskEnabled_;
+    return m_taskEnabled; // Renamed variable
+}
+
+bool Scheduler::isSftpMode() const {
+    return m_isSftpMode;
+}
+
+QString Scheduler::sftpHost() const {
+    return m_sftpHost;
+}
+
+int Scheduler::sftpPort() const {
+    return m_sftpPort;
+}
+
+QString Scheduler::sftpUsername() const {
+    return m_sftpUsername;
+}
+
+QString Scheduler::sftpRemotePath() const {
+    return m_sftpRemotePath;
 }
 
 // Example of how triggerBackupNow could be implemented if needed:
