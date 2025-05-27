@@ -121,7 +121,7 @@ target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core) # For QString etc.
 # Now, add platform-specific libraries to CredentialManager_lib
 if(APPLE)
     # For Keychain services. Security.framework is the one.
-    target_link_libraries(CredentialManager_lib PRIVATE Security) 
+    target_link_libraries(CredentialManager_lib PRIVATE "-framework Security") 
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux" AND NOT ANDROID)
     if(LIBSECRET_FOUND) # Check if pkg_check_modules found it
         target_link_libraries(CredentialManager_lib PRIVATE ${LIBSECRET_LIBRARIES})
@@ -161,7 +161,7 @@ target_link_libraries(backy_full_gui PRIVATE
 target_include_directories(backy_full_gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 if(APPLE)
-    target_link_libraries(backy_full_gui PRIVATE Security)
+    target_link_libraries(backy_full_gui PRIVATE "-framework Security")
 endif()
 
 # For Windows, to make it a GUI application without a console window
@@ -205,7 +205,7 @@ target_link_libraries(test_sftp_target PRIVATE
     # If linking fails for Qt types, add Qt6::Core here.
 )
 if(APPLE)
-    target_link_libraries(test_sftp_target PRIVATE Security)
+    target_link_libraries(test_sftp_target PRIVATE "-framework Security")
 endif()
 # Add test to CTest
 add_test(NAME SftpTargetTests COMMAND test_sftp_target)
