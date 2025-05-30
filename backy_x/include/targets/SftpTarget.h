@@ -18,7 +18,8 @@ public:
 
     // Inherited via IStorageTarget
     bool beginSession() override;
-    bool sendFile(const std::string& relativePath, const FileMetadata& metadata) override;
+    // Changed second parameter name from metadata to remoteRelativePath for clarity
+    bool sendFile(const std::string& relativePath, const FileMetadata& remoteRelativePath) override;
     bool deleteFile(const std::string& relativePath) override;
     bool endSession() override;
 
@@ -31,7 +32,16 @@ private:
 
     CURL* m_curlHandle; // For libcurl operations
     std::unique_ptr<CredentialManager> m_credentialManager;
-    // Add other necessary members, e.g., for libssh2 if used directly
+
+    // New SSH configuration members
+    std::string m_sshPublicKeyPath;
+    std::string m_sshPrivateKeyPath;
+    std::string m_sshKeyPassphrase; // Potentially sensitive, handle with care
+    std::string m_sshKnownHostsPath;
+    bool m_sshSkipHostVerification;
+    long m_sshAuthTypes; 
+    bool m_verboseLogging;
+    bool m_properlyConfigured; // True if essential configuration (host, user) is present
 };
 
 #endif // SFTPTARGET_H

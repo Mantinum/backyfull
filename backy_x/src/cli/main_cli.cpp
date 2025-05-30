@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <filesystem> // Required for checking if source is a file or directory
+#include <curl/curl.h> // For libcurl global init/cleanup
 
 // It's good practice to include headers from your own project with a path
 // relative to a root include directory, assuming CMake is set up for this.
@@ -19,6 +20,14 @@ void printUsage() {
 }
 
 int main(int argc, char* argv[]) {
+    // Initialize libcurl globally
+    if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) {
+        std::cerr << "Error: Failed to initialize libcurl globally in CLI." << std::endl;
+        // Depending on the application, you might want to exit or handle this error
+        return 1; // Indicate an error
+    }
+    std::cout << "libcurl global init/cleanup managed in CLI." << std::endl;
+
     std::string sourcePath;
     std::string destinationPath;
 
@@ -100,5 +109,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Backup process completed." << std::endl;
 
+    // Cleanup libcurl globally
+    curl_global_cleanup();
+    std::cout << "libcurl global cleanup finished in CLI." << std::endl; // Optional: confirm cleanup
     return 0;
 }
