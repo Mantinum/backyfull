@@ -33,20 +33,20 @@ MainWindow::MainWindow(QWidget *parent)
       applyScheduleButton_(nullptr),
       runBackupButton_(nullptr),
       logDisplay_(nullptr),
-      scheduler_(nullptr), 
-      localTarget_(nullptr),
-      sftpTarget_(nullptr),             // Initialized
-      m_credentialManager(nullptr),   // Initialized
-      m_localDestinationGroupBox(nullptr), // Initialized
-      fileDialog_(nullptr),
       backupModeComboBox_(nullptr),
+      m_localDestinationGroupBox(nullptr),
       sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr),
       sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr),
       sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr),
-      sftpSavePasswordCheckBox_(nullptr)
+      sftpSavePasswordCheckBox_(nullptr),
+      scheduler_(nullptr),
+      localTarget_(nullptr),
+      sftpTarget_(nullptr),
+      m_credentialManager(nullptr),
+      fileDialog_(nullptr)
 {
     if (QCoreApplication::organizationName().isEmpty()) {
         QCoreApplication::setOrganizationName("BackyFullOrg");

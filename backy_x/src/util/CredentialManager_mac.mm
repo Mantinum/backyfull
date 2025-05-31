@@ -8,7 +8,7 @@
 #import <Security/Security.h>
 
 // Helper to convert QString to a C-string for Keychain functions
-static const char* qsToCString(const QString& str, QByteArray& byteArray) {
+[[maybe_unused]] static const char* qsToCString(const QString& str, QByteArray& byteArray) {
     byteArray = str.toUtf8(); // Or toLocal8Bit() depending on expected encoding by Keychain
     return byteArray.constData();
 }
