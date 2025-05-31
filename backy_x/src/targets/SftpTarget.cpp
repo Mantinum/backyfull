@@ -722,3 +722,9 @@ bool SftpTarget::endSession() {
     std::cout << "SftpTarget: Session ended." << std::endl;
     return true;
 }
+
+std::vector<std::string> SftpTarget::listFiles(const std::string& prefix) {
+    std::cerr << "SftpTarget: listFiles is not implemented." << std::endl;
+    // Return an empty vector as per the requirement
+    return {};
+}

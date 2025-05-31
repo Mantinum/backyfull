@@ -8,6 +8,8 @@ Scheduler::Scheduler(const QString& settingsFilePath, QObject *parent)
       m_taskEnabled(false), // Renamed variables
       m_isSftpMode(false),  // Initialize new SFTP flag
       m_sftpPort(22),       // Default SFTP port
+      m_isGcsMode(false),   // Initialize GCS flag
+      // m_gcsBucketName and m_gcsObjectPrefix are QStrings, default constructor makes them empty
       m_dailyTimer(new QTimer(this)), // Renamed
       m_settings(nullptr)      // Renamed
 {
@@ -41,24 +43,50 @@ void Scheduler::setDailyBackupTask(const QString& sourcePath,
                                    const QString& sftpHost,
                                    int sftpPort,
                                    const QString& sftpUsername,
-                                   const QString& sftpRemotePath) {
+                                   const QString& sftpRemotePath,
+                                   bool isGcsMode,
+                                   const QString& gcsBucketName,
+                                   const QString& gcsObjectPrefix) {
     m_currentSourcePath = sourcePath;
     m_currentDestinationPath = destinationPathOrIdentifier; // Store identifier or local path
     m_currentScheduledTime = scheduledTime;
     m_taskEnabled = enabled;
     m_isSftpMode = isSftpMode;
+    m_isGcsMode = isGcsMode;
 
     if (m_isSftpMode) {
         m_sftpHost = sftpHost;
         m_sftpPort = sftpPort;
         m_sftpUsername = sftpUsername;
         m_sftpRemotePath = sftpRemotePath;
-    } else {
-        // Clear SFTP details if not in SFTP mode to avoid confusion
+        // Clear GCS and Local settings if SFTP mode is active
+        m_isGcsMode = false;
+        m_gcsBucketName.clear();
+        m_gcsObjectPrefix.clear();
+        if (!m_isGcsMode) m_currentDestinationPath.clear(); // Clear local path if not GCS (SFTP uses destinationOrIdentifier differently)
+
+    } else if (m_isGcsMode) {
+        m_gcsBucketName = gcsBucketName;
+        m_gcsObjectPrefix = gcsObjectPrefix;
+        // Clear SFTP and Local settings if GCS mode is active
+        m_isSftpMode = false;
         m_sftpHost.clear();
-        m_sftpPort = 22; // Reset to default
+        m_sftpPort = 22;
         m_sftpUsername.clear();
         m_sftpRemotePath.clear();
+        // For GCS, destinationPathOrIdentifier can be used to store bucket name or a GCS specific identifier
+        // Or it can be cleared if gcsBucketName is the sole source of truth for bucket.
+        // Let's assume for now destinationPathOrIdentifier is used for GCS as well.
+        // m_currentDestinationPath = gcsBucketName; // Or some other logic
+
+    } else { // Local mode
+        // Clear SFTP and GCS details
+        m_sftpHost.clear();
+        m_sftpPort = 22;
+        m_sftpUsername.clear();
+        m_sftpRemotePath.clear();
+        m_gcsBucketName.clear();
+        m_gcsObjectPrefix.clear();
     }
 
     saveTask();
@@ -73,13 +101,19 @@ void Scheduler::loadTask() {
     m_currentScheduledTime = m_settings->value(KEY_SCHEDULED_TIME, QTime(23, 0)).toTime();
     m_taskEnabled = m_settings->value(KEY_TASK_ENABLED, false).toBool();
     m_isSftpMode = m_settings->value(KEY_IS_SFTP_MODE, false).toBool();
+    m_isGcsMode = m_settings->value(KEY_IS_GCS_MODE, false).toBool();
 
     if (m_isSftpMode) {
         m_sftpHost = m_settings->value(KEY_SFTP_HOST, "").toString();
         m_sftpPort = m_settings->value(KEY_SFTP_PORT, 22).toInt();
         m_sftpUsername = m_settings->value(KEY_SFTP_USERNAME, "").toString();
         m_sftpRemotePath = m_settings->value(KEY_SFTP_REMOTE_PATH, "").toString();
+    } else if (m_isGcsMode) {
+        m_gcsBucketName = m_settings->value(KEY_GCS_BUCKET_NAME, "").toString();
+        m_gcsObjectPrefix = m_settings->value(KEY_GCS_OBJECT_PREFIX, "").toString();
     }
+    // No specific 'else' for local mode here, as its primary setting is m_currentDestinationPath
+
     m_settings->endGroup();
 
     qDebug() << "Scheduler: Loaded task -"
@@ -87,9 +121,13 @@ void Scheduler::loadTask() {
              << "Dest/ID:" << m_currentDestinationPath
              << "Time:" << m_currentScheduledTime.toString("HH:mm")
              << "Enabled:" << m_taskEnabled
-             << "SFTP Mode:" << m_isSftpMode;
+             << "SFTP Mode:" << m_isSftpMode
+             << "GCS Mode:" << m_isGcsMode;
     if (m_isSftpMode) {
         qDebug() << "SFTP Details - Host:" << m_sftpHost << "Port:" << m_sftpPort << "User:" << m_sftpUsername << "Path:" << m_sftpRemotePath;
+    }
+    if (m_isGcsMode) {
+        qDebug() << "GCS Details - Bucket:" << m_gcsBucketName << "Prefix:" << m_gcsObjectPrefix;
     }
 
     scheduleNextCheck();
@@ -103,18 +141,44 @@ void Scheduler::saveTask() {
     m_settings->setValue(KEY_SCHEDULED_TIME, m_currentScheduledTime);
     m_settings->setValue(KEY_TASK_ENABLED, m_taskEnabled);
     m_settings->setValue(KEY_IS_SFTP_MODE, m_isSftpMode);
+    m_settings->setValue(KEY_IS_GCS_MODE, m_isGcsMode);
 
     if (m_isSftpMode) {
         m_settings->setValue(KEY_SFTP_HOST, m_sftpHost);
         m_settings->setValue(KEY_SFTP_PORT, m_sftpPort);
         m_settings->setValue(KEY_SFTP_USERNAME, m_sftpUsername);
         m_settings->setValue(KEY_SFTP_REMOTE_PATH, m_sftpRemotePath);
-    } else {
-        // Remove SFTP keys if not in SFTP mode to keep settings clean
+        // Remove GCS and Local keys
+        m_settings->remove(KEY_IS_GCS_MODE);
+        m_settings->remove(KEY_GCS_BUCKET_NAME);
+        m_settings->remove(KEY_GCS_OBJECT_PREFIX);
+        // KEY_DEST_PATH is used by SFTP as an identifier, so don't remove it based on SFTP mode alone.
+        // However, if it's truly SFTP, local destination path might be irrelevant.
+        // For now, let's assume setDailyBackupTask correctly sets m_currentDestinationPath for SFTP.
+
+    } else if (m_isGcsMode) {
+        m_settings->setValue(KEY_GCS_BUCKET_NAME, m_gcsBucketName);
+        m_settings->setValue(KEY_GCS_OBJECT_PREFIX, m_gcsObjectPrefix);
+        // Remove SFTP and Local keys (if m_currentDestinationPath is not used for GCS identifier)
         m_settings->remove(KEY_SFTP_HOST);
         m_settings->remove(KEY_SFTP_PORT);
         m_settings->remove(KEY_SFTP_USERNAME);
         m_settings->remove(KEY_SFTP_REMOTE_PATH);
+        // If m_currentDestinationPath is purely for local mode, remove it.
+        // If it's also an identifier for GCS, this logic needs refinement.
+        // For now, assuming KEY_DEST_PATH might be cleared by setDailyBackupTask if GCS doesn't use it.
+        // Based on current setDailyBackupTask, it's not cleared for GCS, so we don't remove KEY_DEST_PATH here.
+
+    } else { // Local mode
+        // Remove SFTP and GCS keys
+        m_settings->remove(KEY_SFTP_HOST);
+        m_settings->remove(KEY_SFTP_PORT);
+        m_settings->remove(KEY_SFTP_USERNAME);
+        m_settings->remove(KEY_SFTP_REMOTE_PATH);
+        m_settings->remove(KEY_IS_GCS_MODE);
+        m_settings->remove(KEY_GCS_BUCKET_NAME);
+        m_settings->remove(KEY_GCS_OBJECT_PREFIX);
+        // KEY_DEST_PATH is for local mode here.
     }
     m_settings->endGroup();
     m_settings->sync(); 
@@ -124,17 +188,30 @@ void Scheduler::saveTask() {
              << "Dest/ID:" << m_currentDestinationPath
              << "Time:" << m_currentScheduledTime.toString("HH:mm")
              << "Enabled:" << m_taskEnabled
-             << "SFTP Mode:" << m_isSftpMode;
-     if (m_isSftpMode) {
+             << "SFTP Mode:" << m_isSftpMode
+             << "GCS Mode:" << m_isGcsMode;
+    if (m_isSftpMode) {
         qDebug() << "SFTP Details - Host:" << m_sftpHost << "Port:" << m_sftpPort << "User:" << m_sftpUsername << "Path:" << m_sftpRemotePath;
+    }
+    if (m_isGcsMode) {
+        qDebug() << "GCS Details - Bucket:" << m_gcsBucketName << "Prefix:" << m_gcsObjectPrefix;
     }
 }
 
 void Scheduler::scheduleNextCheck() {
-    m_dailyTimer->stop(); // Renamed variable
-    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || 
-        (m_isSftpMode ? (m_sftpHost.isEmpty() || m_sftpUsername.isEmpty() || m_sftpRemotePath.isEmpty()) : m_currentDestinationPath.isEmpty())) {
+    m_dailyTimer->stop();
+    bool sftpConfigOk = !m_isSftpMode || (!m_sftpHost.isEmpty() && !m_sftpUsername.isEmpty() && !m_sftpRemotePath.isEmpty());
+    bool gcsConfigOk = !m_isGcsMode || !m_gcsBucketName.isEmpty(); // Object prefix can be empty
+    bool localConfigOk = (!m_isSftpMode && !m_isGcsMode) ? !m_currentDestinationPath.isEmpty() : true; // Only check if local mode
+
+    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
         qDebug() << "Scheduler: Task disabled or not fully configured for the current mode, not scheduling.";
+        if (!m_taskEnabled) qDebug() << "Reason: Task not enabled.";
+        if (!m_currentScheduledTime.isValid()) qDebug() << "Reason: Scheduled time invalid.";
+        if (m_currentSourcePath.isEmpty()) qDebug() << "Reason: Source path empty.";
+        if (m_isSftpMode && !sftpConfigOk) qDebug() << "Reason: SFTP mode active but not fully configured.";
+        if (m_isGcsMode && !gcsConfigOk) qDebug() << "Reason: GCS mode active but bucket name empty.";
+        if (!m_isSftpMode && !m_isGcsMode && !localConfigOk) qDebug() << "Reason: Local mode active but destination path empty.";
         return;
     }
 
@@ -158,8 +235,11 @@ void Scheduler::scheduleNextCheck() {
 }
 
 void Scheduler::checkScheduledTime() {
-    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() ||
-        (m_isSftpMode ? (m_sftpHost.isEmpty() || m_sftpUsername.isEmpty() || m_sftpRemotePath.isEmpty()) : m_currentDestinationPath.isEmpty())) {
+    bool sftpConfigOk = !m_isSftpMode || (!m_sftpHost.isEmpty() && !m_sftpUsername.isEmpty() && !m_sftpRemotePath.isEmpty());
+    bool gcsConfigOk = !m_isGcsMode || !m_gcsBucketName.isEmpty(); // Object prefix can be empty
+    bool localConfigOk = (!m_isSftpMode && !m_isGcsMode) ? !m_currentDestinationPath.isEmpty() : true;
+
+    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
         qDebug() << "Scheduler: Check time called, but task is not active or fully configured for the current mode.";
         scheduleNextCheck(); 
         return;
@@ -209,6 +289,19 @@ QString Scheduler::sftpUsername() const {
 
 QString Scheduler::sftpRemotePath() const {
     return m_sftpRemotePath;
+}
+
+// --- GCS Getter methods ---
+bool Scheduler::isGcsMode() const {
+    return m_isGcsMode;
+}
+
+QString Scheduler::gcsBucketName() const {
+    return m_gcsBucketName;
+}
+
+QString Scheduler::gcsObjectPrefix() const {
+    return m_gcsObjectPrefix;
 }
 
 // Example of how triggerBackupNow could be implemented if needed:

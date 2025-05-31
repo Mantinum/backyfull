@@ -33,7 +33,10 @@ public:
                             const QString& sftpHost = QString(), 
                             int sftpPort = 22, 
                             const QString& sftpUsername = QString(), 
-                            const QString& sftpRemotePath = QString());
+                            const QString& sftpRemotePath = QString(),
+                            bool isGcsMode = false, // New GCS parameter
+                            const QString& gcsBucketName = QString(), // New GCS parameter
+                            const QString& gcsObjectPrefix = QString()); // New GCS parameter (renamed from m_gcsPrefix)
 
     // Loads task from QSettings
     void loadTask();
@@ -49,6 +52,11 @@ public:
     int sftpPort() const;
     QString sftpUsername() const;
     QString sftpRemotePath() const;
+
+    // Getters for GCS configuration
+    bool isGcsMode() const;
+    QString gcsBucketName() const;
+    QString gcsObjectPrefix() const;
 
 signals:
     // Emitted when a scheduled backup is due
@@ -76,6 +84,11 @@ private:
     QString m_sftpUsername;
     QString m_sftpRemotePath;
 
+    // GCS specific settings
+    bool m_isGcsMode;
+    QString m_gcsBucketName;
+    QString m_gcsObjectPrefix; // Renamed from m_gcsPrefix
+
     QTimer* m_dailyTimer; // Timer to check if backup is due
     QSettings* m_settings; // For persisting task details
 
@@ -90,6 +103,9 @@ private:
     const QString KEY_SFTP_PORT = "sftpPort";
     const QString KEY_SFTP_USERNAME = "sftpUsername";
     const QString KEY_SFTP_REMOTE_PATH = "sftpRemotePath";
+    const QString KEY_IS_GCS_MODE = "isGcsMode";
+    const QString KEY_GCS_BUCKET_NAME = "gcsBucketName";
+    const QString KEY_GCS_OBJECT_PREFIX = "gcsObjectPrefix";
 };
 
 #endif // SCHEDULER_H

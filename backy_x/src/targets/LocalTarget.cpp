@@ -99,3 +99,9 @@ bool LocalTarget::endSession() {
     // No specific cleanup needed for local target in M0
     return true;
 }
+
+std::vector<std::string> LocalTarget::listFiles(const std::string& prefix) {
+    std::cerr << "LocalTarget: listFiles is not implemented." << std::endl;
+    // Return an empty vector as per the requirement
+    return {};
+}

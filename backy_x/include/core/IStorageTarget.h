@@ -21,6 +21,7 @@ public:
     virtual bool beginSession() = 0;
     virtual bool sendFile(const std::string& relativePath, const FileMetadata& metadata) = 0;
     virtual bool deleteFile(const std::string& relativePath) = 0;
+    virtual std::vector<std::string> listFiles(const std::string& prefix) = 0;
     virtual bool endSession() = 0;
 };
 

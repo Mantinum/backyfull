@@ -25,6 +25,11 @@ public:
     // Returns true on success or if the secret didn't exist; false on failure to delete an existing secret.
     virtual bool deleteSecret(const QString& service, const QString& username) = 0;
 
+    // GCS Refresh Token Management
+    virtual bool storeGcsRefreshToken(const QString& accountIdentifier, const QString& refreshToken) = 0;
+    virtual std::optional<QString> retrieveGcsRefreshToken(const QString& accountIdentifier) = 0;
+    virtual bool deleteGcsRefreshToken(const QString& accountIdentifier) = 0;
+
     // Factory method to get the platform-specific instance
     // This is a common pattern, but implementation details might vary.
     // For now, this declaration serves as a placeholder for the concept.

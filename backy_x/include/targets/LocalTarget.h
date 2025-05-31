@@ -13,6 +13,7 @@ public:
     bool sendFile(const std::string& relativePath, const FileMetadata& metadata) override;
     // For M0, deleteFile might not be fully implemented or needed for simple copy
     bool deleteFile(const std::string& relativePath) override; 
+    std::vector<std::string> listFiles(const std::string& prefix) override;
     bool endSession() override;
 
     // Getter for the destination path

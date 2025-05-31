@@ -138,6 +138,20 @@ public:
             return false;
         }
     }
+
+    // GCS Refresh Token Management
+    bool storeGcsRefreshToken(const QString& accountIdentifier, const QString& refreshToken) override {
+        // Use a fixed service name for all GCS refresh tokens
+        return storeSecret("BackyFull_GCS_RefreshToken", accountIdentifier, refreshToken);
+    }
+
+    std::optional<QString> retrieveGcsRefreshToken(const QString& accountIdentifier) override {
+        return retrieveSecret("BackyFull_GCS_RefreshToken", accountIdentifier);
+    }
+
+    bool deleteGcsRefreshToken(const QString& accountIdentifier) override {
+        return deleteSecret("BackyFull_GCS_RefreshToken", accountIdentifier);
+    }
 };
 
 #if defined(Q_OS_WIN) 

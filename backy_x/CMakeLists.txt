@@ -84,6 +84,19 @@ if(LibSSH2_FOUND)
     target_link_libraries(SftpTarget_lib PRIVATE LibSSH2::libssh2)
 endif()
 
+add_library(GcsTarget_lib STATIC src/targets/GcsTarget.cpp)
+target_include_directories(GcsTarget_lib PUBLIC ${PROJECT_INCLUDE})
+target_link_libraries(GcsTarget_lib PUBLIC
+    backy_x_core
+    CredentialManager_lib
+    Qt6::Core
+    Qt6::Network
+    Qt6::Gui      # For QDesktopServices, QUrl, QJsonDocument etc.
+    CURL::libcurl
+)
+target_compile_options(GcsTarget_lib PRIVATE -Wall -Wextra -pedantic)
+# Note: Qt${QT_VERSION_MAJOR} will be resolved to Qt6 by existing find_package(Qt6 ...)
+
 # --------------------------------------------------------------------
 # ============== exécutables =========================================
 add_executable(backy_x_cli src/cli/main_cli.cpp)
@@ -97,7 +110,7 @@ add_executable(backy_full_gui
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
     PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network
-            LocalTarget_lib SftpTarget_lib CredentialManager_lib)
+            LocalTarget_lib SftpTarget_lib GcsTarget_lib CredentialManager_lib)
 target_compile_options(backy_full_gui PRIVATE -Wall -Wextra -pedantic)
 if(WIN32)
     set_target_properties(backy_full_gui PROPERTIES WIN32_EXECUTABLE ON)
