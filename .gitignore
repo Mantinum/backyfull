@@ -1,0 +1,31 @@
+# Ignore CMake build directory
+backy_x/build/
+backy_x/build_new/
+
+# Ignore other common build artifacts and OS-specific files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# macOS specific
+.DS_Store
+*/.DS_Store
+
+# Qt specific (often handled by Qt's own .gitignore if using Qt Creator's setup, but good to have)
+*_automoc.cpp
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# User-specific settings (e.g., from IDEs)
+.vscode/
+*.suo
+*.user
+*.userprefs
+*.kdev4/
+*.creator.user
+*.creator.user.shared

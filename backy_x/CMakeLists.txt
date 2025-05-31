@@ -12,7 +12,7 @@ set(CMAKE_AUTOUIC ON)
 
 # --------------------------------------------------------------------
 # ============== dépendances =========================================
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test Network)
 find_package(CURL    REQUIRED)
 find_package(LibSSH2)          # optionnel : SFTP
 
@@ -42,6 +42,7 @@ add_library(backy_x_core STATIC
 )
 target_include_directories(backy_x_core PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(backy_x_core PUBLIC Qt6::Core)
+target_compile_options(backy_x_core PRIVATE -Wall -Wextra -pedantic)
 
 # -------- CredentialManager -----------------------------------------
 set(CREDMAN_SRC src/util/CredentialManager.cpp)
@@ -56,6 +57,7 @@ endif()
 add_library(CredentialManager_lib STATIC ${CREDMAN_SRC})
 target_include_directories(CredentialManager_lib PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(CredentialManager_lib PUBLIC Qt6::Core)
+target_compile_options(CredentialManager_lib PRIVATE -Wall -Wextra -pedantic)
 if(APPLE)
     target_link_libraries(CredentialManager_lib PRIVATE "-framework Security" "-framework CoreFoundation")
 elseif(UNIX AND NOT ANDROID)
@@ -69,10 +71,12 @@ endif()
 add_library(LocalTarget_lib STATIC src/targets/LocalTarget.cpp)
 target_include_directories(LocalTarget_lib PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(LocalTarget_lib PUBLIC backy_x_core)
+target_compile_options(LocalTarget_lib PRIVATE -Wall -Wextra -pedantic)
 
 add_library(SftpTarget_lib STATIC src/targets/SftpTarget.cpp)
 target_include_directories(SftpTarget_lib PUBLIC ${PROJECT_INCLUDE})
-target_link_libraries(SftpTarget_lib PUBLIC backy_x_core CredentialManager_lib)
+target_link_libraries(SftpTarget_lib PUBLIC backy_x_core CredentialManager_lib Qt6::Network)
+target_compile_options(SftpTarget_lib PRIVATE -Wall -Wextra -pedantic)
 if(CURL_FOUND)
     target_link_libraries(SftpTarget_lib PRIVATE CURL::libcurl)
 endif()
@@ -83,7 +87,8 @@ endif()
 # --------------------------------------------------------------------
 # ============== exécutables =========================================
 add_executable(backy_x_cli src/cli/main_cli.cpp)
-target_link_libraries(backy_x_cli PRIVATE LocalTarget_lib)
+target_link_libraries(backy_x_cli PRIVATE LocalTarget_lib CURL::libcurl)
+target_compile_options(backy_x_cli PRIVATE -Wall -Wextra -pedantic)
 
 add_executable(backy_full_gui
     src/gui/main_gui.cpp
@@ -91,8 +96,9 @@ add_executable(backy_full_gui
 )
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
-    PRIVATE Qt6::Widgets Qt6::Concurrent
+    PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network
             LocalTarget_lib SftpTarget_lib CredentialManager_lib)
+target_compile_options(backy_full_gui PRIVATE -Wall -Wextra -pedantic)
 if(WIN32)
     set_target_properties(backy_full_gui PROPERTIES WIN32_EXECUTABLE ON)
 endif()
@@ -108,6 +114,7 @@ function(add_backy_test NAME SRC)
         GTest::gtest_main      # une seule cible, plus de doublon
         ${ARGN}                # libs du projet
     )
+    target_compile_options(${NAME} PRIVATE -Wall -Wextra -pedantic)
     gtest_discover_tests(${NAME})
 endfunction()
 

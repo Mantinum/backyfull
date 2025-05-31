@@ -435,16 +435,21 @@ bool SftpTarget::beginSession() {
     // Host Key Verification
     if (m_sshSkipHostVerification) {
         std::cerr << "SftpTarget: WARNING - SSH host key verification is disabled via m_sshSkipHostVerification. This is insecure and should only be used for testing." << std::endl;
-        res = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_VERIFYHOST, 0L);
-        if (res != CURLE_OK) {
-            std::cerr << "SftpTarget: Failed to disable CURLOPT_SSH_VERIFYHOST: " << curl_easy_strerror(res) << std::endl;
-            // goto error; // Security setting failure could be critical
-        }
-        res = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_VERIFYPEER, 0L);
-        if (res != CURLE_OK) {
-            std::cerr << "SftpTarget: Failed to disable CURLOPT_SSH_VERIFYPEER: " << curl_easy_strerror(res) << std::endl;
-            // goto error; 
-        }
+        // The options CURLOPT_SSH_VERIFYHOST and CURLOPT_SSH_VERIFYPEER do not exist in standard libcurl.
+        // Host key verification is typically managed via CURLOPT_SSH_KNOWNHOSTS.
+        // If m_sshSkipHostVerification is true, one might avoid setting CURLOPT_SSH_KNOWNHOSTS
+        // or use other mechanisms if available and truly needed, though it's insecure.
+        // For now, commenting out the problematic lines that cause a compile error.
+        // res = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_VERIFYHOST, 0L); // Erroneous option
+        // if (res != CURLE_OK) {
+        //     std::cerr << "SftpTarget: Failed to disable CURLOPT_SSH_VERIFYHOST: " << curl_easy_strerror(res) << std::endl;
+        //     // goto error; // Security setting failure could be critical
+        // }
+        // res = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_VERIFYPEER, 0L); // Erroneous option
+        // if (res != CURLE_OK) {
+        //     std::cerr << "SftpTarget: Failed to disable CURLOPT_SSH_VERIFYPEER: " << curl_easy_strerror(res) << std::endl;
+        //     // goto error;
+        // }
     } else if (!m_sshKnownHostsPath.empty()) {
         res = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, m_sshKnownHostsPath.c_str());
         if (res != CURLE_OK) {
@@ -468,24 +473,24 @@ error:
     return false;
 }
 
-bool SftpTarget::sendFile(const std::string& sourceAbsolutePath, const FileMetadata& remoteRelativePathAndSize) {
+bool SftpTarget::sendFile(const std::string& relativePath, const FileMetadata& remoteRelativePath) {
     // Assuming remoteRelativePathAndSize is a string "path:size" or just "path" and we get size from source.
     // For this subtask, let's assume remoteRelativePathAndSize IS the remoteRelativePath.
-    // We'll get size from sourceAbsolutePath.
+    // We'll get size from relativePath.
     // const std::string& remoteRelativePath = remoteRelativePathAndSize; // Treat FileMetadata as remote relative path string
     // Per instructions: remoteRelativePathAndSize is the remoteRelativePath.
-    const std::string& remoteRelativePath = remoteRelativePathAndSize;
+    // const std::string& remoteRelativePath = remoteRelativePath; // This line is removed as parameter name matches
 
 
-    std::cout << "SftpTarget: sendFile(" << sourceAbsolutePath << ", remote_path: " << remoteRelativePath << ") called." << std::endl;
+    std::cout << "SftpTarget: sendFile(" << relativePath << ", remote_path: " << remoteRelativePath << ") called." << std::endl;
     if (!m_curlHandle) {
         std::cerr << "SftpTarget: Session not begun or curl handle not initialized." << std::endl;
         return false;
     }
 
-    std::ifstream sourceFile(sourceAbsolutePath, std::ios::binary);
+    std::ifstream sourceFile(relativePath, std::ios::binary);
     if (!sourceFile.is_open()) {
-        std::cerr << "SftpTarget: Failed to open source file: " << sourceAbsolutePath << std::endl;
+        std::cerr << "SftpTarget: Failed to open source file: " << relativePath << std::endl;
         return false;
     }
 
@@ -494,7 +499,7 @@ bool SftpTarget::sendFile(const std::string& sourceAbsolutePath, const FileMetad
     sourceFile.seekg(0, std::ios::beg);
 
     if (fileSize < 0) { // Or == -1, depending on platform for tellg error
-        std::cerr << "SftpTarget: Failed to get size of source file: " << sourceAbsolutePath << std::endl;
+        std::cerr << "SftpTarget: Failed to get size of source file: " << relativePath << std::endl;
         sourceFile.close();
         return false;
     }
@@ -565,8 +570,8 @@ bool SftpTarget::sendFile(const std::string& sourceAbsolutePath, const FileMetad
     return true;
 }
 
-bool SftpTarget::deleteFile(const std::string& remoteRelativePath) {
-    std::cout << "SftpTarget: deleteFile(" << remoteRelativePath << ") called (stub)" << std::endl;
+bool SftpTarget::deleteFile(const std::string& relativePath) {
+    std::cout << "SftpTarget: deleteFile(" << relativePath << ") called (stub)" << std::endl;
     if (!m_curlHandle) {
         std::cerr << "SftpTarget: Session not begun or curl handle not initialized." << std::endl;
         return false;
@@ -581,7 +586,7 @@ bool SftpTarget::deleteFile(const std::string& remoteRelativePath) {
     std::cout << "SftpTarget: Establishing connection via URL for delete: " << connectionUrl << std::endl;
 
     // The path for the RM command needs to be an absolute path on the server.
-    std::string absolutePathForRm = buildSftpAbsolutePath(m_remoteBasePath, remoteRelativePath);
+    std::string absolutePathForRm = buildSftpAbsolutePath(m_remoteBasePath, relativePath);
     
     std::cout << "SftpTarget: Absolute path for RM command: " << absolutePathForRm << std::endl;
 
@@ -644,12 +649,12 @@ bool SftpTarget::deleteFile(const std::string& remoteRelativePath) {
     if (res != CURLE_OK) {
         // Note: Deleting a non-existent file might also return an error.
         // Check specific error codes if finer-grained handling is needed.
-        std::cerr << "SftpTarget: curl_easy_perform() failed for deleteFile (" << remoteRelativePath 
+        std::cerr << "SftpTarget: curl_easy_perform() failed for deleteFile (" << relativePath
                   << "). Error: " << curl_easy_strerror(res) << std::endl;
         return false;
     }
     
-    std::cout << "SftpTarget: File deletion command successfully executed for " << remoteRelativePath << std::endl;
+    std::cout << "SftpTarget: File deletion command successfully executed for " << relativePath << std::endl;
     return true;
 }
 

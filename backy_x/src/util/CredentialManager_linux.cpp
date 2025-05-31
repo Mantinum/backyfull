@@ -5,6 +5,12 @@
 
 #if defined(__linux__) && !defined(ANDROID) // Ensure it's not Android Linux
 
+// Qt's 'signals' keyword can conflict with identifiers in system headers like those from GLib (used by libsecret).
+// Undefine 'signals' before including libsecret headers, as Qt headers (QString, QDebug, etc.) are already included.
+#ifdef signals
+#undef signals
+#endif
+
 #include <libsecret-1/libsecret/secret.h>
 #include <vector> // For attribute list if needed for complex queries, not strictly for this schema
 
