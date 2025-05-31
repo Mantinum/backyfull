@@ -14,6 +14,7 @@
 #include <QMessageBox>
 #include <QTime>
 #include <QDir>
+#include <QFileInfo> // Added for QFileInfo
 #include <QDebug>
 #include <QStandardPaths>
 #include <QSettings>
@@ -364,6 +365,13 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
     updateLog(QString("Performing backup using active target: Source: %1").arg(sourcePath));
 
     std::filesystem::path fsSourcePath(sourcePath.toStdString());
+
+    // Define baseDirForLambda for relative path calculation
+    QFileInfo initialSourceInfo(QString::fromStdString(fsSourcePath.string()));
+    QString baseDirForLambda = initialSourceInfo.absolutePath();
+    // Example: sourcePath = /tmp/foo, baseDirForLambda = /tmp
+    //          sourcePath = /foo (root folder), baseDirForLambda = /
+
     if (!std::filesystem::is_directory(fsSourcePath)) {
          updateLog(QString("Error: Source path '%1' is not a directory.").arg(sourcePath));
          QMessageBox::critical(this, tr("Backup Failed"), tr("Source path is not a directory."));
@@ -395,8 +403,22 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                std::filesystem::path fullEntryPath = entry.path();
                // IMPORTANT: SftpTarget expects remoteRelativePath as second argument to sendFile.
                // LocalTarget also expects relativePath.
-               std::filesystem::path relativePathFs = std::filesystem::relative(fullEntryPath, fsSourcePath);
-               std::string relativePathStr = relativePathFs.generic_string(); 
+               // OLD:
+               // std::filesystem::path relativePathFs = std::filesystem::relative(fullEntryPath, fsSourcePath);
+               // std::string relativePathStr = relativePathFs.generic_string();
+
+               // NEW (refined):
+               QString qFullEntryPath_new = QString::fromStdString(fullEntryPath.string());
+               // baseDirForLambda is defined outside lambda as parent of initial sourcePath
+               // e.g. sourcePath = /tmp/foo, baseDirForLambda = /tmp
+               //      qFullEntryPath_new = /tmp/foo/file.txt
+               //      baseDirForLambda.length() = 4
+               //      qFullEntryPath_new.mid(5) results in "foo/file.txt"
+               // if sourcePath = /foo (root level folder), baseDirForLambda = /
+               //      qFullEntryPath_new = /foo/file.txt
+               //      baseDirForLambda.length() = 1
+               //      qFullEntryPath_new.mid(1) results in "foo/file.txt" (if baseDirForLambda == "/")
+               std::string relativePathStr = qFullEntryPath_new.mid(baseDirForLambda.length() + (baseDirForLambda == "/" ? 0 : 1)).toStdString();
 
                if (entry.is_directory()) {
                    updateLog(QString("Scanning subdirectory: %1").arg(QString::fromStdString(relativePathStr)));
