@@ -595,20 +595,29 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                    updateLog(QString("Scanning subdirectory: %1").arg(QString::fromStdString(relativePathStr)));
                    recursiveCopy(fullEntryPath); 
                } else if (entry.is_regular_file()) {
-                   files_processed_count++;
-                   if (target->sendFile(fullEntryPath.string(), relativePathStr)) {
+                   ++files_processed_count;
+
+                   // Fabrique un FileMetadata minimal
+                   FileMetadata meta;
+                   meta.name          = relativePathStr;
+                   meta.size          = entry.file_size();
+                   meta.modificationTime =
+                       std::chrono::system_clock::from_time_t(
+                           std::chrono::system_clock::to_time_t(
+                               std::chrono::file_clock::to_sys(entry.last_write_time())));
+
+                   if (target->sendFile(fullEntryPath.string(), meta)) {
                        updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
                    } else {
-                       std::string specificError;
-                       GcsTarget* currentGcsTarget = dynamic_cast<GcsTarget*>(target);
-                       if (currentGcsTarget) {
-                           specificError = currentGcsTarget->getLastError();
-                       }
-                       QString errorDetails = QString::fromStdString(specificError);
-                       if (errorDetails.isEmpty()) errorDetails = tr("Check target logs for specifics.");
-
-                       updateLog(QString("Error backing up: %1. Target error: %2").arg(QString::fromStdString(relativePathStr), errorDetails));
-                       all_ok = false; 
+                       updateLog(QString("Error backing up: %1. Error: %2")
+                                     .arg(QString::fromStdString(relativePathStr))
+                                     .arg(target->getLastError()),
+                                 true);
+                       QMessageBox::critical(this, "Backup Error",
+                                             QString("Failed to back up: %1\nError: %2")
+                                                 .arg(QString::fromStdString(relativePathStr))
+                                                 .arg(target->getLastError()));
+                       return; // Stop backup if one file fails
                    }
                }
            }
@@ -925,9 +934,15 @@ void MainWindow::displayRemoteFiles(const std::vector<IStorageTarget::FileMetada
         sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         fileTableWidget_->setItem(row, 1, sizeItem);
 
-        QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(file.modificationTime);
-        QString formattedDate = modDateTime.toString(Qt::DefaultLocaleShortDate); // TODO: Nicer format
-        DateTimeTableWidgetItem *dateItem = new DateTimeTableWidgetItem(formattedDate, file.modificationTime);
+        qint64 secs = static_cast<qint64>(
+                          std::chrono::duration_cast<std::chrono::seconds>(
+                              file.modificationTime.time_since_epoch()).count());
+
+        QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(secs);
+        QString formattedDate = modDateTime.toString(Qt::DefaultLocaleShortDate);
+
+        DateTimeTableWidgetItem *dateItem =
+                new DateTimeTableWidgetItem(formattedDate, secs);
         fileTableWidget_->setItem(row, 2, dateItem);
 
         fileTableWidget_->setItem(row, 3, new QTableWidgetItem(file.isDirectory ? tr("Folder") : tr("File")));
@@ -941,7 +956,7 @@ void MainWindow::browseRemotePath(const QString& path) {
     }
     updateLog("Browsing remote path: " + path);
 
-    std::vector<IStorageTarget::FileMetadata> files;
+    std::vector<FileMetadata> files;
     QString currentModeText = backupModeComboBox_->currentText();
 
     if (currentModeText == tr("Google Cloud Storage")) {
