@@ -1,28 +1,29 @@
 #include "gui/MainWindow.h"
 #include "core/Scheduler.h"
 #include "targets/LocalTarget.h"
-#include "targets/SftpTarget.h"     // Added
-#include "util/CredentialManager.h" // Added
+#include "targets/SftpTarget.h"
+#include "targets/GcsTarget.h"      // Added for GCS Target
+#include "util/CredentialManager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
-#include <QFormLayout> // Added for sftpSettingsGroupBox_
+#include <QFormLayout>
 #include <QWidget>
 #include <QLabel>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTime>
 #include <QDir>
-#include <QFileInfo> // Added for QFileInfo
+#include <QFileInfo>
 #include <QDebug>
 #include <QStandardPaths>
 #include <QSettings>
 #include <QCoreApplication>
-#include <QCloseEvent> // Added
+#include <QCloseEvent>
 #include <filesystem>
 #include <functional>
-#include <map> // Added for SftpTarget config
+#include <map>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -43,9 +44,16 @@ MainWindow::MainWindow(QWidget *parent)
       sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr),
       sftpSavePasswordCheckBox_(nullptr),
+      gcsSettingsGroupBox_(nullptr),
+      gcsBucketNameLineEdit_(nullptr),
+      gcsAccountIdentifierLineEdit_(nullptr),
+      gcsConnectButton_(nullptr),
+      gcsTestConnectionButton_(nullptr), // Initialize new GCS Test Connection button
+      gcsAuthStatusLabel_(nullptr),
       scheduler_(nullptr),
       localTarget_(nullptr),
       sftpTarget_(nullptr),
+      gcsTarget_(nullptr),            // Initialize GCS target member
       m_credentialManager(nullptr),
       fileDialog_(nullptr)
 {
@@ -59,29 +67,28 @@ MainWindow::MainWindow(QWidget *parent)
     m_credentialManager = std::unique_ptr<CredentialManager>(createPlatformCredentialManager());
     scheduler_ = new Scheduler(QString(), this); 
 
-    setupUI();      // Create UI elements first
-    loadSettings(); // Then load settings which might affect UI state (like combo box index)
+    setupUI();
+    loadSettings();
 
-    // Connect scheduler signals
     connect(scheduler_, &Scheduler::backupTaskTriggered, this, &MainWindow::handleScheduledBackup);
     connect(scheduler_, &Scheduler::taskChanged, this, &MainWindow::onTaskChanged);
 
-    // Set initial UI state based on loaded settings (especially combo box)
-    if (backupModeComboBox_) { // backupModeComboBox_ is setup in setupUI()
+    if (backupModeComboBox_) {
         onBackupModeChanged(backupModeComboBox_->currentIndex());
     }
-    onTaskChanged(); // Reflect scheduler's initial state (which also loads from its own settings)
+    onTaskChanged();
 
     updateLog("BackyFull application started.");
     updateLog("Please configure your backup source, destination/SFTP, and schedule.");
 }
 
 MainWindow::~MainWindow() {
-    // saveSettings(); // Done in closeEvent
     delete localTarget_; 
     localTarget_ = nullptr;
     delete sftpTarget_; 
     sftpTarget_ = nullptr;
+    delete gcsTarget_;
+    gcsTarget_ = nullptr;
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
@@ -95,21 +102,18 @@ void MainWindow::setupUI() {
     QWidget *centralWidget = new QWidget(this);
     setCentralWidget(centralWidget);
 
-    // Main vertical layout for the central widget
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
     
-    // --- Backup Mode Selection ---
-    QHBoxLayout *modeLayout = new QHBoxLayout(); // Use QHBoxLayout for label and combobox
+    QHBoxLayout *modeLayout = new QHBoxLayout();
     modeLayout->addWidget(new QLabel(tr("Backup Mode:")));
     backupModeComboBox_ = new QComboBox();
     backupModeComboBox_->addItem(tr("Local Backup"));
     backupModeComboBox_->addItem(tr("SFTP Backup"));
+    backupModeComboBox_->addItem(tr("Google Cloud Storage"));
     modeLayout->addWidget(backupModeComboBox_);
-    modeLayout->addStretch(); // Add stretch to push combobox to the left
+    modeLayout->addStretch();
     mainLayout->addLayout(modeLayout);
 
-
-    // --- Common Settings (Source Directory) ---
     QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
     QGridLayout *sourceLayout = new QGridLayout(sourceGroupBox);
     sourceLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
@@ -121,8 +125,7 @@ void MainWindow::setupUI() {
     sourceLayout->addWidget(sourceDirButton_, 0, 2);
     mainLayout->addWidget(sourceGroupBox);
 
-    // --- Local Destination Settings ---
-    m_localDestinationGroupBox = new QGroupBox(tr("Local Destination Configuration")); // Assign to member
+    m_localDestinationGroupBox = new QGroupBox(tr("Local Destination Configuration"));
     QGridLayout *localDestLayout = new QGridLayout(m_localDestinationGroupBox);
     localDestLayout->addWidget(new QLabel(tr("Destination Directory (Local):")), 0, 0);
     destinationDirEdit_ = new QLineEdit();
@@ -133,63 +136,64 @@ void MainWindow::setupUI() {
     localDestLayout->addWidget(destinationDirButton_, 0, 2);
     mainLayout->addWidget(m_localDestinationGroupBox);
 
-
-    // --- SFTP Settings GroupBox ---
     sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
     QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
-
     sftpHostLineEdit_ = new QLineEdit();
     sftpFormLayout->addRow(new QLabel(tr("SFTP Host:")), sftpHostLineEdit_);
-
     sftpPortLineEdit_ = new QLineEdit();
-    sftpPortLineEdit_->setText("22"); // Default port
-    sftpPortLineEdit_->setValidator(new QIntValidator(1, 65535, this)); // Basic port validation
+    sftpPortLineEdit_->setText("22");
+    sftpPortLineEdit_->setValidator(new QIntValidator(1, 65535, this));
     sftpFormLayout->addRow(new QLabel(tr("SFTP Port:")), sftpPortLineEdit_);
-
     sftpUsernameLineEdit_ = new QLineEdit();
     sftpFormLayout->addRow(new QLabel(tr("SFTP Username:")), sftpUsernameLineEdit_);
-
     sftpPasswordLineEdit_ = new QLineEdit();
     sftpPasswordLineEdit_->setEchoMode(QLineEdit::Password);
     sftpFormLayout->addRow(new QLabel(tr("SFTP Password:")), sftpPasswordLineEdit_);
-    
     sftpSavePasswordCheckBox_ = new QCheckBox(tr("Save password securely"));
-    sftpFormLayout->addRow(sftpSavePasswordCheckBox_); // QFormLayout handles checkbox layout well
-
+    sftpFormLayout->addRow(sftpSavePasswordCheckBox_);
     sftpRemotePathLineEdit_ = new QLineEdit();
     sftpFormLayout->addRow(new QLabel(tr("SFTP Remote Path:")), sftpRemotePathLineEdit_);
-    
     mainLayout->addWidget(sftpSettingsGroupBox_);
-    // sftpSettingsGroupBox_->setVisible(false); // Visibility handled by onBackupModeChanged
+
+    gcsSettingsGroupBox_ = new QGroupBox(tr("Google Cloud Storage Configuration"));
+    QFormLayout *gcsFormLayout = new QFormLayout(gcsSettingsGroupBox_);
+    gcsBucketNameLineEdit_ = new QLineEdit();
+    gcsFormLayout->addRow(new QLabel(tr("GCS Bucket Name:")), gcsBucketNameLineEdit_);
+    gcsAccountIdentifierLineEdit_ = new QLineEdit();
+    gcsFormLayout->addRow(new QLabel(tr("GCS Account Identifier:")), gcsAccountIdentifierLineEdit_);
+    gcsConnectButton_ = new QPushButton(tr("Connect to Google Account"));
+    gcsFormLayout->addRow(gcsConnectButton_);
+    connect(gcsConnectButton_, &QPushButton::clicked, this, &MainWindow::onGcsConnectButtonClicked);
+    gcsAuthStatusLabel_ = new QLabel(tr("Status: Not Authenticated"));
+    gcsFormLayout->addRow(gcsAuthStatusLabel_);
+    gcsTestConnectionButton_ = new QPushButton(tr("Test Connection")); // Instantiate and add
+    gcsFormLayout->addRow(gcsTestConnectionButton_);
+    connect(gcsTestConnectionButton_, &QPushButton::clicked, this, &MainWindow::onGcsTestConnectionClicked);
+    mainLayout->addWidget(gcsSettingsGroupBox_);
+
     connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onBackupModeChanged);
 
-
-    // --- Scheduling and Controls ---
     QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
     QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-
     scheduleLayout->addWidget(new QLabel(tr("Daily Backup Time:")), 0, 0);
     backupTimeEdit_ = new QTimeEdit();
     backupTimeEdit_->setDisplayFormat("HH:mm");
-    scheduleLayout->addWidget(backupTimeEdit_, 0, 1, 1, 2); // Span 2 columns for time edit
-
+    scheduleLayout->addWidget(backupTimeEdit_, 0, 1, 1, 2);
     applyScheduleButton_ = new QPushButton(tr("Apply Schedule"));
     connect(applyScheduleButton_, &QPushButton::clicked, this, &MainWindow::applySchedule);
     scheduleLayout->addWidget(applyScheduleButton_, 1, 0, 1, 3);
-
     runBackupButton_ = new QPushButton(tr("Run Backup Now"));
     connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
     scheduleLayout->addWidget(runBackupButton_, 2, 0, 1, 3);
     mainLayout->addWidget(scheduleGroupBox);
 
-    // --- Log Display ---
     mainLayout->addWidget(new QLabel(tr("Logs:")));
     logDisplay_ = new QTextEdit();
     logDisplay_->setReadOnly(true);
     mainLayout->addWidget(logDisplay_);
-    mainLayout->setStretchFactor(logDisplay_, 1); // Make log display expand
+    mainLayout->setStretchFactor(logDisplay_, 1);
 
-    fileDialog_ = new QFileDialog(this); // Keep this for browse dialogs
+    fileDialog_ = new QFileDialog(this);
 }
 
 void MainWindow::selectSourceDirectory() {
@@ -231,57 +235,75 @@ void MainWindow::applySchedule() {
         return;
     }
 
-    QString effectiveDestPath; // Used for scheduler and logging
-    bool sftpMode = (backupModeComboBox_->currentIndex() == 1); // 0 for Local, 1 for SFTP
+    QString effectiveDestPathOrIdentifier;
+    QString currentModeText = backupModeComboBox_->currentText();
+    bool localMode = (currentModeText == tr("Local Backup"));
+    bool sftpMode = (currentModeText == tr("SFTP Backup"));
+    bool gcsMode = (currentModeText == tr("Google Cloud Storage"));
 
-    if (sftpMode) {
+    if (localMode) {
+        effectiveDestPathOrIdentifier = destinationDirEdit_->text();
+        if (effectiveDestPathOrIdentifier.isEmpty()) {
+            QMessageBox::warning(this, tr("Configuration Error"), tr("Destination path cannot be empty for local backup."));
+            updateLog("Error: Failed to apply schedule for Local Backup. Destination path empty.");
+            return;
+        }
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+                                       false, false,
+                                       QString(), 0, QString(), QString(),
+                                       QString(), QString());
+        updateLog(QString("Schedule applied for Local Backup: %1 to %2 at %3")
+                      .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
+
+    } else if (sftpMode) {
         if (sftpHostLineEdit_->text().isEmpty() || sftpUsernameLineEdit_->text().isEmpty() || sftpRemotePathLineEdit_->text().isEmpty()) {
              QMessageBox::warning(this, tr("Configuration Error"), tr("SFTP Host, Username, and Remote Path cannot be empty for SFTP mode."));
              updateLog("Error: Failed to apply schedule for SFTP. Required fields missing.");
              return;
         }
-        // For SFTP, the "destination path" for the scheduler is more conceptual.
-        // It combines host and remote path for uniqueness if needed by scheduler logic.
-        effectiveDestPath = QString("sftp://%1%2").arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());
+        effectiveDestPathOrIdentifier = QString("sftp://%1%2").arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());
         
-        // CredentialManager interaction during "Apply Schedule" mirrors saveSettings logic
         if (m_credentialManager) {
             QString serviceName = QString("sftp_%1_%2").arg(sftpHostLineEdit_->text()).arg(sftpPortLineEdit_->text().toInt());
             QString qUsername = sftpUsernameLineEdit_->text();
             QString qPassword = sftpPasswordLineEdit_->text();
             if (sftpSavePasswordCheckBox_->isChecked()) {
-                if (!qPassword.isEmpty()) {
-                    updateLog("SFTP Schedule: Storing password via CredentialManager.");
-                    m_credentialManager->storeSecret(serviceName, qUsername, qPassword);
-                }
+                if (!qPassword.isEmpty()) m_credentialManager->storeSecret(serviceName, qUsername, qPassword);
             } else {
-                updateLog("SFTP Schedule: 'Save Password' not checked. Removing any stored password.");
                 m_credentialManager->deleteSecret(serviceName, qUsername);
             }
         }
-    } else { // Local Backup
-        effectiveDestPath = destinationDirEdit_->text();
-        if (effectiveDestPath.isEmpty()) {
-            QMessageBox::warning(this, tr("Configuration Error"), tr("Destination path cannot be empty for local backup."));
-            updateLog("Error: Failed to apply schedule for Local Backup. Destination path empty.");
-            return;
-        }
-    }
-
-    // Update scheduler; scheduler needs to know if it's an SFTP task for its persistence.
-    if (sftpMode) {
-        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPath, backupTime, true, 
-                                       sftpMode, 
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+                                       true, false,
                                        sftpHostLineEdit_->text(), 
                                        sftpPortLineEdit_->text().toInt(), 
                                        sftpUsernameLineEdit_->text(), 
-                                       sftpRemotePathLineEdit_->text());
+                                       sftpRemotePathLineEdit_->text(),
+                                       QString(), QString());
+        updateLog(QString("Schedule applied for SFTP Backup: %1 to %2 at %3")
+                      .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
+
+    } else if (gcsMode) {
+        QString bucketName = gcsBucketNameLineEdit_->text();
+        QString accountId = gcsAccountIdentifierLineEdit_->text();
+        if (bucketName.isEmpty() || accountId.isEmpty()) {
+            QMessageBox::warning(this, tr("Configuration Error"), tr("GCS Bucket Name and Account Identifier cannot be empty for GCS mode."));
+            updateLog("Error: Failed to apply schedule for GCS. Bucket Name or Account ID missing.");
+            return;
+        }
+        effectiveDestPathOrIdentifier = QString("gcs://%1").arg(bucketName);
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+                                       false, true,
+                                       QString(), 0, QString(), QString(),
+                                       bucketName, accountId);
+        updateLog(QString("Schedule applied for GCS Backup: %1 to bucket '%2' (Account: %3) at %4")
+                      .arg(sourcePath, bucketName, accountId, backupTime.toString("HH:mm")));
     } else {
-        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPath, backupTime, true, 
-                                       sftpMode); // Pass default/empty SFTP params
+        QMessageBox::critical(this, tr("Internal Error"), tr("Unknown backup mode selected."));
+        updateLog("Error: Apply schedule failed. Unknown backup mode.");
+        return;
     }
-    updateLog(QString("Schedule applied: Backup at %1 for source '%2' to '%3' (SFTP Mode: %4).")
-                  .arg(backupTime.toString("HH:mm"), sourcePath, effectiveDestPath, sftpMode ? "Yes" : "No"));
+
     QMessageBox::information(this, tr("Schedule Updated"), tr("Backup schedule has been updated and saved."));
 }
 
@@ -293,42 +315,17 @@ void MainWindow::runBackupNow() {
         return;
     }
 
-    bool sftpMode = (backupModeComboBox_->currentIndex() == 1);
+    QString currentModeText = backupModeComboBox_->currentText();
+    bool localMode = (currentModeText == tr("Local Backup"));
+    bool sftpMode = (currentModeText == tr("SFTP Backup"));
+    bool gcsMode = (currentModeText == tr("Google Cloud Storage"));
+
     IStorageTarget* currentTarget = nullptr;
-
-    delete localTarget_; localTarget_ = nullptr; // Clear previous targets
+    delete localTarget_; localTarget_ = nullptr;
     delete sftpTarget_; sftpTarget_ = nullptr;
+    delete gcsTarget_; gcsTarget_ = nullptr;
 
-    if (sftpMode) {
-        updateLog("SFTP Mode selected for manual backup.");
-        if (sftpHostLineEdit_->text().isEmpty() || sftpUsernameLineEdit_->text().isEmpty() || sftpRemotePathLineEdit_->text().isEmpty()) {
-             QMessageBox::warning(this, tr("Backup Error"), tr("SFTP Host, Username, and Remote Path must be configured."));
-             updateLog("Error: Manual SFTP backup failed. Required SFTP fields missing.");
-             return;
-        }
-
-        std::map<std::string, std::string> sftpConfig;
-        sftpConfig["host"] = sftpHostLineEdit_->text().toStdString();
-        sftpConfig["port"] = sftpPortLineEdit_->text().toStdString();
-        sftpConfig["username"] = sftpUsernameLineEdit_->text().toStdString();
-        sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
-
-        QString qPasswordFromField = sftpPasswordLineEdit_->text();
-        if (!qPasswordFromField.isEmpty()) {
-            sftpConfig["password"] = qPasswordFromField.toStdString();
-            updateLog("SFTP: Using password from field for this session.");
-        }
-        // SftpTarget's constructor handles CredentialManager interaction based on whether "password" is in its config.
-        // If "password" is in config, SftpTarget's CredentialManager logic will store it if it's configured to do so (which it is).
-        // If "password" is NOT in config, SftpTarget's CredentialManager logic will try to retrieve it.
-        // The sftpSavePasswordCheckBox_ primarily influences what *MainWindow* saves via its own QSettings and CredentialManager calls,
-        // SftpTarget itself has its own internal logic for when it receives a password.
-
-        sftpTarget_ = new SftpTarget(sftpConfig); // SftpTarget handles its own credential manager logic internally now
-        currentTarget = sftpTarget_;
-        updateLog(QString("Manual SFTP backup started: From '%1' to host '%2'.").arg(sourcePath, QString::fromStdString(sftpConfig["host"])));
-
-    } else { // Local Backup
+    if (localMode) {
         updateLog("Local Mode selected for manual backup.");
         QString destPath = destinationDirEdit_->text();
         if (destPath.isEmpty()) {
@@ -336,14 +333,54 @@ void MainWindow::runBackupNow() {
             updateLog("Error: Manual backup failed. Local destination path empty.");
             return;
         }
-        
         std::filesystem::path fsSourcePath(sourcePath.toStdString());
         std::filesystem::path fsDestinationPathFromUI(destPath.toStdString());
         std::filesystem::path backupRootForTarget = fsDestinationPathFromUI / fsSourcePath.filename();
-        
         localTarget_ = new LocalTarget(backupRootForTarget.string());
         currentTarget = localTarget_;
         updateLog(QString("Manual Local backup started: From '%1' to '%2'.").arg(sourcePath, destPath));
+
+    } else if (sftpMode) {
+        updateLog("SFTP Mode selected for manual backup.");
+        if (sftpHostLineEdit_->text().isEmpty() || sftpUsernameLineEdit_->text().isEmpty() || sftpRemotePathLineEdit_->text().isEmpty()) {
+             QMessageBox::warning(this, tr("Backup Error"), tr("SFTP Host, Username, and Remote Path must be configured."));
+             updateLog("Error: Manual SFTP backup failed. Required SFTP fields missing.");
+             return;
+        }
+        std::map<std::string, std::string> sftpConfig;
+        sftpConfig["host"] = sftpHostLineEdit_->text().toStdString();
+        sftpConfig["port"] = sftpPortLineEdit_->text().toStdString();
+        sftpConfig["username"] = sftpUsernameLineEdit_->text();
+        sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
+        QString qPasswordFromField = sftpPasswordLineEdit_->text();
+        if (!qPasswordFromField.isEmpty()) sftpConfig["password"] = qPasswordFromField.toStdString();
+        sftpTarget_ = new SftpTarget(sftpConfig);
+        currentTarget = sftpTarget_;
+        updateLog(QString("Manual SFTP backup started: From '%1' to host '%2'.").arg(sourcePath, QString::fromStdString(sftpConfig["host"])));
+
+    } else if (gcsMode) {
+        updateLog("GCS Mode selected for manual backup.");
+        QString bucketName = gcsBucketNameLineEdit_->text();
+        QString accountId = gcsAccountIdentifierLineEdit_->text();
+        if (bucketName.isEmpty() || accountId.isEmpty()) {
+            QMessageBox::warning(this, tr("Backup Error"), tr("GCS Bucket Name and Account Identifier must be configured."));
+            updateLog("Error: Manual GCS backup failed. Bucket Name or Account ID missing.");
+            return;
+        }
+        std::map<std::string, std::string> gcsConfig;
+        gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
+        gcsConfig["gcs_account_identifier"] = accountId.toStdString();
+        gcsConfig["gcs_object_prefix"] = "";
+
+        delete this->gcsTarget_;
+        this->gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+        currentTarget = this->gcsTarget_;
+        updateLog(QString("Manual GCS backup started: From '%1' to GCS Bucket '%2' (Account: '%3')")
+                      .arg(sourcePath, bucketName, accountId));
+    } else {
+        QMessageBox::critical(this, tr("Internal Error"), tr("Unknown backup mode selected for manual backup."));
+        updateLog("Error: Manual backup failed. Unknown backup mode.");
+        return;
     }
 
     if (!currentTarget) {
@@ -355,7 +392,100 @@ void MainWindow::runBackupNow() {
     performBackupInternal(sourcePath, currentTarget);
 }
 
-// Renamed from performBackup and takes IStorageTarget*
+void MainWindow::onGcsConnectButtonClicked() {
+    updateLog("GCS Connect button clicked.");
+    QString bucketName = gcsBucketNameLineEdit_->text();
+    QString accountId = gcsAccountIdentifierLineEdit_->text();
+
+    if (bucketName.isEmpty() || accountId.isEmpty()) {
+        QMessageBox::warning(this, tr("GCS Configuration Error"),
+                             tr("GCS Bucket Name and Account Identifier must be provided before connecting."));
+        updateLog("GCS Connect: Bucket Name or Account Identifier missing.");
+        return;
+    }
+
+    std::map<std::string, std::string> gcsConfig;
+    gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
+    gcsConfig["gcs_account_identifier"] = accountId.toStdString();
+
+    delete gcsTarget_;
+    gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+
+    gcsAuthStatusLabel_->setText(tr("Status: Authenticating..."));
+    updateLog(QString("GCS Connect: Attempting authentication for account '%1' with bucket '%2'.").arg(accountId, bucketName));
+
+    if (gcsTarget_->initiateOAuthAndStoreToken()) {
+        gcsAuthStatusLabel_->setText(tr("Status: Authentication Successful for %1").arg(accountId));
+        updateLog(QString("GCS Connect: Authentication successful for account '%1'.").arg(accountId));
+
+        QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+        settings.beginGroup("GCS");
+        settings.setValue("gcs_last_authenticated_account", accountId);
+        settings.endGroup();
+        updateLog(QString("GCS Connect: Stored '%1' as last authenticated account.").arg(accountId));
+
+    } else {
+        gcsAuthStatusLabel_->setText(tr("Status: Authentication Failed. Check logs."));
+        updateLog(QString("GCS Connect: Authentication failed for account '%1'. Error: %2")
+                      .arg(accountId, QString::fromStdString(gcsTarget_->getLastError())));
+        QMessageBox::critical(this, tr("GCS Authentication Failed"),
+                              tr("Could not authenticate with Google Cloud Storage. Error: %1")
+                              .arg(QString::fromStdString(gcsTarget_->getLastError())));
+    }
+    delete gcsTarget_;
+    gcsTarget_ = nullptr;
+}
+
+void MainWindow::onGcsTestConnectionClicked() {
+    updateLog("GCS Test Connection button clicked.");
+    QString bucketName = gcsBucketNameLineEdit_->text();
+    QString accountId = gcsAccountIdentifierLineEdit_->text();
+
+    if (bucketName.isEmpty() || accountId.isEmpty()) {
+        QMessageBox::warning(this, tr("GCS Configuration Error"),
+                             tr("GCS Bucket Name and Account Identifier must be provided before testing connection."));
+        updateLog("GCS Test Connection: Bucket Name or Account Identifier missing.");
+        return;
+    }
+
+    std::map<std::string, std::string> gcsConfig;
+    gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
+    gcsConfig["gcs_account_identifier"] = accountId.toStdString();
+
+    delete gcsTarget_;
+    gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+
+    gcsAuthStatusLabel_->setText(tr("Status: Testing Connection..."));
+    updateLog(QString("GCS Test Connection: Attempting for account '%1' with bucket '%2'.").arg(accountId, bucketName));
+
+    std::string testErrorMsg;
+    if (gcsTarget_->testConnection(testErrorMsg)) {
+        QMessageBox::information(this, tr("GCS Connection Test"), tr("Connection Successful!"));
+        updateLog(QString("GCS Test Connection: Successful for account '%1'.").arg(accountId));
+
+        QString lastAuthAccount = QSettings().value("GCS/gcs_last_authenticated_account").toString();
+        if (!lastAuthAccount.isEmpty() && lastAuthAccount == accountId) {
+            gcsAuthStatusLabel_->setText(tr("Status: Authenticated as %1").arg(accountId));
+        } else {
+            // If test passed but not explicitly "Connected" via button, or token expired and test used a new one implicitly
+            gcsAuthStatusLabel_->setText(tr("Status: Connection test passed."));
+        }
+    } else {
+        QMessageBox::warning(this, tr("GCS Connection Test"), tr("Connection Failed: %1").arg(QString::fromStdString(testErrorMsg)));
+        updateLog(QString("GCS Test Connection: Failed for account '%1'. Error: %2").arg(accountId, QString::fromStdString(testErrorMsg)));
+        if (testErrorMsg.find("OAuth") != std::string::npos || testErrorMsg.find("token") != std::string::npos ||
+            testErrorMsg.find("permission") != std::string::npos || testErrorMsg.find("denied") != std::string::npos ||
+            testErrorMsg.find("authenticate") != std::string::npos) { // Added generic auth term
+            gcsAuthStatusLabel_->setText(tr("Status: Auth/Permission issue during test."));
+        } else {
+            gcsAuthStatusLabel_->setText(tr("Status: Connection test failed."));
+        }
+    }
+
+    delete gcsTarget_;
+    gcsTarget_ = nullptr;
+}
+
 void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget* target) {
     if (!target) {
         updateLog("Error: performBackupInternal called with null target.");
@@ -366,11 +496,8 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
 
     std::filesystem::path fsSourcePath(sourcePath.toStdString());
 
-    // Define baseDirForLambda for relative path calculation
     QFileInfo initialSourceInfo(QString::fromStdString(fsSourcePath.string()));
     QString baseDirForLambda = initialSourceInfo.absolutePath();
-    // Example: sourcePath = /tmp/foo, baseDirForLambda = /tmp
-    //          sourcePath = /foo (root folder), baseDirForLambda = /
 
     if (!std::filesystem::is_directory(fsSourcePath)) {
          updateLog(QString("Error: Source path '%1' is not a directory.").arg(sourcePath));
@@ -379,14 +506,22 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
     }
     
     if (!target->beginSession()) {
-        updateLog(QString("Error: Could not begin backup session with target. Check target logs."));
-        QMessageBox::critical(this, tr("Backup Failed"), tr("Could not begin backup session. Check logs."));
+        std::string specificError;
+        GcsTarget* currentGcsTarget = dynamic_cast<GcsTarget*>(target);
+        if (currentGcsTarget) {
+            specificError = currentGcsTarget->getLastError();
+        }
+        QString errorDetails = QString::fromStdString(specificError);
+        if (errorDetails.isEmpty()) errorDetails = tr("Check target logs for more information.");
+
+        updateLog(QString("Error: Could not begin backup session. Target error: %1").arg(errorDetails));
+        QMessageBox::critical(this, tr("Backup Failed"), tr("Could not begin backup session. Details: %1").arg(errorDetails));
         return;
     }
 
     if (!std::filesystem::exists(fsSourcePath)) {
         updateLog(QString("Error: Source directory '%1' does not exist.").arg(sourcePath));
-        target->endSession(); // Attempt to clean up session
+        target->endSession();
         QMessageBox::critical(this, tr("Backup Failed"), tr("Source directory not found."));
         return;
     }
@@ -401,23 +536,7 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
        try {
            for (const auto& entry : std::filesystem::directory_iterator(currentPathInSource)) {
                std::filesystem::path fullEntryPath = entry.path();
-               // IMPORTANT: SftpTarget expects remoteRelativePath as second argument to sendFile.
-               // LocalTarget also expects relativePath.
-               // OLD:
-               // std::filesystem::path relativePathFs = std::filesystem::relative(fullEntryPath, fsSourcePath);
-               // std::string relativePathStr = relativePathFs.generic_string();
-
-               // NEW (refined):
                QString qFullEntryPath_new = QString::fromStdString(fullEntryPath.string());
-               // baseDirForLambda is defined outside lambda as parent of initial sourcePath
-               // e.g. sourcePath = /tmp/foo, baseDirForLambda = /tmp
-               //      qFullEntryPath_new = /tmp/foo/file.txt
-               //      baseDirForLambda.length() = 4
-               //      qFullEntryPath_new.mid(5) results in "foo/file.txt"
-               // if sourcePath = /foo (root level folder), baseDirForLambda = /
-               //      qFullEntryPath_new = /foo/file.txt
-               //      baseDirForLambda.length() = 1
-               //      qFullEntryPath_new.mid(1) results in "foo/file.txt" (if baseDirForLambda == "/")
                std::string relativePathStr = qFullEntryPath_new.mid(baseDirForLambda.length() + (baseDirForLambda == "/" ? 0 : 1)).toStdString();
 
                if (entry.is_directory()) {
@@ -425,10 +544,18 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                    recursiveCopy(fullEntryPath); 
                } else if (entry.is_regular_file()) {
                    files_processed_count++;
-                   if (target->sendFile(fullEntryPath.string(), relativePathStr)) { // Pass correct paths
+                   if (target->sendFile(fullEntryPath.string(), relativePathStr)) {
                        updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
                    } else {
-                       updateLog(QString("Error backing up: %1. Check target logs.").arg(QString::fromStdString(relativePathStr)));
+                       std::string specificError;
+                       GcsTarget* currentGcsTarget = dynamic_cast<GcsTarget*>(target);
+                       if (currentGcsTarget) {
+                           specificError = currentGcsTarget->getLastError();
+                       }
+                       QString errorDetails = QString::fromStdString(specificError);
+                       if (errorDetails.isEmpty()) errorDetails = tr("Check target logs for specifics.");
+
+                       updateLog(QString("Error backing up: %1. Target error: %2").arg(QString::fromStdString(relativePathStr), errorDetails));
                        all_ok = false; 
                    }
                }
@@ -442,7 +569,15 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
     recursiveCopy(fsSourcePath); 
 
     if (!target->endSession()) {
-        updateLog("Error: Could not properly end backup session with target.");
+        std::string specificError;
+        GcsTarget* currentGcsTarget = dynamic_cast<GcsTarget*>(target);
+        if (currentGcsTarget) {
+            specificError = currentGcsTarget->getLastError();
+        }
+        QString errorDetails = QString::fromStdString(specificError);
+        if (errorDetails.isEmpty()) errorDetails = tr("Check target logs.");
+
+        updateLog(QString("Error: Could not properly end backup session with target. Target error: %1").arg(errorDetails));
         all_ok = false; 
     }
 
@@ -470,13 +605,12 @@ void MainWindow::updateLog(const QString& message) {
 void MainWindow::onTaskChanged() {
     sourceDirEdit_->setText(scheduler_->sourcePath());
     
-    // If scheduler was in SFTP mode, reflect this in UI.
-    // Scheduler's destinationPath might be the composite SFTP path or just the local path.
-    if (scheduler_->isSftpMode()) {
-        backupModeComboBox_->setCurrentText(tr("SFTP Backup")); // Or find by index
-        // SFTP fields (host, port, etc.) are loaded from their own QSettings group.
-        // destinationDirEdit_ (for local) should be empty or reflect last local path.
-        // The actual SFTP "destination" is composed from SFTP fields.
+    if (scheduler_->isGcsMode()) {
+        backupModeComboBox_->setCurrentText(tr("Google Cloud Storage"));
+        gcsBucketNameLineEdit_->setText(scheduler_->gcsBucketName());
+        gcsAccountIdentifierLineEdit_->setText(scheduler_->gcsAccountIdentifier());
+    } else if (scheduler_->isSftpMode()) {
+        backupModeComboBox_->setCurrentText(tr("SFTP Backup"));
     } else {
         backupModeComboBox_->setCurrentText(tr("Local Backup"));
         destinationDirEdit_->setText(scheduler_->destinationPath());
@@ -485,21 +619,24 @@ void MainWindow::onTaskChanged() {
     if (scheduler_->scheduledTime().isValid()) {
         backupTimeEdit_->setTime(scheduler_->scheduledTime());
     } else {
-        // Provide a default time if scheduler's time is not valid (e.g., first run)
         backupTimeEdit_->setTime(QTime(23, 0)); 
     }
-    // Ensure UI visibility matches the potentially updated mode from scheduler
     onBackupModeChanged(backupModeComboBox_->currentIndex());
     updateLog("Task details updated in UI from Scheduler state.");
 }
 
 void MainWindow::onBackupModeChanged(int index) {
-    bool sftpSelected = (backupModeComboBox_->itemText(index) == tr("SFTP Backup"));
+    QString currentModeText = backupModeComboBox_->itemText(index);
+    bool localSelected = (currentModeText == tr("Local Backup"));
+    bool sftpSelected = (currentModeText == tr("SFTP Backup"));
+    bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 
-    if (m_localDestinationGroupBox) m_localDestinationGroupBox->setVisible(!sftpSelected);
+    if (m_localDestinationGroupBox) m_localDestinationGroupBox->setVisible(localSelected);
     if (sftpSettingsGroupBox_) sftpSettingsGroupBox_->setVisible(sftpSelected);
+    if (gcsSettingsGroupBox_) gcsSettingsGroupBox_->setVisible(gcsSelected);
     
-    updateLog(QString("Backup mode changed. SFTP Selected: %1").arg(sftpSelected ? "Yes" : "No"));
+    updateLog(QString("Backup mode changed. Local: %1, SFTP: %2, GCS: %3")
+                  .arg(localSelected ? "Yes" : "No", sftpSelected ? "Yes" : "No", gcsSelected ? "Yes" : "No"));
 }
 
 void MainWindow::loadSettings() {
@@ -510,16 +647,11 @@ void MainWindow::loadSettings() {
     if (!geometry.isEmpty()) {
         restoreGeometry(geometry);
     } else {
-        resize(800, 700); // Adjusted default size for more fields
+        resize(800, 700);
     }
     
-    // Load backup mode. Scheduler also loads its own settings including source/dest/time/sftpMode.
-    // MainWindow settings primarily drive the UI elements not directly tied to a single scheduled task.
     backupModeComboBox_->setCurrentIndex(settings.value("backupModeIndex", 0).toInt());
-    // sourceDirEdit_->setText(settings.value("lastSourcePath", "").toString()); // Or let Scheduler handle this
-    // destinationDirEdit_->setText(settings.value("lastLocalDestPath", "").toString()); // For local mode
-
-    settings.endGroup(); // MainWindow group
+    settings.endGroup();
 
     settings.beginGroup("SFTP");
     sftpHostLineEdit_->setText(settings.value("host", "").toString());
@@ -527,12 +659,20 @@ void MainWindow::loadSettings() {
     sftpUsernameLineEdit_->setText(settings.value("username", "").toString());
     sftpRemotePathLineEdit_->setText(settings.value("remotePath", "").toString());
     sftpSavePasswordCheckBox_->setChecked(settings.value("savePassword", false).toBool());
-    // Password itself is NOT loaded into sftpPasswordLineEdit_ from QSettings.
-    // SftpTarget's constructor will attempt to retrieve it from CredentialManager if not provided.
-    settings.endGroup(); // SFTP group
+    settings.endGroup();
+
+    settings.beginGroup("GCS");
+    gcsBucketNameLineEdit_->setText(settings.value("gcs_bucket_name", "").toString());
+    gcsAccountIdentifierLineEdit_->setText(settings.value("gcs_account_identifier", "").toString());
+    QString lastAuthAccount = settings.value("gcs_last_authenticated_account", "").toString();
+    if (!lastAuthAccount.isEmpty() && lastAuthAccount == gcsAccountIdentifierLineEdit_->text()) {
+        gcsAuthStatusLabel_->setText(tr("Status: Authenticated as %1").arg(lastAuthAccount));
+    } else {
+        gcsAuthStatusLabel_->setText(tr("Status: Not Authenticated"));
+    }
+    settings.endGroup();
     
     updateLog("Settings loaded.");
-    // onBackupModeChanged() will be called after this from constructor to set initial visibility
 }
 
 void MainWindow::saveSettings() {
@@ -540,9 +680,7 @@ void MainWindow::saveSettings() {
     settings.beginGroup("MainWindow");
     settings.setValue("geometry", saveGeometry());
     settings.setValue("backupModeIndex", backupModeComboBox_->currentIndex());
-    // settings.setValue("lastSourcePath", sourceDirEdit_->text()); // Scheduler handles task specific paths
-    // settings.setValue("lastLocalDestPath", destinationDirEdit_->text());
-    settings.endGroup(); // MainWindow group
+    settings.endGroup();
 
     settings.beginGroup("SFTP");
     settings.setValue("host", sftpHostLineEdit_->text());
@@ -550,10 +688,15 @@ void MainWindow::saveSettings() {
     settings.setValue("username", sftpUsernameLineEdit_->text());
     settings.setValue("remotePath", sftpRemotePathLineEdit_->text());
     settings.setValue("savePassword", sftpSavePasswordCheckBox_->isChecked());
-    settings.endGroup(); // SFTP group
+    settings.endGroup();
 
-    // Handle credential storage based on current SFTP UI state if SFTP mode is active
-    if (backupModeComboBox_->currentIndex() == 1) { // SFTP Mode
+    settings.beginGroup("GCS");
+    settings.setValue("gcs_bucket_name", gcsBucketNameLineEdit_->text());
+    settings.setValue("gcs_account_identifier", gcsAccountIdentifierLineEdit_->text());
+    // gcs_last_authenticated_account is saved only on successful connect
+    settings.endGroup();
+
+    if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {
         QString host = sftpHostLineEdit_->text();
         QString port = sftpPortLineEdit_->text();
         QString username = sftpUsernameLineEdit_->text();
@@ -562,17 +705,10 @@ void MainWindow::saveSettings() {
         if (!host.isEmpty() && !port.isEmpty() && !username.isEmpty() && m_credentialManager) {
             QString serviceName = QString("sftp_%1_%2").arg(host).arg(port.toInt());
             if (sftpSavePasswordCheckBox_->isChecked()) {
-                // Only store/update if password field is not empty.
-                // If field is empty, user might want to rely on previously stored password.
                 if (!passwordInField.isEmpty()) {
-                    updateLog("Saving SFTP password to CredentialManager due to 'Save Password' checked and password field non-empty.");
                     m_credentialManager->storeSecret(serviceName, username, passwordInField);
-                } else {
-                    updateLog("SFTP 'Save Password' is checked, but password field is empty. No change to stored password at this time.");
                 }
             } else { 
-                // If "Save Password" is not checked, delete any existing password for this service/user.
-                updateLog("SFTP 'Save Password' is not checked. Removing any stored password from CredentialManager for this service.");
                 m_credentialManager->deleteSecret(serviceName, username);
             }
         }
@@ -584,38 +720,53 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
     updateLog(QString("Scheduled backup triggered by Scheduler: Source '%1', Dest/ID '%2'")
                   .arg(sourcePath, destinationOrIdentifier));
 
-    bool sftpMode = scheduler_->isSftpMode();
     IStorageTarget* currentTarget = nullptr;
-
     delete localTarget_; localTarget_ = nullptr;
     delete sftpTarget_; sftpTarget_ = nullptr;
+    delete gcsTarget_; gcsTarget_ = nullptr;
 
-    if (sftpMode) {
+    if (scheduler_->isGcsMode()) {
+        updateLog("Scheduled task is GCS Mode.");
+        QString bucketName = scheduler_->gcsBucketName();
+        QString accountId = scheduler_->gcsObjectPrefix();
+
+        if (bucketName.isEmpty() || accountId.isEmpty()) {
+            updateLog("Error: Scheduled GCS backup but bucket name or account ID (from scheduler's gcsObjectPrefix) is missing in Scheduler.");
+            QMessageBox::critical(this, tr("Scheduled Backup Error"), tr("GCS configuration for scheduled backup is incomplete (bucket or account ID)."));
+            return;
+        }
+
+        std::map<std::string, std::string> gcsConfig;
+        gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
+        gcsConfig["gcs_account_identifier"] = accountId.toStdString();
+        gcsConfig["gcs_object_prefix"] = "";
+
+        delete this->gcsTarget_;
+        this->gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+        currentTarget = this->gcsTarget_;
+        updateLog(QString("Scheduled GCS backup started: From '%1' to GCS Bucket '%2' (Account: '%3')")
+                      .arg(sourcePath, bucketName, accountId));
+
+    } else if (scheduler_->isSftpMode()) {
         updateLog("Scheduled task is SFTP Mode.");
         std::map<std::string, std::string> sftpConfig;
         sftpConfig["host"] = scheduler_->sftpHost().toStdString();
         sftpConfig["port"] = QString::number(scheduler_->sftpPort()).toStdString();
         sftpConfig["username"] = scheduler_->sftpUsername().toStdString();
         sftpConfig["remoteBasePath"] = scheduler_->sftpRemotePath().toStdString();
-        // Password is NOT included here; SftpTarget will use CredentialManager to retrieve it.
-        
         sftpTarget_ = new SftpTarget(sftpConfig);
         currentTarget = sftpTarget_;
         updateLog(QString("Scheduled SFTP backup: From '%1' to host '%2'")
                       .arg(sourcePath, scheduler_->sftpHost()));
     } else {
         updateLog("Scheduled task is Local Mode.");
-        // destinationOrIdentifier is the actual local destination path for local mode
         if (destinationOrIdentifier.isEmpty()) {
             updateLog("Error: Scheduled local backup triggered but destination path is empty in Scheduler.");
             QMessageBox::critical(this, tr("Scheduled Backup Error"), tr("Destination path for scheduled local backup is missing."));
             return;
         }
-        
         std::filesystem::path fsSourcePath(sourcePath.toStdString());
         std::filesystem::path fsDestinationPathFromScheduler(destinationOrIdentifier.toStdString());
-        // For local target, destinationPath in scheduler is the root backup dir (e.g. /path/to/backup_folder/SourceDirName)
-        // So, LocalTarget constructor just needs this path.
         localTarget_ = new LocalTarget(fsDestinationPathFromScheduler.string());
         currentTarget = localTarget_;
         updateLog(QString("Scheduled Local backup: From '%1' to '%2'")

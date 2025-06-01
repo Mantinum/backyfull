@@ -4,32 +4,27 @@
 #include <QMainWindow>
 #include <QString>
 
-// Qt class includes (replacing forward declarations)
+// Qt class includes
 #include <QLineEdit>
 #include <QPushButton>
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QFileDialog>
-#include <QComboBox>     // For m_backupModeComboBox
-#include <QGroupBox>     // For m_sftpSettingsGroupBox
-#include <QCheckBox>     // For m_sftpSavePasswordCheckBox
-// QLineEdit is already included
-// QLabel will be included in .cpp or here if needed for direct use
+#include <QComboBox>
+#include <QGroupBox>
+#include <QCheckBox>
+#include <QLabel> // Added for gcsAuthStatusLabel_
 
-// Forward declaration for our Scheduler
+// Forward declaration for Scheduler
 class Scheduler;
 #include "util/CredentialManager.h" // For CredentialManager
 #include <memory> // For std::unique_ptr
 
-// Forward declaration for IStorageTarget and LocalTarget
+// Forward declaration for Storage Targets
 class IStorageTarget;
 class LocalTarget;
-class SftpTarget; // Forward declare SftpTarget
-// Forward declarations for layout classes used in setupUI if not included,
-// but they are mostly implementation details of .cpp
-// class QFormLayout;
-// class QVBoxLayout;
-
+class SftpTarget;
+class GcsTarget; // Forward declare GcsTarget
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -39,22 +34,24 @@ public:
     ~MainWindow() override;
 
 protected:
-    void closeEvent(QCloseEvent *event) override; // To save settings on close
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void selectSourceDirectory();
     void selectDestinationDirectory();
     void applySchedule();
     void runBackupNow();
-    void updateLog(const QString& message); // Slot to receive log messages
-    void onTaskChanged(); // Slot to react to Scheduler's taskChanged signal
-    void onBackupModeChanged(int index); // Slot for backup mode change
-    void handleScheduledBackup(const QString& sourcePath, const QString& destinationOrIdentifier); // Slot for scheduled backups
+    void updateLog(const QString& message);
+    void onTaskChanged();
+    void onBackupModeChanged(int index);
+    void handleScheduledBackup(const QString& sourcePath, const QString& destinationOrIdentifier);
+    void onGcsConnectButtonClicked();
+    void onGcsTestConnectionClicked(); // Slot for GCS Test Connection
 
 private:
-    void setupUI(); // Helper to create and layout widgets
-    void loadSettings(); // Load window geometry and potentially other UI settings
-    void saveSettings(); // Save window geometry
+    void setupUI();
+    void loadSettings();
+    void saveSettings();
 
     // UI Elements
     QLineEdit *sourceDirEdit_;
@@ -70,8 +67,7 @@ private:
     QComboBox *backupModeComboBox_;
 
     // Local Backup Settings
-    QGroupBox *m_localDestinationGroupBox; // Declaration for the local destination group box
-    // QLabel *destinationDirLabel_; // Will be changed based on mode
+    QGroupBox *m_localDestinationGroupBox;
 
     // SFTP Settings
     QGroupBox *sftpSettingsGroupBox_;
@@ -82,12 +78,19 @@ private:
     QLineEdit *sftpRemotePathLineEdit_;
     QCheckBox *sftpSavePasswordCheckBox_;
 
+    // GCS Settings
+    QGroupBox *gcsSettingsGroupBox_;
+    QLineEdit *gcsBucketNameLineEdit_;
+    QLineEdit *gcsAccountIdentifierLineEdit_;
+    QPushButton *gcsConnectButton_;
+    QPushButton *gcsTestConnectionButton_; // Added
+    QLabel *gcsAuthStatusLabel_;
 
     // Core components
     Scheduler *scheduler_;
-    // For M1, we'll directly use LocalTarget. Later, BackupEngine would manage IStorageTarget.
     LocalTarget *localTarget_; 
-    SftpTarget *sftpTarget_; // Will be initialized based on mode
+    SftpTarget *sftpTarget_;
+    GcsTarget *gcsTarget_; // GCS Target instance
 
     std::unique_ptr<CredentialManager> m_credentialManager;
 
@@ -95,7 +98,6 @@ private:
     QFileDialog *fileDialog_;
 
     // Internal helper to perform the backup logic
-    // This will use the currently active target (localTarget_ or sftpTarget_)
     void performBackupInternal(const QString& sourcePath, IStorageTarget* target);
 };
 
