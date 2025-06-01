@@ -304,6 +304,10 @@ QString Scheduler::gcsObjectPrefix() const {
     return m_gcsObjectPrefix;
 }
 
+QString Scheduler::gcsAccountIdentifier() const {
+    return m_gcsObjectPrefix; // m_gcsObjectPrefix stores the GCS account identifier
+}
+
 // Example of how triggerBackupNow could be implemented if needed:
 // void Scheduler::triggerBackupNow() {
 //     if (taskEnabled_ && !currentSourcePath_.isEmpty() && !currentDestinationPath_.isEmpty()) {

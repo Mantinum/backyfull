@@ -57,6 +57,7 @@ public:
     bool isGcsMode() const;
     QString gcsBucketName() const;
     QString gcsObjectPrefix() const;
+    QString gcsAccountIdentifier() const;
 
 signals:
     // Emitted when a scheduled backup is due

@@ -249,8 +249,8 @@ void MainWindow::applySchedule() {
             return;
         }
         scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
-                                       false, false,
-                                       QString(), 0, QString(), QString(),
+                                       false, QString(),      // sftpHost is QString
+                                       0, QString(), QString(), false, // isGcsMode is bool
                                        QString(), QString());
         updateLog(QString("Schedule applied for Local Backup: %1 to %2 at %3")
                       .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
@@ -274,12 +274,11 @@ void MainWindow::applySchedule() {
             }
         }
         scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
-                                       true, false,
-                                       sftpHostLineEdit_->text(), 
+                                       true, sftpHostLineEdit_->text(), // sftpHost
                                        sftpPortLineEdit_->text().toInt(), 
                                        sftpUsernameLineEdit_->text(), 
                                        sftpRemotePathLineEdit_->text(),
-                                       QString(), QString());
+                                       false, QString(), QString()); // isGcsMode, gcsBucketName, gcsObjectPrefix
         updateLog(QString("Schedule applied for SFTP Backup: %1 to %2 at %3")
                       .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
 
@@ -293,8 +292,8 @@ void MainWindow::applySchedule() {
         }
         effectiveDestPathOrIdentifier = QString("gcs://%1").arg(bucketName);
         scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
-                                       false, true,
-                                       QString(), 0, QString(), QString(),
+                                       false, QString(),      // sftpHost is QString
+                                       0, QString(), QString(), true, // isGcsMode is bool
                                        bucketName, accountId);
         updateLog(QString("Schedule applied for GCS Backup: %1 to bucket '%2' (Account: %3) at %4")
                       .arg(sourcePath, bucketName, accountId, backupTime.toString("HH:mm")));
@@ -350,7 +349,7 @@ void MainWindow::runBackupNow() {
         std::map<std::string, std::string> sftpConfig;
         sftpConfig["host"] = sftpHostLineEdit_->text().toStdString();
         sftpConfig["port"] = sftpPortLineEdit_->text().toStdString();
-        sftpConfig["username"] = sftpUsernameLineEdit_->text();
+        sftpConfig["username"] = sftpUsernameLineEdit_->text().toStdString();
         sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
         QString qPasswordFromField = sftpPasswordLineEdit_->text();
         if (!qPasswordFromField.isEmpty()) sftpConfig["password"] = qPasswordFromField.toStdString();
