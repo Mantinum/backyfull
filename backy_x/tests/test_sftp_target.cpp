@@ -116,7 +116,8 @@ TEST_F(SftpTargetTest, EndSessionNoBegin) {
 TEST_F(SftpTargetTest, SendFileNoSession) {
     SftpTarget target(baseConfig);
     // Attempt to send file without calling beginSession
-    EXPECT_FALSE(target.sendFile(dummyFilePath))
+    FileMetadata dummy{};
+    EXPECT_FALSE(target.sendFile(dummyFilePath, dummy))
         << "sendFile should fail if beginSession was not called.";
 }
 
@@ -125,7 +126,8 @@ TEST_F(SftpTargetTest, SendFileAfterFailedBeginSession) {
     config["host"] = ""; // Ensure beginSession fails
     SftpTarget target(config);
     ASSERT_FALSE(target.beginSession()); // Precondition: beginSession failed
-    EXPECT_FALSE(target.sendFile(dummyFilePath))
+    FileMetadata dummy{};
+    EXPECT_FALSE(target.sendFile(dummyFilePath, dummy))
         << "sendFile should fail if beginSession failed.";
 }
 
@@ -143,10 +145,12 @@ TEST_F(SftpTargetTest, SendNonExistentLocalFile) {
     // the file operation itself should fail.
     // If beginSession fails (as it should with invalid host), sendFile also fails.
     if (!offlineTarget.beginSession()) { // This is expected
-         EXPECT_FALSE(offlineTarget.sendFile("non_existent_local_file.txt"))
+         FileMetadata dummy{};
+         EXPECT_FALSE(offlineTarget.sendFile("non_existent_local_file.txt", dummy))
             << "sendFile should fail if beginSession failed.";
     } else { // Should not happen with invalid host, but if it did:
-        EXPECT_FALSE(offlineTarget.sendFile("non_existent_local_file.txt"))
+        FileMetadata dummy{};
+        EXPECT_FALSE(offlineTarget.sendFile("non_existent_local_file.txt", dummy))
             << "sendFile should fail for non-existent local file even if session began.";
         offlineTarget.endSession();
     }
@@ -202,7 +206,8 @@ TEST_F(SftpTargetOnlineTest, UploadSingleFile) {
     SftpTarget target(onlineConfig);
     ASSERT_TRUE(target.beginSession());
     std::string remoteFileName = "uploaded_test_file.txt";
-    EXPECT_TRUE(target.sendFile(dummyFilePath));
+    FileMetadata dummy{};
+    EXPECT_TRUE(target.sendFile(dummyFilePath, dummy));
     // TODO: Add verification step (e.g., list directory or try to download)
     // For now, also test delete.
     EXPECT_TRUE(target.deleteFile(remoteFileName)) << "Failed to delete the uploaded file. Manual cleanup may be required.";
@@ -217,7 +222,8 @@ TEST_F(SftpTargetOnlineTest, UploadToNonExistentDirectoryAndCreate) {
     SftpTarget target(onlineConfig);
     ASSERT_TRUE(target.beginSession());
     std::string remotePathWithDir = "new_test_dir/another_uploaded_test_file.txt";
-    EXPECT_TRUE(target.sendFile(dummyFilePath))
+    FileMetadata dummy_subdir{};
+    EXPECT_TRUE(target.sendFile(dummyFilePath, dummy_subdir))
         << "Failed to upload file, possibly due to directory creation failure.";
     
     // Cleanup: delete the file, then attempt to delete the directory.

@@ -24,6 +24,8 @@ public:
     bool downloadFile(const std::string& remotePath, const std::string& localPath) override;
     bool endSession() override;
 
+    std::string getLastError() const;
+
 private:
     std::string m_host;
     std::string m_username;
@@ -43,6 +45,7 @@ private:
     long m_sshAuthTypes; 
     bool m_verboseLogging;
     bool m_properlyConfigured; // True if essential configuration (host, user) is present
+    std::string lastError_;
 };
 
 #endif // SFTPTARGET_H

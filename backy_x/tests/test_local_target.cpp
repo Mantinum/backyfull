@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 #include "targets/LocalTarget.h" // Adjust if necessary
+#include "core/IStorageTarget.h" // For FileMetadata
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -66,7 +67,8 @@ TEST_F(LocalTargetTest, CopySingleFileToRoot) {
     ASSERT_TRUE(target.beginSession()) << "LocalTarget beginSession failed.";
 
     // Call sendFile with absolute source path and relative target path (just filename for root)
-    ASSERT_TRUE(target.sendFile(sourceFile.string())) << "LocalTarget sendFile failed for " << sourceFile;
+    FileMetadata dummy{};
+    ASSERT_TRUE(target.sendFile(sourceFile.string(), dummy)) << "LocalTarget sendFile failed for " << sourceFile;
     ASSERT_TRUE(target.endSession()) << "LocalTarget endSession failed.";
 
     // Verify that the file was copied to destDir / fileName
@@ -97,7 +99,8 @@ TEST_F(LocalTargetTest, CopyFileToSubDirectory) {
     ASSERT_TRUE(target.beginSession()) << "LocalTarget beginSession failed.";
     
     // Call sendFile with absolute source path and relative target path including subdirectory
-    ASSERT_TRUE(target.sendFile(sourceFile.string())) << "LocalTarget sendFile failed for " << sourceFile << " to " << relativeTargetPath;
+    FileMetadata dummy_subdir{}; // Use a different name or ensure scope is limited if concerned
+    ASSERT_TRUE(target.sendFile(sourceFile.string(), dummy_subdir)) << "LocalTarget sendFile failed for " << sourceFile << " to " << relativeTargetPath;
     ASSERT_TRUE(target.endSession()) << "LocalTarget endSession failed.";
 
     // Verify that the file was copied to destDir / subDirName / fileName

@@ -5,6 +5,7 @@
 #include "targets/GcsTarget.h"      // Added for GCS Target
 #include "util/CredentialManager.h"
 
+#include <QApplication> // Added include
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -601,14 +602,18 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                    FileMetadata meta;
                    meta.name          = relativePathStr;
                    meta.size          = entry.file_size();
-                   time_t raw_time_t = std::chrono::file_clock::to_time_t(entry.last_write_time());
-                   meta.modificationTime = std::chrono::system_clock::from_time_t(raw_time_t);
+                   auto ftime = entry.last_write_time();
+                   auto sctp  = std::chrono::time_point_cast<
+                                   std::chrono::system_clock::duration>(
+                                   ftime - decltype(ftime)::clock::now()
+                                   + std::chrono::system_clock::now());
+                   meta.modificationTime = sctp;
 
                    if (target->sendFile(fullEntryPath.string(), meta)) {
                        updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
                    } else {
                        std::string err_msg;
-                       GcsTarget* gcs = dynamic_cast<GcsTarget*>(target);
+                       GcsTarget* gcs = dynamic_cast<GcsTarget*>(target); // Assuming target is IStorageTarget*
                        SftpTarget* sftp = dynamic_cast<SftpTarget*>(target);
 
                        if (gcs) {
@@ -616,10 +621,7 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                        } else if (sftp) {
                            err_msg = sftp->getLastError();
                        } else {
-                           // This case handles LocalTarget and potentially others.
-                           // If LocalTarget *does* have a getLastError, it needs to be part of IStorageTarget.
-                           // Given the prompt, it seems it's not guaranteed.
-                           err_msg = "Error details not available for this target type or operation failed before specific error could be retrieved.";
+                           err_msg = "unknown error"; // Changed part
                        }
 
                        updateLog(QString("Error backing up: %1. Error: %2")
@@ -952,7 +954,12 @@ void MainWindow::displayRemoteFiles(const std::vector<FileMetadata>& files) {
                               file.modificationTime.time_since_epoch()).count());
 
         QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(secs);
-        QString formattedDate = modDateTime.toString(Qt::SystemLocaleShortDate); // New line with updated enum
+    #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+      auto dateFmt = Qt::SystemLocaleShortDate;
+    #else
+      auto dateFmt = Qt::DefaultLocaleShortDate;
+    #endif
+        QString formattedDate = modDateTime.toString(dateFmt);
 
         DateTimeTableWidgetItem *dateItem =
                 new DateTimeTableWidgetItem(formattedDate, secs); // New line using qint64 secs

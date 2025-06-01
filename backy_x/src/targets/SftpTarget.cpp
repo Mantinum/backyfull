@@ -413,3 +413,7 @@ bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& 
     std::cout << "SftpTarget: File downloaded successfully to " << localPath << std::endl;
     return true;
 }
+
+std::string SftpTarget::getLastError() const {
+    return lastError_;
+}
