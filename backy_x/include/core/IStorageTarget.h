@@ -11,16 +11,18 @@
 
 // Definition of FileMetadata struct
 struct FileMetadata {
-    std::string name = "";
-    uint64_t size = 0;
-    std::chrono::system_clock::time_point modificationTime = std::chrono::system_clock::now();
-    bool isDirectory = false;
+    std::string name{};
+    uint64_t    size{0};
+    std::chrono::system_clock::time_point modificationTime{}; // Default to epoch or a known state
+    bool        isDirectory{false};
+    // Any other pre-existing members should also have initializers for consistency
 
-    // Optional: Default constructor
-    // FileMetadata() = default; // No longer strictly needed with all members default initialized
+    FileMetadata() = default;   // Explicitly defaulted constructor
 
     // Optional: Parameterized constructor - keep if used
-    FileMetadata(std::string n, uint64_t s, std::chrono::system_clock::time_point mt, bool isDir)
+    FileMetadata(std::string n, uint64_t s,
+                 std::chrono::system_clock::time_point mt,
+                 bool isDir)
         : name(std::move(n)), size(s), modificationTime(mt), isDirectory(isDir) {}
 };
 
