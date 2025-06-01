@@ -50,8 +50,8 @@ static std::string parseGcsError(const std::string& responseBody) {
 // --- GcsTarget Implementation ---
 
 GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, CredentialManager* credentialManager)
-    : m_curlHandle(nullptr),
-      m_credentialManager(credentialManager), // Use passed CredentialManager
+    : m_credentialManager(credentialManager), // Use passed CredentialManager
+      m_curlHandle(nullptr),
       m_accessTokenExpiryTime(0),
       m_oauthCallbackServer(nullptr),
       m_oauthFlowCompletedSuccessfully(false),
@@ -250,7 +250,7 @@ std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string
     return files; // Placeholder
 }
 
-bool GcsTarget::deleteFile(const std::string& remoteObjectName) {
+bool GcsTarget::deleteFile(const std::string& /*remoteObjectName*/) {
     m_lastError.clear();
     // ... (rest of deleteFile implementation, ensuring m_lastError is set on failures)
     // Similar to sendFile, set m_lastError on:
@@ -511,7 +511,9 @@ bool GcsTarget::performInitialOAuthFlow() {
                      std::cerr << "GcsTarget: " << m_lastError << std::endl;
                      m_oauthFlowCompletedSuccessfully = false; // Explicitly false
                      QByteArray response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n";
-                     response += QByteArray("<html><body><h1>Authentication Failed</h1><p>Error received from Google: ") + QUrl::fromPercentEncoding(query.queryItemValue("error").toUtf8()) + QByteArray("</p></body></html>");
+                     response = QByteArray("<html><body><h1>Authentication Failed</h1><p>Error received from Google: ");
+                     response += QUrl::fromPercentEncoding(query.queryItemValue("error").toUtf8()).toUtf8();
+                     response += QByteArray("</p></body></html>");
                      clientSocket->write(response);
                 } else {
                      m_lastError = "Callback received but 'code' or 'error' parameter missing or invalid.";
