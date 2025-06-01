@@ -110,14 +110,28 @@ static std::string buildSftpAbsolutePath(const std::string& basePath, const std:
 
 static std::string buildSftpUrl(const std::string& host, int port, const std::string& basePath, const std::string& relativePath) {
     std::string path = joinPaths(basePath, relativePath);
-    std::string url = "sftp://" + host + ":" + std::to_string(port);
-    if (path == "/" && (relativePath.empty() || relativePath == "/")) {
-        url += path; 
-        if (url.back() != '/') url += '/';
+    std::string url_str = "sftp://" + host + ":" + std::to_string(port);
+
+    if (path == "/") {
+        url_str += "/"; // For root, URL is sftp://host:port/
     } else {
-        url += path;
+        // For non-root paths like "/foo/bar" or "/file with space"
+        // path comes from joinPaths, so it's absolute, e.g., "/foo" or "/foo/file name"
+        // We need to encode the part *after* the initial "/"
+        // QString::fromUtf8 can handle potentially broken UTF-8 sequences gracefully.
+        QString pathSuffixToEncode = QString::fromUtf8(path.c_str() + 1); // Skip the leading '/'
+
+        // Define characters to be percent-encoded. Includes space, quotes, accented chars, and crucially '/'
+        // if it can appear in filenames/directory names that are not actual path separators.
+        // joinPaths should have already created a canonical path structure.
+        QByteArray charsToIncludeInEncoding = " /'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ";
+
+        QByteArray percentEncodedSuffixBytes = QUrl::toPercentEncoding(pathSuffixToEncode, QByteArray(), charsToIncludeInEncoding);
+        std::string encodedSuffix = std::string(percentEncodedSuffixBytes.constData(), percentEncodedSuffixBytes.length());
+
+        url_str += "/" + encodedSuffix;
     }
-    return url;
+    return url_str;
 }
 
 SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)

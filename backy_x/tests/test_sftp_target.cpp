@@ -262,9 +262,111 @@ TEST_F(SftpTargetOnlineTest, DeleteNonExistentFile) {
     // Let's assume for now it should return false if the file truly isn't there and RM fails.
     // However, some servers might return success for RM on non-existent file.
     // This test's expectation might need adjustment based on typical server behavior.
+    // Some SFTP servers return success for 'rm' on a non-existent file.
+    // If that's the case for the test server, this might need to be EXPECT_TRUE or have server-specific logic.
+    // For now, assuming a strict server that errors on 'rm non_existent_file'.
     EXPECT_FALSE(target.deleteFile("this_file_should_not_exist_ever.txt"));
     EXPECT_TRUE(target.endSession());
 }
+
+// --- Tests for filenames with special characters ---
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_Spaces) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    meta.name = "test file with spaces.txt";
+    // meta.size and meta.modificationTime are not strictly needed for sendFile/deleteFile path tests.
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload file with spaces in name.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete file with spaces in name.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_Apostrophe) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    meta.name = "file_with_apostrophe'.txt";
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload file with apostrophe in name.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete file with apostrophe in name.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_Accent) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    meta.name = "fichier_avec_accent_à.txt"; // UTF-8 encoded string
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload file with accent in name.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete file with accent in name.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_CaptureDEcran) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    // This specific string "Capture d’écran test.png" uses:
+    // ’ : RIGHT SINGLE QUOTATION MARK (U+2019)
+    // é : LATIN SMALL LETTER E WITH ACUTE (U+00E9) - precomposed
+    // Or it could be e + combining acute accent : e (U+0065) +  ́ (U+0301)
+    // We'll use the precomposed version as it's more common in direct typing.
+    // C++ string literals with UTF-8 characters need to be handled correctly by the compiler.
+    // Ensure the source file is saved as UTF-8.
+    meta.name = "Capture d’écran test.png";
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload 'Capture d’écran test.png'.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete 'Capture d’écran test.png'.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_ComplexName) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    meta.name = "complex name ' & à # % .txt"; // Includes various characters
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload file with complex name.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete file with complex name.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
+TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_FileNameWithSlash) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    // This tests if a filename containing a slash (which should be percent-encoded) works.
+    // The SftpTarget::buildSftpUrl is expected to encode the '/' within the filename part.
+    meta.name = "file/with/slash.txt";
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload file with slash in its name.";
+    // After upload, the file should exist on SFTP server as "file%2Fwith%2Fslash.txt" in the remoteBasePath.
+    // The deleteFile will use the same meta.name, and buildSftpUrl should generate the same encoded path.
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete file with slash in its name.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
 
 // Main function for Google Test (if not linking with gtest_main)
 // int main(int argc, char **argv) {
