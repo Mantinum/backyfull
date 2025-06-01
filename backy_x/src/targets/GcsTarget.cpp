@@ -15,6 +15,7 @@
 #include <QJsonValue>
 #include <QDesktopServices> // To open browser
 #include <QCoreApplication> // For event loop during OAuth
+#include <QTimer> // For OAuth timeout
 
 // libcurl
 #include <curl/curl.h>
@@ -217,12 +218,11 @@ bool GcsTarget::sendFile(const std::string& localPath, const FileMetadata& remot
             return false;
         }
     }
-    inFile.close();
     m_lastError = "File upload failed for " + (m_objectPrefix + remoteObjectName) + " after maximum retries.";
     return false;
 }
 
-std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string& listPrefix) {
+std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string& /*listPrefix*/) {
     m_lastError.clear();
     std::vector<IStorageTarget::FileMetadata> files;
     // ... (rest of the listFiles implementation remains largely the same but should ensure m_lastError is set on failures)
@@ -511,7 +511,7 @@ bool GcsTarget::performInitialOAuthFlow() {
                      std::cerr << "GcsTarget: " << m_lastError << std::endl;
                      m_oauthFlowCompletedSuccessfully = false; // Explicitly false
                      QByteArray response = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\n\r\n";
-                     response += "<html><body><h1>Authentication Failed</h1><p>Error received from Google: " + QUrl::fromPercentEncoding(query.queryItemValue("error").toUtf8()) + "</p></body></html>";
+                     response += QByteArray("<html><body><h1>Authentication Failed</h1><p>Error received from Google: ") + QUrl::fromPercentEncoding(query.queryItemValue("error").toUtf8()) + QByteArray("</p></body></html>");
                      clientSocket->write(response);
                 } else {
                      m_lastError = "Callback received but 'code' or 'error' parameter missing or invalid.";
