@@ -28,7 +28,7 @@ bool LocalTarget::beginSession() {
     }
 }
 
-bool LocalTarget::sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) {
+bool LocalTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
     // Treat 'localPath' (first param) as the absoluteSourcePath for this function's logic
     const std::filesystem::path absoluteSourceFsPath(localPath);
     // Use 'metadata.name' as the targetRelativePath
@@ -102,8 +102,8 @@ bool LocalTarget::endSession() {
     return true;
 }
 
-std::vector<IStorageTarget::FileMetadata> LocalTarget::listFiles(const std::string& path) {
-    std::vector<IStorageTarget::FileMetadata> files;
+std::vector<FileMetadata> LocalTarget::listFiles(const std::string& path) {
+    std::vector<FileMetadata> files;
     std::filesystem::path dirToList = std::filesystem::path(currentBasePath_) / path;
 
     try {
@@ -136,7 +136,7 @@ std::vector<IStorageTarget::FileMetadata> LocalTarget::listFiles(const std::stri
             }
 
             bool isDir = entry.is_directory();
-            files.emplace_back(filename, fileSize, modTime, isDir);
+            files.emplace_back(filename, fileSize, std::chrono::system_clock::from_time_t(modTime), isDir);
         }
     } catch (const std::filesystem::filesystem_error& e) {
         std::cerr << "LocalTarget: Error listing directory " << dirToList.string() << ": " << e.what() << std::endl;

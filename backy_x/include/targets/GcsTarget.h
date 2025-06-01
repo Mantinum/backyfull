@@ -18,8 +18,8 @@ public:
 
     // IStorageTarget interface implementation
     bool beginSession() override;
-    bool sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) override; // Corrected
-    std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& path) override; // Corrected param name
+    bool sendFile(const std::string& localPath, const FileMetadata& metadata) override; // Corrected
+    std::vector<FileMetadata> listFiles(const std::string& path) override; // Corrected param name
     bool deleteFile(const std::string& remoteObjectName) override; // remoteObjectName is the path string
     bool downloadFile(const std::string& remoteObjectName, const std::string& localPath) override; // remoteObjectName is the path string
     bool endSession() override;

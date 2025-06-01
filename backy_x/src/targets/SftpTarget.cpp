@@ -206,7 +206,6 @@ bool SftpTarget::beginSession() {
     else if (m_sshSkipHostVerification) {
          // For disabling host key check, libcurl uses these options with SSH backend:
          // This is insecure and should be used with caution.
-        setopt_check(CURLOPT_SSH_SKIP_HOST_KEY_CHECK_INTERNAL, 1L, "CURLOPT_SSH_SKIP_HOST_KEY_CHECK_INTERNAL"); // Internal option, may not be public
         // A more common way if the above internal option isn't available/working is to use:
         // curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYPEER, 0L); // Not for SSH host key
         // curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYHOST, 0L); // Not for SSH host key
@@ -230,7 +229,7 @@ error:
     return false;
 }
 
-bool SftpTarget::sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) {
+bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
     std::cout << "SftpTarget: sendFile(" << localPath << ", remote_path: " << metadata.name << ") called." << std::endl;
     if (!m_curlHandle) { std::cerr << "SftpTarget: Session not begun or curl handle not initialized." << std::endl; return false; }
     std::ifstream sourceFile(localPath, std::ios::binary);
@@ -345,8 +344,8 @@ static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*u
     return outFile->good() ? size * nmemb : 0;
 }
 
-std::vector<IStorageTarget::FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
-    std::vector<IStorageTarget::FileMetadata> resultFiles;
+std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
+    std::vector<FileMetadata> resultFiles;
     if (!m_curlHandle) { std::cerr << "SftpTarget: listFiles - Session not begun or curl handle not initialized." << std::endl; return resultFiles; }
     std::string dirUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, remotePath);
     if (dirUrl.back() != '/') dirUrl += '/';
@@ -371,12 +370,12 @@ std::vector<IStorageTarget::FileMetadata> SftpTarget::listFiles(const std::strin
         while (lineStream >> token) tokens.push_back(token);
         if (tokens.size() < 9) {
             if (tokens.size() == 1 && tokens[0] != "." && tokens[0] != "..") {
-                 resultFiles.emplace_back(tokens[0], 0, 0, false);
+                 resultFiles.emplace_back(tokens[0], 0, std::chrono::system_clock::from_time_t(0), false);
                  qWarning() << "SftpTarget: listFiles - Parsed simple entry (1 token):" << QString::fromStdString(tokens[0]);
             } else qWarning() << "SftpTarget: listFiles - Skipping line due to insufficient tokens:" << QString::fromStdString(line);
             continue;
         }
-        IStorageTarget::FileMetadata meta; char type = tokens[0][0]; meta.isDirectory = (type == 'd');
+        FileMetadata meta; char type = tokens[0][0]; meta.isDirectory = (type == 'd');
         std::string filename; for (size_t i = 8; i < tokens.size(); ++i) { if (i > 8) filename += " "; filename += tokens[i]; }
         if (filename == "." || filename == "..") continue;
         meta.name = filename;

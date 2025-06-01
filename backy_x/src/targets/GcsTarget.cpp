@@ -124,7 +124,7 @@ bool GcsTarget::beginSession() {
     return true;
 }
 
-bool GcsTarget::sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) {
+bool GcsTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
     m_lastError.clear();
     std::string accessToken;
     int attempt = 0; const int maxAttempts = 2;
@@ -165,9 +165,9 @@ bool GcsTarget::sendFile(const std::string& localPath, const IStorageTarget::Fil
     return false;
 }
 
-std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string& path) { // param name 'path'
+std::vector<FileMetadata> GcsTarget::listFiles(const std::string& path) { // param name 'path'
     m_lastError.clear();
-    std::vector<IStorageTarget::FileMetadata> resultFiles;
+    std::vector<FileMetadata> resultFiles;
     std::string accessToken = getAccessToken();
     if (accessToken.empty()) { std::cerr << "GcsTarget: listFiles - No access token. Error: " << m_lastError << std::endl; return resultFiles; }
 
