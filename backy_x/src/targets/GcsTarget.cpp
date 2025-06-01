@@ -52,15 +52,15 @@ static std::string parseGcsError(const std::string& responseBody) {
     return responseBody;
 }
 
-static int64_t rfc3339ToTimestamp(const QString& rfc3339String) {
+static std::chrono::system_clock::time_point rfc3339ToTimestamp(const QString& rfc3339String) {
     QDateTime dateTime = QDateTime::fromString(rfc3339String, Qt::ISODate);
     if (dateTime.isValid()) {
         if (rfc3339String.endsWith('Z')) {
             dateTime.setTimeZone(QTimeZone::utc());
         }
-        return dateTime.toSecsSinceEpoch();
+        return std::chrono::system_clock::from_time_t(dateTime.toSecsSinceEpoch());
     }
-    return 0;
+    return std::chrono::system_clock::from_time_t(0);
 }
 
 static size_t gcsFileWriteCallback(void*contents, size_t size, size_t nmemb, void*userp) {
@@ -197,7 +197,7 @@ std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string
                         std::string name = fullPrefixPath;
                         if (name.rfind(effectivePath, 0) == 0) name.erase(0, effectivePath.length());
                         if (!name.empty() && name.back() == '/') name.pop_back();
-                        if (!name.empty()) resultFiles.emplace_back(name, 0, 0, true);
+                        if (!name.empty()) resultFiles.emplace_back(name, 0, std::chrono::system_clock::from_time_t(0), true);
                     }
                 }
             }
@@ -210,7 +210,7 @@ std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string
                         if (name.rfind(effectivePath, 0) == 0) name.erase(0, effectivePath.length());
                         if (name.empty() || name.back() == '/') continue;
                         uint64_t size = item.contains("size") ? std::stoull(item["size"].toString().toStdString()) : 0;
-                        int64_t modTime = item.contains("updated") ? rfc3339ToTimestamp(item["updated"].toString()) : 0;
+                        std::chrono::system_clock::time_point modTime = item.contains("updated") ? rfc3339ToTimestamp(item["updated"].toString()) : std::chrono::system_clock::from_time_t(0);
                         resultFiles.emplace_back(name, size, modTime, false);
                     }
                 }

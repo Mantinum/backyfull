@@ -27,7 +27,7 @@ static size_t sftpListWriteCallback(void* contents, size_t size, size_t nmemb, s
 // Generic file write callback for libcurl
 static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*userp);
 // Helper function to parse date strings from SFTP listing
-static int64_t parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken);
+static std::chrono::system_clock::time_point parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken);
 
 
 // Helper functions for SFTP path and URL construction
@@ -290,7 +290,7 @@ static size_t sftpListWriteCallback(void* contents, size_t size, size_t nmemb, s
 }
 
 // Updated parseSftpDate function
-static int64_t parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken) {
+static std::chrono::system_clock::time_point parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken) {
     QLocale cLocale(QLocale::English, QLocale::UnitedStates);
     QString yearStr, timeStr;
     bool hasYear = false;
@@ -333,9 +333,9 @@ static int64_t parseSftpDate(const QString& monthToken, const QString& dayToken,
 
     if (!dateTime.isValid()) {
         qWarning() << "SFTP Date Parse: Could not parse date string:" << dateString << "from tokens [" << monthToken << dayToken << timeOrYearToken << "]";
-        return 0;
+        return std::chrono::system_clock::from_time_t(0);
     }
-    return dateTime.toSecsSinceEpoch();
+    return std::chrono::system_clock::from_time_t(dateTime.toSecsSinceEpoch());
 }
 
 

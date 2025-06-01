@@ -4,6 +4,7 @@
 #include <string>
 #include <vector> // Or some other appropriate type for metadata
 #include <cstdint>
+#include <chrono>
 
 // Forward declaration if metadata is a complex type defined elsewhere
 // struct FileMetadata; 
@@ -12,14 +13,14 @@
 struct FileMetadata {
     std::string name;
     uint64_t size = 0;
-    int64_t modificationTime = 0; // Unix timestamp
+    std::chrono::system_clock::time_point modificationTime; // Unix timestamp
     bool isDirectory = false;
 
     // Optional: Default constructor
     FileMetadata() = default;
 
     // Optional: Parameterized constructor
-    FileMetadata(std::string n, uint64_t s, int64_t mt, bool isDir)
+    FileMetadata(std::string n, uint64_t s, std::chrono::system_clock::time_point mt, bool isDir)
         : name(std::move(n)), size(s), modificationTime(mt), isDirectory(isDir) {}
 };
 
