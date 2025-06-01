@@ -10,7 +10,7 @@ public:
     ~LocalTarget() override = default;
 
     bool beginSession() override;
-    bool sendFile(const std::string& relativePath, const FileMetadata& metadata) override;
+    bool sendFile(const std::string& path, const FileMetadata& meta = FileMetadata{}) override;
     // For M0, deleteFile might not be fully implemented or needed for simple copy
     bool deleteFile(const std::string& relativePath) override; 
     std::vector<FileMetadata> listFiles(const std::string& prefix) override;

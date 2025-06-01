@@ -24,6 +24,7 @@ QT_END_NAMESPACE
 class Scheduler;
 #include "util/CredentialManager.h" // For CredentialManager
 #include <memory> // For std::unique_ptr
+#include "core/IStorageTarget.h" // For FileMetadata
 
 // Forward declaration for Storage Targets
 class IStorageTarget;
@@ -120,7 +121,7 @@ private:
     void performBackupInternal(const QString& sourcePath, IStorageTarget* target);
 
     // Remote File Viewer methods
-    void displayRemoteFiles(const std::vector<IStorageTarget::FileMetadata>& files);
+    void displayRemoteFiles(const std::vector<FileMetadata>& files);
     void browseRemotePath(const QString& path);
 };
 

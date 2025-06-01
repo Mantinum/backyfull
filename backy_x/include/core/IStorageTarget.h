@@ -11,15 +11,15 @@
 
 // Definition of FileMetadata struct
 struct FileMetadata {
-    std::string name;
+    std::string name = "";
     uint64_t size = 0;
-    std::chrono::system_clock::time_point modificationTime; // Unix timestamp
+    std::chrono::system_clock::time_point modificationTime = std::chrono::system_clock::now();
     bool isDirectory = false;
 
     // Optional: Default constructor
-    FileMetadata() = default;
+    // FileMetadata() = default; // No longer strictly needed with all members default initialized
 
-    // Optional: Parameterized constructor
+    // Optional: Parameterized constructor - keep if used
     FileMetadata(std::string n, uint64_t s, std::chrono::system_clock::time_point mt, bool isDir)
         : name(std::move(n)), size(s), modificationTime(mt), isDirectory(isDir) {}
 };
@@ -33,7 +33,7 @@ public:
 
     virtual bool beginSession() = 0;
     // Ensure sendFile uses the struct FileMetadata
-    virtual bool sendFile(const std::string& localPath, const FileMetadata& metadata) = 0;
+    virtual bool sendFile(const std::string& path, const FileMetadata& meta = FileMetadata{}) = 0;
     virtual bool deleteFile(const std::string& remotePath) = 0;
     // Ensure listFiles returns a vector of the struct FileMetadata
     virtual std::vector<FileMetadata> listFiles(const std::string& path) = 0;

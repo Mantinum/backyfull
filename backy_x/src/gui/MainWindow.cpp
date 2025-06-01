@@ -601,22 +601,35 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                    FileMetadata meta;
                    meta.name          = relativePathStr;
                    meta.size          = entry.file_size();
-                   meta.modificationTime =
-                       std::chrono::system_clock::from_time_t(
-                           std::chrono::system_clock::to_time_t(
-                               std::chrono::file_clock::to_sys(entry.last_write_time())));
+                   time_t raw_time_t = std::chrono::file_clock::to_time_t(entry.last_write_time());
+                   meta.modificationTime = std::chrono::system_clock::from_time_t(raw_time_t);
 
                    if (target->sendFile(fullEntryPath.string(), meta)) {
                        updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
                    } else {
+                       std::string err_msg;
+                       GcsTarget* gcs = dynamic_cast<GcsTarget*>(target);
+                       SftpTarget* sftp = dynamic_cast<SftpTarget*>(target);
+
+                       if (gcs) {
+                           err_msg = gcs->getLastError();
+                       } else if (sftp) {
+                           err_msg = sftp->getLastError();
+                       } else {
+                           // This case handles LocalTarget and potentially others.
+                           // If LocalTarget *does* have a getLastError, it needs to be part of IStorageTarget.
+                           // Given the prompt, it seems it's not guaranteed.
+                           err_msg = "Error details not available for this target type or operation failed before specific error could be retrieved.";
+                       }
+
                        updateLog(QString("Error backing up: %1. Error: %2")
                                      .arg(QString::fromStdString(relativePathStr))
-                                     .arg(target->getLastError()),
+                                     .arg(QString::fromStdString(err_msg)),
                                  true);
                        QMessageBox::critical(this, "Backup Error",
                                              QString("Failed to back up: %1\nError: %2")
                                                  .arg(QString::fromStdString(relativePathStr))
-                                                 .arg(target->getLastError()));
+                                                 .arg(QString::fromStdString(err_msg)));
                        return; // Stop backup if one file fails
                    }
                }
@@ -884,7 +897,7 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
 }
 
 // New slots implementation & Remote file viewer methods
-void MainWindow::displayRemoteFiles(const std::vector<IStorageTarget::FileMetadata>& files) {
+void MainWindow::displayRemoteFiles(const std::vector<FileMetadata>& files) {
     fileTableWidget_->setRowCount(0); // Clear existing items
 
     // Add ".." navigation entry if not at root
@@ -939,10 +952,10 @@ void MainWindow::displayRemoteFiles(const std::vector<IStorageTarget::FileMetada
                               file.modificationTime.time_since_epoch()).count());
 
         QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(secs);
-        QString formattedDate = modDateTime.toString(Qt::DefaultLocaleShortDate);
+        QString formattedDate = modDateTime.toString(Qt::SystemLocaleShortDate); // New line with updated enum
 
         DateTimeTableWidgetItem *dateItem =
-                new DateTimeTableWidgetItem(formattedDate, secs);
+                new DateTimeTableWidgetItem(formattedDate, secs); // New line using qint64 secs
         fileTableWidget_->setItem(row, 2, dateItem);
 
         fileTableWidget_->setItem(row, 3, new QTableWidgetItem(file.isDirectory ? tr("Folder") : tr("File")));

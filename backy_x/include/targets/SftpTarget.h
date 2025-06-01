@@ -18,7 +18,7 @@ public:
 
     // Inherited via IStorageTarget
     bool beginSession() override;
-    bool sendFile(const std::string& localPath, const FileMetadata& metadata) override; // Corrected
+    bool sendFile(const std::string& path, const FileMetadata& meta = FileMetadata{}) override; // Corrected
     bool deleteFile(const std::string& remotePath) override; // Corrected
     std::vector<FileMetadata> listFiles(const std::string& remotePath) override;
     bool downloadFile(const std::string& remotePath, const std::string& localPath) override;
