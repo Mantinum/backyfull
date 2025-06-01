@@ -24,6 +24,8 @@ struct FileMetadata {
         : name(std::move(n)), size(s), modificationTime(mt), isDirectory(isDir) {}
 };
 
+using FileMetadata_t = ::FileMetadata;
+
 // Then, the IStorageTarget class definition follows
 class IStorageTarget {
 public:

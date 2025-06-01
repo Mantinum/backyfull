@@ -188,6 +188,10 @@ bool SftpTarget::beginSession() {
     if (m_curlHandle) { curl_easy_cleanup(m_curlHandle); m_curlHandle = nullptr; }
     m_curlHandle = curl_easy_init();
     if (!m_curlHandle) { std::cerr << "SftpTarget: curl_easy_init() failed." << std::endl; return false; }
+
+    // TODO: Replace with a secure SSH host key verification mechanism (e.g., user-provided known_hosts file)
+    curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, "/dev/null");
+
     CURLcode res;
     auto setopt_check = [&](CURLoption opt, auto val, const char* name) {
         res = curl_easy_setopt(m_curlHandle, opt, val);
