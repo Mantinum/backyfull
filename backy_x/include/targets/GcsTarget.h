@@ -21,6 +21,7 @@ public:
     bool sendFile(const std::string& localPath, const FileMetadata& remoteObjectName) override;
     std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& /*listPrefix*/) override;
     bool deleteFile(const std::string& /*remoteObjectName*/) override;
+    bool downloadFile(const std::string& remoteObjectName, const std::string& localPath) override;
     bool endSession() override;
 
     // Public OAuth method for UI

@@ -14,6 +14,11 @@
 #include <QGroupBox>
 #include <QCheckBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
+// Forward declarations for Qt UI elements related to File Viewer
+QT_BEGIN_NAMESPACE
+class QTableWidget;
+class QTableWidgetItem;
+QT_END_NAMESPACE
 
 // Forward declaration for Scheduler
 class Scheduler;
@@ -47,6 +52,11 @@ private slots:
     void handleScheduledBackup(const QString& sourcePath, const QString& destinationOrIdentifier);
     void onGcsConnectButtonClicked();
     void onGcsTestConnectionClicked(); // Slot for GCS Test Connection
+    // Slots for File Viewer
+    void onFileViewerRefreshClicked();
+    void onFileViewerDownloadClicked();
+    void onFileViewerDeleteClicked();
+    void onFileTableItemDoubleClicked(QTableWidgetItem *item);
 
 private:
     void setupUI();
@@ -86,6 +96,15 @@ private:
     QPushButton *gcsTestConnectionButton_; // Added
     QLabel *gcsAuthStatusLabel_;
 
+    // File Viewer UI Elements
+    QGroupBox *fileViewerGroupBox_ = nullptr;
+    QTableWidget *fileTableWidget_ = nullptr;
+    QPushButton *refreshButton_ = nullptr;
+    QPushButton *downloadButton_ = nullptr;
+    QPushButton *deleteButton_ = nullptr;
+    QLabel *currentPathLabel_ = nullptr;
+    QString currentRemotePath_ = "/";
+
     // Core components
     Scheduler *scheduler_;
     LocalTarget *localTarget_; 
@@ -99,6 +118,10 @@ private:
 
     // Internal helper to perform the backup logic
     void performBackupInternal(const QString& sourcePath, IStorageTarget* target);
+
+    // Remote File Viewer methods
+    void displayRemoteFiles(const std::vector<IStorageTarget::FileMetadata>& files);
+    void browseRemotePath(const QString& path);
 };
 
 #endif // MAINWINDOW_H

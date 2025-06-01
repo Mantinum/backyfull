@@ -13,9 +13,13 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QJsonArray> // Added for listFiles
 #include <QDesktopServices> // To open browser
 #include <QCoreApplication> // For event loop during OAuth
 #include <QTimer> // For OAuth timeout
+#include <QDateTime> // Added for RFC3339 parsing
+#include <QTimeZone> // Added for RFC3339 parsing
+
 
 // libcurl
 #include <curl/curl.h>
@@ -44,6 +48,30 @@ static std::string parseGcsError(const std::string& responseBody) {
         }
     }
     return responseBody; // Return raw body if not typical GCS JSON error format
+}
+
+// Helper function to convert RFC3339 string to Unix timestamp
+static int64_t rfc3339ToTimestamp(const QString& rfc3339String) {
+    QDateTime dateTime = QDateTime::fromString(rfc3339String, Qt::ISODate);
+    if (dateTime.isValid()) {
+        // It's crucial to ensure the datetime is interpreted as UTC if no offset is present,
+        // or correctly use the offset if it is. GCS 'updated' timestamps are RFC3339, typically UTC.
+        // Qt::ISODate should handle this, but to be explicit:
+        if (rfc3339String.endsWith('Z')) {
+            dateTime.setTimeZone(QTimeZone::utc());
+        }
+        return dateTime.toSecsSinceEpoch();
+    }
+    // Fallback or error handling for invalid format
+    // std::cerr << "Warning: Could not parse RFC3339 timestamp: " << rfc3339String.toStdString() << std::endl;
+    return 0;
+}
+
+// Static callback function for libcurl to write downloaded file data
+static size_t gcsFileWriteCallback(void*contents, size_t size, size_t nmemb, void*userp) {
+    std::ofstream* outFile = static_cast<std::ofstream*>(userp);
+    outFile->write(static_cast<const char*>(contents), size * nmemb);
+    return outFile->good() ? size * nmemb : 0;
 }
 
 
@@ -222,53 +250,277 @@ bool GcsTarget::sendFile(const std::string& localPath, const FileMetadata& remot
     return false;
 }
 
-std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string& /*listPrefix*/) {
+std::vector<IStorageTarget::FileMetadata> GcsTarget::listFiles(const std::string& listPrefix) {
     m_lastError.clear();
-    std::vector<IStorageTarget::FileMetadata> files;
-    // ... (rest of the listFiles implementation remains largely the same but should ensure m_lastError is set on failures)
-    // For brevity, I'll assume the error setting logic shown in sendFile is applied here too.
-    // Key points for listFiles:
-    // - Set m_lastError on getAccessToken() failure.
-    // - Set m_lastError on JSON parsing failure from GCS response.
-    // - Set m_lastError on HTTP errors (401, 429, 50x) if retries exhausted or error is fatal.
-    // - Set m_lastError on CURL_code errors.
+    std::vector<IStorageTarget::FileMetadata> resultFiles;
+
     std::string accessToken = getAccessToken();
     if (accessToken.empty()) {
-        std::cerr << "GcsTarget: No access token for listFiles. Error: " << m_lastError << std::endl;
-        return {};
+        // m_lastError is already set by getAccessToken()
+        std::cerr << "GcsTarget: listFiles - Failed to get access token. Error: " << m_lastError << std::endl;
+        return resultFiles; // Empty vector
     }
-    // ... (actual list logic with performCurlRequest)
-    // Example error handling within the loop:
-    // if (res != CURLE_OK || responseCode != 200) {
-    //     m_lastError = "Failed to list files. HTTP: " + std::to_string(responseCode) + ", Curl: " + curl_easy_strerror(res);
-    //     return {};
-    // }
-    // if (json_parsing_failed) {
-    //     m_lastError = "Failed to parse listFiles response.";
-    //     return {};
-    // }
-    return files; // Placeholder
+
+    QUrl gcsUrl("https://storage.googleapis.com/storage/v1/b/" + QString::fromStdString(m_bucketName) + "/o");
+    QUrlQuery query;
+
+    std::string effectiveListPrefix = m_objectPrefix + listPrefix;
+    if (!effectiveListPrefix.empty() && effectiveListPrefix.back() != '/') {
+        effectiveListPrefix += '/';
+    }
+
+    if (!effectiveListPrefix.empty()){
+        query.addQueryItem("prefix", QString::fromStdString(effectiveListPrefix));
+    }
+    query.addQueryItem("delimiter", "/");
+    // query.addQueryItem("maxResults", "1000"); // Optional: for pagination
+
+    gcsUrl.setQuery(query);
+    std::string url = gcsUrl.toString(QUrl::FullyEncoded).toStdString();
+
+    std::vector<std::string> headers = {"Authorization: Bearer " + accessToken};
+    std::string responseBody;
+    long responseCode = 0;
+
+    std::cout << "GcsTarget: Listing files with URL: " << url << std::endl;
+
+    CURLcode res = performCurlRequest(url, "GET", headers, "", nullptr, responseBody, responseCode);
+
+    if (res != CURLE_OK) {
+        m_lastError = "listFiles failed. CURL Error: " + std::string(curl_easy_strerror(res)) + " (" + std::to_string(res) + ")";
+        std::cerr << "GcsTarget: " << m_lastError << std::endl;
+        return resultFiles;
+    }
+
+    if (responseCode != 200) {
+        m_lastError = "listFiles failed. HTTP Code: " + std::to_string(responseCode) + ". Response: " + parseGcsError(responseBody);
+        std::cerr << "GcsTarget: " << m_lastError << std::endl;
+        return resultFiles;
+    }
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(QString::fromStdString(responseBody).toUtf8());
+    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
+        m_lastError = "listFiles failed to parse JSON response: " + responseBody;
+        std::cerr << "GcsTarget: " << m_lastError << std::endl;
+        return resultFiles;
+    }
+
+    QJsonObject rootObject = jsonDoc.object();
+
+    // Process Prefixes (Directories)
+    if (rootObject.contains("prefixes") && rootObject["prefixes"].isArray()) {
+        QJsonArray prefixesArray = rootObject["prefixes"].toArray();
+        for (const QJsonValue& val : prefixesArray) {
+            if (val.isString()) {
+                std::string fullPrefixPath = val.toString().toStdString(); // e.g., "my_backup_root/some_folder/sub_folder/"
+                std::string name = fullPrefixPath;
+
+                // Remove the effectiveListPrefix from the beginning
+                if (name.rfind(effectiveListPrefix, 0) == 0) { // starts with effectiveListPrefix
+                    name.erase(0, effectiveListPrefix.length());
+                }
+                // Remove trailing slash for display name
+                if (!name.empty() && name.back() == '/') {
+                    name.pop_back();
+                }
+
+                if (name.empty()) continue; // Skip if the prefix is the same as listPrefix itself
+
+                FileMetadata meta;
+                meta.name = name;
+                meta.isDirectory = true;
+                meta.size = 0;
+                meta.modificationTime = 0; // GCS doesn't provide mod time for prefixes
+                resultFiles.push_back(meta);
+                std::cout << "GcsTarget: Found directory: " << meta.name << std::endl;
+            }
+        }
+    }
+
+    // Process Items (Files)
+    if (rootObject.contains("items") && rootObject["items"].isArray()) {
+        QJsonArray itemsArray = rootObject["items"].toArray();
+        for (const QJsonValue& val : itemsArray) {
+            if (val.isObject()) {
+                QJsonObject itemObject = val.toObject();
+                FileMetadata meta;
+
+                std::string fullItemPath = itemObject["name"].toString().toStdString(); // e.g. "my_backup_root/some_folder/file.txt"
+                std::string name = fullItemPath;
+
+                // Remove the effectiveListPrefix from the beginning
+                if (name.rfind(effectiveListPrefix, 0) == 0) { // starts with effectiveListPrefix
+                     name.erase(0, effectiveListPrefix.length());
+                }
+
+                if (name.empty()) continue; // Should not happen for files if prefix is handled correctly
+                if (name.back() == '/') continue; // Skip objects that end with a slash (pseudo-folders) if any slip through
+
+                meta.name = name;
+                meta.isDirectory = false;
+                if (itemObject.contains("size") && itemObject["size"].isString()) {
+                    meta.size = std::stoull(itemObject["size"].toString().toStdString());
+                } else {
+                    meta.size = 0; // Or handle error
+                }
+                if (itemObject.contains("updated") && itemObject["updated"].isString()) {
+                    meta.modificationTime = rfc3339ToTimestamp(itemObject["updated"].toString());
+                } else {
+                    meta.modificationTime = 0; // Or handle error
+                }
+                resultFiles.push_back(meta);
+                std::cout << "GcsTarget: Found file: " << meta.name << " (Size: " << meta.size << ")" << std::endl;
+            }
+        }
+    }
+    std::cout << "GcsTarget: listFiles completed. Found " << resultFiles.size() << " items." << std::endl;
+    return resultFiles;
 }
 
-bool GcsTarget::deleteFile(const std::string& /*remoteObjectName*/) {
+bool GcsTarget::downloadFile(const std::string& remoteObjectName, const std::string& localPath) {
     m_lastError.clear();
-    // ... (rest of deleteFile implementation, ensuring m_lastError is set on failures)
-    // Similar to sendFile, set m_lastError on:
-    // - getAccessToken() failure.
-    // - HTTP errors (401, 429, 50x) if retries exhausted or error is fatal (excluding 404, which is success for delete).
-    // - CURL_code errors.
     std::string accessToken = getAccessToken();
     if (accessToken.empty()) {
-        std::cerr << "GcsTarget: No access token for deleteFile. Error: " << m_lastError << std::endl;
+        std::cerr << "GcsTarget: downloadFile - Failed to get access token. Error: " << m_lastError << std::endl;
         return false;
     }
-    // ... (actual delete logic with performCurlRequest)
-    // Example error handling:
-    // if (res != CURLE_OK || (responseCode != 204 && responseCode != 404)) {
-    //    m_lastError = "Failed to delete file " + remoteObjectName + ". HTTP: " + std::to_string(responseCode) + ", Curl: " + curl_easy_strerror(res);
-    //    return false;
-    // }
-    return true; // Placeholder
+
+    // remoteObjectName is the path relative to the current browsing path/prefix.
+    // It needs to be combined with m_objectPrefix to form the full path in the bucket.
+    std::string fullRemoteObjectPath = m_objectPrefix + remoteObjectName;
+    QString qFullRemotePath = QString::fromStdString(fullRemoteObjectPath);
+    // GCS expects object names to be URL-encoded. Slashes should NOT be encoded for path segments.
+    std::string encodedObjectName = QUrl::toPercentEncoding(qFullRemotePath, "", "/").toStdString();
+
+
+    std::string url = "https://storage.googleapis.com/storage/v1/b/" + m_bucketName +
+                      "/o/" + encodedObjectName + "?alt=media";
+
+    std::ofstream outFile(localPath, std::ios::binary);
+    if (!outFile.is_open()) {
+        m_lastError = "Failed to open local file for writing: " + localPath;
+        std::cerr << "GcsTarget: " << m_lastError << std::endl;
+        return false;
+    }
+
+    std::vector<std::string> headers = {"Authorization: Bearer " + accessToken};
+    long responseCode = 0;
+    CURLcode res;
+
+    // Temporarily configure curl for this specific download request
+    // Store original write function and data to restore later if performCurlRequest is not used
+    // For this subtask, we'll directly configure and use curl_easy_perform here.
+
+    if (!m_curlHandle) { // Should always be initialized by constructor
+         m_lastError = "libcurl handle not initialized.";
+         std::cerr << "GcsTarget: " << m_lastError << std::endl;
+         outFile.close();
+         std::remove(localPath.c_str()); // Delete potentially empty file
+         return false;
+    }
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L); // Explicitly GET
+
+    struct curl_slist *header_slist = nullptr;
+    for (const auto& header : headers) {
+        header_slist = curl_slist_append(header_slist, header.c_str());
+    }
+    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPHEADER, header_slist);
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, gcsFileWriteCallback);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &outFile);
+
+    // Ensure other options like POSTFIELDS etc are not set from previous calls if handle is reused extensively
+    // For safety, explicitly clear options that might interfere
+    curl_easy_setopt(m_curlHandle, CURLOPT_POSTFIELDS, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_POSTFIELDSIZE, -1L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
+
+
+    std::cout << "GcsTarget: Downloading " << fullRemoteObjectPath << " to " << localPath << " from URL: " << url << std::endl;
+    res = curl_easy_perform(m_curlHandle);
+
+    if (header_slist) {
+        curl_slist_free_all(header_slist);
+    }
+    // Reset write function to default or to the one used by performCurlRequest (string appender)
+    // This is important if m_curlHandle is reused by performCurlRequest later.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, writeCallback); // Assuming 'writeCallback' is the default for string responses
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr); // Or to the string pointer if performCurlRequest expects one
+
+
+    if (res == CURLE_OK) {
+        curl_easy_getinfo(m_curlHandle, CURLINFO_RESPONSE_CODE, &responseCode);
+        if (responseCode == 200) {
+            std::cout << "GcsTarget: File downloaded successfully: " << fullRemoteObjectPath << std::endl;
+            outFile.close();
+            return true;
+        } else {
+            // Attempt to read error from outFile if it was written there (some servers might send JSON error for GET failures)
+            // However, GCS usually provides error info in headers or specific error structures not directly in file stream for alt=media.
+            // For now, use a generic error.
+            m_lastError = "File download failed for " + fullRemoteObjectPath + ". HTTP Code: " + std::to_string(responseCode);
+            // If response body for error was written to file, it needs to be handled/cleared.
+            // For now, we assume error details are not in the downloaded file body for alt=media.
+        }
+    } else {
+        m_lastError = "File download failed for " + fullRemoteObjectPath + ". CURL Error: " + std::string(curl_easy_strerror(res)) + " (" + std::to_string(res) + ")";
+    }
+
+    std::cerr << "GcsTarget: " << m_lastError << std::endl;
+    outFile.close();
+    std::remove(localPath.c_str()); // Delete partially downloaded or empty file
+    return false;
+}
+
+
+bool GcsTarget::deleteFile(const std::string& remoteObjectName) {
+    m_lastError.clear();
+    std::string accessToken = getAccessToken();
+    if (accessToken.empty()) {
+        std::cerr << "GcsTarget: deleteFile - Failed to get access token. Error: " << m_lastError << std::endl;
+        return false;
+    }
+
+    std::string fullRemoteObjectPath = m_objectPrefix + remoteObjectName;
+    QString qFullRemotePath = QString::fromStdString(fullRemoteObjectPath);
+    std::string encodedObjectName = QUrl::toPercentEncoding(qFullRemotePath, "", "/").toStdString();
+
+    std::string url = "https://storage.googleapis.com/storage/v1/b/" + m_bucketName +
+                      "/o/" + encodedObjectName;
+
+    std::vector<std::string> headers = {"Authorization: Bearer " + accessToken};
+    std::string responseBody; // To capture any error messages from GCS
+    long responseCode = 0;
+
+    std::cout << "GcsTarget: Deleting object " << fullRemoteObjectPath << " from URL: " << url << std::endl;
+
+    // performCurlRequest is set up for GET/POST with optional file streams and string responseBody.
+    // For DELETE, we don't have a request body stream, but we do want the responseBody for errors.
+    // The current performCurlRequest should mostly work if inFileStream is nullptr.
+    CURLcode res = performCurlRequest(url, "DELETE", headers, "", nullptr, responseBody, responseCode);
+
+    if (res == CURLE_OK) {
+        // HTTP 204 No Content is success for DELETE.
+        // HTTP 404 Not Found can also be considered success for idempotent delete.
+        if (responseCode == 204 || responseCode == 404) {
+            std::cout << "GcsTarget: Object deleted successfully (or was already deleted): " << fullRemoteObjectPath
+                      << " (HTTP " << responseCode << ")" << std::endl;
+            return true;
+        } else {
+            m_lastError = "Object deletion failed for " + fullRemoteObjectPath + ". HTTP Code: " + std::to_string(responseCode)
+                          + ". Response: " + parseGcsError(responseBody);
+        }
+    } else {
+        m_lastError = "Object deletion failed for " + fullRemoteObjectPath + ". CURL Error: " + std::string(curl_easy_strerror(res))
+                      + " (" + std::to_string(res) + ")";
+    }
+
+    std::cerr << "GcsTarget: " << m_lastError << std::endl;
+    return false;
 }
 
 bool GcsTarget::endSession() {

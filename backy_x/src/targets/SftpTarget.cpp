@@ -3,12 +3,15 @@
 #include <fstream>  // For std::ifstream
 #include <filesystem> // For std::filesystem::path (C++17)
 #include <vector>   // For directory creation components
-#include <sstream>  // For std::istringstream (used in parseSshAuthTypes)
+#include <sstream>  // For std::istringstream (used in parseSshAuthTypes and listFiles)
+#include <iomanip>  // For std::get_time (potentially, if not using Qt)
 
 #include <QString> // For service name and password with CredentialManager
 #include <QDebug> // For qDebug, qWarning
 #include <QByteArray> // For QByteArray and toUtf8()
 #include <QUrl> // For QUrl and QUrl::toPercentEncoding
+#include <QDateTime> // For SFTP date parsing
+#include <QLocale>   // For SFTP date parsing
 #include "util/CredentialManager.h" // For createPlatformCredentialManager and CredentialManager class
 
 // For libcurl (SFTP operations)
@@ -710,6 +713,9 @@ bool SftpTarget::deleteFile(const std::string& relativePath) {
     }
     
     std::cout << "SftpTarget: File deletion command successfully executed for " << relativePath << std::endl;
+    // It's good practice to reset options that were specific to this operation.
+    // CURLOPT_QUOTE was reset. If CURLOPT_NOBODY or others were used, reset them too.
+    // Example: curl_easy_setopt(m_curlHandle, CURLOPT_NOBODY, 0L);
     return true;
 }
 
@@ -723,8 +729,284 @@ bool SftpTarget::endSession() {
     return true;
 }
 
-std::vector<std::string> SftpTarget::listFiles(const std::string& prefix) {
-    std::cerr << "SftpTarget: listFiles is not implemented." << std::endl;
-    // Return an empty vector as per the requirement
-    return {};
+// Static callback function for libcurl to store SFTP listing data
+static size_t sftpListWriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
+    userp->append((char*)contents, size * nmemb);
+    return size * nmemb;
+}
+
+// Helper function to parse date strings from SFTP listing
+// Example formats: "May 29 10:00" or "May 29 2023"
+static int64_t parseSftpDate(const QString& monthStr, const QString& dayStr, const QString& timeOrYearStr) {
+    QLocale cLocale(QLocale::C);
+    QDateTime currentDateTime = QDateTime::currentDateTime();
+    int year;
+    QTime timeVal;
+
+    // Try to parse timeOrYearStr as a year first
+    bool isYear = false;
+    int parsedYear = timeOrYearStr.toInt(&isYear);
+    if (isYear && timeOrYearStr.length() == 4) { // Basic check for a 4-digit year
+        year = parsedYear;
+    } else {
+        // Try to parse as time (HH:mm)
+        timeVal = cLocale.toTime(timeOrYearStr, "hh:mm");
+        if (timeVal.isValid()) {
+            year = currentDateTime.date().year(); // Assume current year
+            isYear = false; // It's a time, not a year directly
+        } else {
+            qWarning() << "SFTP Date Parse: Could not parse time/year part:" << timeOrYearStr;
+            return 0; // Cannot determine year or time
+        }
+    }
+
+    // Parse month string (e.g., "May") to month number
+    int month = cLocale.monthShortName(monthStr);
+    if (month == 0) { // Fallback if short name fails, try long name (though less common in ls -l)
+        month = cLocale.monthName(monthStr);
+    }
+    if (month == 0) {
+        qWarning() << "SFTP Date Parse: Could not parse month:" << monthStr;
+        return 0;
+    }
+
+    int day = dayStr.toInt();
+    if (day == 0 || day > 31) {
+         qWarning() << "SFTP Date Parse: Could not parse day:" << dayStr;
+        return 0;
+    }
+
+    QDate date(year, month, day);
+    if (!date.isValid()) {
+        qWarning() << "SFTP Date Parse: Constructed QDate is invalid:" << year << month << day;
+        return 0;
+    }
+
+    QDateTime dateTime;
+    if (!isYear || !timeVal.isValid()) { // If timeOrYearStr was a year, or if timeVal is still default (invalid)
+        // This means timeOrYearStr was a year, so time is 00:00, or time parsing failed earlier (which should have exited)
+        // For listings with year, time is usually not provided, so midnight is a common assumption.
+        dateTime.setDate(date);
+        dateTime.setTime(QTime(0,0,0)); // Assume midnight if only year was given
+    } else {
+        dateTime.setDate(date);
+        dateTime.setTime(timeVal);
+    }
+
+    // Adjust year for recent files if time was given (timeOrYearStr was HH:mm)
+    // and the parsed date is in the future (e.g. listing "Dec" in "Jan" -> previous year)
+    if (!isYear && timeVal.isValid()) { // Only if timeOrYearStr was a time
+        // Set timezone to local and then check. Or assume server lists in its local time.
+        // This logic assumes the server's time is somewhat synchronized with the client's current year concept.
+        QDateTime tempDateTimeWithLocalOffset = dateTime;
+        // If server is UTC and client is local, this might need adjustment.
+        // For now, assume server time makes sense in context of current client year.
+        if (tempDateTimeWithLocalOffset > currentDateTime.addDays(1)) { // Add 1 day tolerance
+            date = date.addYears(-1);
+            dateTime.setDate(date);
+        }
+    }
+
+    if (!dateTime.isValid()) {
+        qWarning() << "SFTP Date Parse: Final QDateTime is invalid from components:" << monthStr << dayStr << timeOrYearStr;
+        return 0;
+    }
+
+    return dateTime.toSecsSinceEpoch();
+}
+
+// Generic file write callback for libcurl
+static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*userp) {
+    std::ofstream* outFile = static_cast<std::ofstream*>(userp);
+    outFile->write(static_cast<const char*>(contents), size * nmemb);
+    return outFile->good() ? size * nmemb : 0;
+}
+
+std::vector<IStorageTarget::FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
+    std::vector<IStorageTarget::FileMetadata> resultFiles;
+    if (!m_curlHandle) {
+        std::cerr << "SftpTarget: listFiles - Session not begun or curl handle not initialized." << std::endl;
+        return resultFiles;
+    }
+
+    std::string dirUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, remotePath);
+    if (dirUrl.back() != '/') {
+        dirUrl += '/';
+    }
+
+    std::cout << "SftpTarget: Listing directory URL: " << dirUrl << std::endl;
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_URL, dirUrl.c_str());
+    // We want a detailed listing. CURLOPT_DIRLISTONLY = 0L is default, but be explicit.
+    // For SFTP, just setting the URL to a directory path should give a listing.
+    // The format of this listing can be server-dependent.
+    // `CURLOPT_CUSTOMREQUEST, "LIST -l"` is an attempt to get `ls -l` like format.
+    // This is NOT a standard SFTP command and might not work on all servers.
+    // If it fails, a fallback to parse simpler name-only listing or trying other custom commands might be needed.
+    // For now, we attempt "LIST -l" as it's common for servers that blend FTP/SFTP commands.
+    // A more robust SFTP approach would be to use libssh2 directly for directory listing,
+    // as SFTP protocol itself has structured ways to get file attributes. Libcurl abstracts this,
+    // but the detailed list format isn't standardized across all SFTP servers via LIST command.
+    // For now, let's try with default listing (no custom request) and see the format.
+    // If that doesn't give details, we can try "LIST -l".
+    // Let's start by requesting a normal directory listing. Libcurl usually provides a detailed one for SFTP if possible.
+    // curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, "LIST -l"); // Try this if default is not detailed enough
+
+    std::string listingData;
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, sftpListWriteCallback);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &listingData);
+    curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L); // Ensure detailed list, not just names. Default is 0L.
+
+    CURLcode res = curl_easy_perform(m_curlHandle);
+
+    // Reset options for subsequent calls
+    curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, NULL); // Reset custom request
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+
+    if (res != CURLE_OK) {
+        std::cerr << "SftpTarget: listFiles - curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+        return resultFiles;
+    }
+
+    std::cout << "SftpTarget: Raw listing data:\n" << listingData << std::endl;
+
+    std::istringstream iss(listingData);
+    std::string line;
+    while (std::getline(iss, line)) {
+        if (line.empty() || line[0] == '\r' || line[0] == '\n') continue; // Skip empty lines or only CR/LF
+        // Remove CR if present
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line.empty()) continue;
+
+
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream lineStream(line);
+        while (lineStream >> token) {
+            tokens.push_back(token);
+        }
+
+        // Basic check for ls -l like format (usually 9+ tokens, e.g. "drwxr-xr-x 2 user group 4096 May 29 10:00 dirname")
+        // A simple name-only listing might have only 1 token.
+        if (tokens.size() < 9) { // Heuristic for detailed listing
+            // This might be a name-only listing or an unexpected format
+            // If it's one token and not "." or "..", treat as file/dir with unknown details
+            if (tokens.size() == 1 && tokens[0] != "." && tokens[0] != "..") {
+                FileMetadata meta;
+                meta.name = tokens[0];
+                meta.isDirectory = false; // Cannot determine, default to file
+                meta.size = 0;
+                meta.modificationTime = 0;
+                resultFiles.push_back(meta);
+                 qWarning() << "SftpTarget: listFiles - Parsed simple entry (1 token):" << QString::fromStdString(meta.name);
+            } else {
+                 qWarning() << "SftpTarget: listFiles - Skipping line due to insufficient tokens or unexpected format:" << QString::fromStdString(line);
+            }
+            continue;
+        }
+
+        // Assuming ls -l format:
+        // tokens[0] = permissions (e.g., drwxr-xr-x)
+        // tokens[1] = number of links
+        // tokens[2] = owner
+        // tokens[3] = group
+        // tokens[4] = size
+        // tokens[5] = Month (e.g., May)
+        // tokens[6] = Day (e.g., 29)
+        // tokens[7] = Time (e.g., 10:00) or Year (e.g., 2023)
+        // tokens[8 onwards] = Filename (can contain spaces)
+
+        FileMetadata meta;
+        char type = tokens[0][0];
+        meta.isDirectory = (type == 'd');
+        // meta.isLink = (type == 'l'); // If we need to handle symlinks specifically
+
+        // Skip "." and ".." entries
+        std::string filename;
+        // Filename starts at tokens[8] and can have spaces
+        for (size_t i = 8; i < tokens.size(); ++i) {
+            if (i > 8) filename += " ";
+            filename += tokens[i];
+        }
+
+        if (filename == "." || filename == "..") {
+            continue;
+        }
+        meta.name = filename;
+
+        try {
+            meta.size = std::stoull(tokens[4]);
+        } catch (const std::exception& e) {
+            qWarning() << "SftpTarget: listFiles - Failed to parse size for" << QString::fromStdString(meta.name) << ". Error:" << e.what();
+            meta.size = 0;
+        }
+
+        meta.modificationTime = parseSftpDate(QString::fromStdString(tokens[5]), QString::fromStdString(tokens[6]), QString::fromStdString(tokens[7]));
+
+        resultFiles.push_back(meta);
+        std::cout << "SftpTarget: Parsed: Name=" << meta.name << ", Dir=" << meta.isDirectory << ", Size=" << meta.size << ", ModTime=" << meta.modificationTime << std::endl;
+    }
+
+    return resultFiles;
+}
+
+bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& localPath) {
+    if (!m_curlHandle) {
+        std::cerr << "SftpTarget: downloadFile - Session not begun or curl handle not initialized." << std::endl;
+        return false;
+    }
+
+    // remotePath is relative to m_remoteBasePath for SFTP target.
+    // buildSftpUrl already handles joining m_remoteBasePath with the provided relative path.
+    std::string fileUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, remotePath);
+    std::cout << "SftpTarget: Downloading from URL: " << fileUrl << " to local path: " << localPath << std::endl;
+
+    std::ofstream outFile(localPath, std::ios::binary);
+    if (!outFile.is_open()) {
+        std::cerr << "SftpTarget: Failed to open local file for writing: " << localPath << std::endl;
+        return false;
+    }
+
+    CURLcode res;
+    curl_easy_setopt(m_curlHandle, CURLOPT_URL, fileUrl.c_str());
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, fileWriteCallback); // Use the generic file write callback
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &outFile);
+    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L); // Ensure not in upload mode
+    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L); // Explicitly GET (though default for SFTP URLs not needing UPLOAD)
+
+    // Reset other potentially interfering options (like those for LIST)
+    curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, NULL);
+
+
+    res = curl_easy_perform(m_curlHandle);
+
+    // Reset write function to NULL or a default string writer if other operations use it.
+    // For safety, setting to NULL. If other operations need a string writer, they should set it.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+
+    outFile.close(); // Close file before checking result and potentially deleting
+
+    if (res != CURLE_OK) {
+        std::cerr << "SftpTarget: curl_easy_perform() failed for downloadFile: " << curl_easy_strerror(res) << std::endl;
+        std::remove(localPath.c_str()); // Delete partially downloaded file
+        return false;
+    }
+
+    // For SFTP, response code might not be as relevant as for HTTP, but good to check if available.
+    // long responseCode = 0;
+    // curl_easy_getinfo(m_curlHandle, CURLINFO_RESPONSE_CODE, &responseCode);
+    // if (responseCode != 200 && responseCode != 0) { // 0 might be default if not HTTP
+    //    std::cerr << "SftpTarget: Download failed with response code: " << responseCode << std::endl;
+    //    std::remove(localPath.c_str());
+    //    return false;
+    // }
+
+
+    std::cout << "SftpTarget: File downloaded successfully to " << localPath << std::endl;
+    return true;
 }

@@ -21,7 +21,8 @@ public:
     // Changed second parameter name from metadata to remoteRelativePath for clarity
     bool sendFile(const std::string& relativePath, const FileMetadata& remoteRelativePath) override;
     bool deleteFile(const std::string& relativePath) override;
-    std::vector<std::string> listFiles(const std::string& prefix) override;
+    std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& remotePath) override;
+    bool downloadFile(const std::string& remotePath, const std::string& localPath) override;
     bool endSession() override;
 
 private:
