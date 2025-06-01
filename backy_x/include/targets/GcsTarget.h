@@ -9,7 +9,7 @@
 #include <memory> // For std::unique_ptr
 #include <curl/curl.h> // For CURL handle
 
-class QTcpServer;
+class QTcpServer; // Forward declaration
 
 class GcsTarget : public IStorageTarget {
 public:
@@ -18,10 +18,10 @@ public:
 
     // IStorageTarget interface implementation
     bool beginSession() override;
-    bool sendFile(const std::string& localPath, const FileMetadata& remoteObjectName) override;
-    std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& /*listPrefix*/) override;
-    bool deleteFile(const std::string& /*remoteObjectName*/) override;
-    bool downloadFile(const std::string& remoteObjectName, const std::string& localPath) override;
+    bool sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) override; // Corrected
+    std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& path) override; // Corrected param name
+    bool deleteFile(const std::string& remoteObjectName) override; // remoteObjectName is the path string
+    bool downloadFile(const std::string& remoteObjectName, const std::string& localPath) override; // remoteObjectName is the path string
     bool endSession() override;
 
     // Public OAuth method for UI
@@ -29,7 +29,7 @@ public:
     std::string getLastError() const;
 
     // GCS Specific methods
-    bool testConnection(std::string& errorMsg); // Method for testing connection
+    bool testConnection(std::string& errorMsg);
 
 private:
     // OAuth2 and GCS interaction helper methods
@@ -40,16 +40,20 @@ private:
 
     // libcurl helper
     static size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* s);
+    // Note: performCurlRequest might need variants if used for both string and file stream outputs directly
     CURLcode performCurlRequest(const std::string& url, const std::string& method,
                                 const std::vector<std::string>& headers,
                                 const std::string& postData,
-                                std::ifstream* inFileStream,
-                                std::string& responseBody,
+                                std::ifstream* inFileStream, // For uploads
+                                std::string& responseBody,   // For string responses
                                 long& responseCode);
+    // Potentially a new one for downloads to ostream if needed, or adapt existing one.
+    // For now, download directly configures curl in its method.
+
 
     // Configuration
     std::string m_bucketName;
-    std::string m_objectPrefix;
+    std::string m_objectPrefix; // Base prefix for this target instance, e.g., "backups/sourceA/"
     std::string m_accountIdentifier;
     std::string m_clientId;
     std::string m_clientSecret;

@@ -18,9 +18,8 @@ public:
 
     // Inherited via IStorageTarget
     bool beginSession() override;
-    // Changed second parameter name from metadata to remoteRelativePath for clarity
-    bool sendFile(const std::string& relativePath, const FileMetadata& remoteRelativePath) override;
-    bool deleteFile(const std::string& relativePath) override;
+    bool sendFile(const std::string& localPath, const IStorageTarget::FileMetadata& metadata) override; // Corrected
+    bool deleteFile(const std::string& remotePath) override; // Corrected
     std::vector<IStorageTarget::FileMetadata> listFiles(const std::string& remotePath) override;
     bool downloadFile(const std::string& remotePath, const std::string& localPath) override;
     bool endSession() override;
