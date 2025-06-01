@@ -1141,7 +1141,11 @@ CMakeFiles/backy_full_gui.dir/src/gui/MainWindow.cpp.o: \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qgroupbox.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QCheckBox \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qcheckbox.h \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QLabel \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qlabel.h \
+  /opt/homebrew/include/QtGui/qpicture.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/util/CredentialManager.h \
+  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/core/IStorageTarget.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/core/Scheduler.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QObject \
   /opt/homebrew/lib/QtCore.framework/Headers/qobject.h \
@@ -1157,11 +1161,9 @@ CMakeFiles/backy_full_gui.dir/src/gui/MainWindow.cpp.o: \
   /opt/homebrew/lib/QtCore.framework/Headers/QSettings \
   /opt/homebrew/lib/QtCore.framework/Headers/qsettings.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/targets/LocalTarget.h \
-  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/core/IStorageTarget.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/targets/SftpTarget.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curl.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/curlver.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/system.h \
+  /opt/homebrew/include/curl/curl.h /opt/homebrew/include/curl/curlver.h \
+  /opt/homebrew/include/curl/system.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/socket.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/constrained_ctypes.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_param.h \
@@ -1173,12 +1175,22 @@ CMakeFiles/backy_full_gui.dir/src/gui/MainWindow.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/time.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval64.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_select.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/easy.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/multi.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/urlapi.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/options.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/header.h \
-  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/curl/websockets.h \
+  /opt/homebrew/include/curl/easy.h /opt/homebrew/include/curl/multi.h \
+  /opt/homebrew/include/curl/urlapi.h \
+  /opt/homebrew/include/curl/options.h \
+  /opt/homebrew/include/curl/header.h \
+  /opt/homebrew/include/curl/websockets.h \
+  /opt/homebrew/include/curl/mprintf.h \
+  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/targets/GcsTarget.h \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QApplication \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qapplication.h \
+  /opt/homebrew/include/QtCore/qcoreapplication.h \
+  /opt/homebrew/include/QtCore/qcoreevent.h \
+  /opt/homebrew/include/QtCore/qnativeinterface.h \
+  /opt/homebrew/include/QtCore/qcoreapplication_platform.h \
+  /opt/homebrew/include/QtGui/qguiapplication.h \
+  /opt/homebrew/include/QtGui/qinputmethod.h \
+  /opt/homebrew/include/QtGui/qguiapplication_platform.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QVBoxLayout \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qboxlayout.h \
   /opt/homebrew/include/QtWidgets/qlayout.h \
@@ -1194,24 +1206,19 @@ CMakeFiles/backy_full_gui.dir/src/gui/MainWindow.cpp.o: \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qlayout.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QWidget \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qwidget.h \
-  /opt/homebrew/lib/QtWidgets.framework/Headers/QLabel \
-  /opt/homebrew/lib/QtWidgets.framework/Headers/qlabel.h \
-  /opt/homebrew/include/QtGui/qpicture.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QMessageBox \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qmessagebox.h \
   /opt/homebrew/include/QtWidgets/qdialogbuttonbox.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QDir \
   /opt/homebrew/lib/QtCore.framework/Headers/qdir.h \
+  /opt/homebrew/lib/QtCore.framework/Headers/QFileInfo \
+  /opt/homebrew/lib/QtCore.framework/Headers/qfileinfo.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QDebug \
   /opt/homebrew/lib/QtCore.framework/Headers/qdebug.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QStandardPaths \
   /opt/homebrew/lib/QtCore.framework/Headers/qstandardpaths.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QCoreApplication \
   /opt/homebrew/lib/QtCore.framework/Headers/qcoreapplication.h \
-  /opt/homebrew/include/QtCore/qcoreevent.h \
-  /opt/homebrew/include/QtCore/qnativeinterface.h \
-  /opt/homebrew/include/QtCore/qcoreapplication_platform.h \
-  /opt/homebrew/include/QtCore/qcoreapplication.h \
   /opt/homebrew/lib/QtGui.framework/Headers/QCloseEvent \
   /opt/homebrew/lib/QtGui.framework/Headers/qevent.h \
   /opt/homebrew/include/QtGui/qeventpoint.h \
@@ -1231,6 +1238,17 @@ CMakeFiles/backy_full_gui.dir/src/gui/MainWindow.cpp.o: \
   /opt/homebrew/include/QtGui/QTransform \
   /opt/homebrew/lib/QtGui.framework/Headers/qtransform.h \
   /opt/homebrew/include/QtGui/qscreen_platform.h \
-  /opt/homebrew/include/QtGui/qguiapplication.h \
-  /opt/homebrew/include/QtGui/qinputmethod.h \
-  /opt/homebrew/include/QtGui/qguiapplication_platform.h
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QTableWidget \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qtablewidget.h \
+  /opt/homebrew/include/QtWidgets/qtableview.h \
+  /opt/homebrew/include/QtWidgets/qabstractitemview.h \
+  /opt/homebrew/include/QtCore/qitemselectionmodel.h \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QTableWidgetItem \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QHeaderView \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qheaderview.h \
+  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/src/gui/CustomTableWidgetItems.h \
+  /opt/homebrew/lib/QtCore.framework/Headers/QVariant \
+  /opt/homebrew/lib/QtCore.framework/Headers/qvariant.h \
+  /opt/homebrew/lib/QtCore.framework/Headers/QDateTime \
+  /opt/homebrew/lib/QtCore.framework/Headers/QtGlobal \
+  /opt/homebrew/lib/QtCore.framework/Headers/qglobal.h

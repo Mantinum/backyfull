@@ -116,8 +116,10 @@ test_sftp_target: libSftpTarget_lib.a
 test_sftp_target: lib/libgtest.a
 test_sftp_target: libbacky_x_core.a
 test_sftp_target: libCredentialManager_lib.a
+test_sftp_target: /opt/homebrew/lib/QtNetwork.framework/Versions/A/QtNetwork
 test_sftp_target: /opt/homebrew/lib/QtCore.framework/Versions/A/QtCore
-test_sftp_target: /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libcurl.tbd
+test_sftp_target: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
+test_sftp_target: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
 test_sftp_target: CMakeFiles/test_sftp_target.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable test_sftp_target"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_sftp_target.dir/link.txt --verbose=$(VERBOSE)

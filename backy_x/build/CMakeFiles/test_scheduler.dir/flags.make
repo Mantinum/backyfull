@@ -6,7 +6,7 @@ CXX_DEFINES = -DQT_CORE_LIB -DQT_NO_DEBUG -DQT_TESTCASE_BUILDDIR=\"/Users/alexmo
 
 CXX_INCLUDES = -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/test_scheduler_autogen/include -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include -isystem /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/_deps/googletest-src/googletest/include -isystem /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/_deps/googletest-src/googletest -isystem /opt/homebrew/lib/QtCore.framework/Headers -iframework /opt/homebrew/lib -isystem /opt/homebrew/share/qt/mkspecs/macx-clang -isystem /opt/homebrew/include -isystem /opt/homebrew/lib/QtTest.framework/Headers
 
-CXX_FLAGSarm64 = -O3 -DNDEBUG -std=c++17 -arch arm64
+CXX_FLAGSarm64 = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -pedantic
 
-CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -arch arm64
+CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -pedantic
 

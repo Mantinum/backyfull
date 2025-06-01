@@ -1141,7 +1141,11 @@ CMakeFiles/backy_full_gui.dir/src/gui/main_gui.cpp.o: \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qgroupbox.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QCheckBox \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qcheckbox.h \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QLabel \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qlabel.h \
+  /opt/homebrew/include/QtGui/qpicture.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/util/CredentialManager.h \
+  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/core/IStorageTarget.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QApplication \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qapplication.h \
   /opt/homebrew/include/QtCore/qcoreapplication.h \
@@ -1157,4 +1161,24 @@ CMakeFiles/backy_full_gui.dir/src/gui/main_gui.cpp.o: \
   /opt/homebrew/include/QtGui/qinputmethod.h \
   /opt/homebrew/include/QtGui/qguiapplication_platform.h \
   /opt/homebrew/lib/QtCore.framework/Headers/QCoreApplication \
-  /opt/homebrew/lib/QtCore.framework/Headers/qcoreapplication.h
+  /opt/homebrew/lib/QtCore.framework/Headers/qcoreapplication.h \
+  /opt/homebrew/include/curl/curl.h /opt/homebrew/include/curl/curlver.h \
+  /opt/homebrew/include/curl/system.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/socket.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/constrained_ctypes.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/machine/_param.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arm/_param.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/net/net_kev.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_sa_family_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_socklen_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_iovec_t.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/time.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_timeval64.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_select.h \
+  /opt/homebrew/include/curl/easy.h /opt/homebrew/include/curl/multi.h \
+  /opt/homebrew/include/curl/urlapi.h \
+  /opt/homebrew/include/curl/options.h \
+  /opt/homebrew/include/curl/header.h \
+  /opt/homebrew/include/curl/websockets.h \
+  /opt/homebrew/include/curl/mprintf.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream

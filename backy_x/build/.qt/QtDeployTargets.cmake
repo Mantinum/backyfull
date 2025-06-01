@@ -14,6 +14,8 @@ set(__QT_DEPLOY_TARGET_LocalTarget_lib_FILE /Users/alexmoll/Desktop/backy_x/back
 set(__QT_DEPLOY_TARGET_LocalTarget_lib_TYPE STATIC_LIBRARY)
 set(__QT_DEPLOY_TARGET_SftpTarget_lib_FILE /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/libSftpTarget_lib.a)
 set(__QT_DEPLOY_TARGET_SftpTarget_lib_TYPE STATIC_LIBRARY)
+set(__QT_DEPLOY_TARGET_GcsTarget_lib_FILE /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/libGcsTarget_lib.a)
+set(__QT_DEPLOY_TARGET_GcsTarget_lib_TYPE STATIC_LIBRARY)
 set(__QT_DEPLOY_TARGET_backy_x_cli_FILE /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/backy_x_cli)
 set(__QT_DEPLOY_TARGET_backy_x_cli_TYPE EXECUTABLE)
 set(__QT_DEPLOY_TARGET_backy_full_gui_FILE /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/backy_full_gui)

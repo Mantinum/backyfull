@@ -52,7 +52,15 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "index",
         "handleScheduledBackup",
         "sourcePath",
-        "destinationOrIdentifier"
+        "destinationOrIdentifier",
+        "onGcsConnectButtonClicked",
+        "onGcsTestConnectionClicked",
+        "onFileViewerRefreshClicked",
+        "onFileViewerDownloadClicked",
+        "onFileViewerDeleteClicked",
+        "onFileTableItemDoubleClicked",
+        "QTableWidgetItem*",
+        "item"
     };
 
     QtMocHelpers::UintData qt_methods {
@@ -77,6 +85,20 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         // Slot 'handleScheduledBackup'
         QtMocHelpers::SlotData<void(const QString &, const QString &)>(11, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { QMetaType::QString, 12 }, { QMetaType::QString, 13 },
+        }}),
+        // Slot 'onGcsConnectButtonClicked'
+        QtMocHelpers::SlotData<void()>(14, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onGcsTestConnectionClicked'
+        QtMocHelpers::SlotData<void()>(15, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onFileViewerRefreshClicked'
+        QtMocHelpers::SlotData<void()>(16, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onFileViewerDownloadClicked'
+        QtMocHelpers::SlotData<void()>(17, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onFileViewerDeleteClicked'
+        QtMocHelpers::SlotData<void()>(18, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onFileTableItemDoubleClicked'
+        QtMocHelpers::SlotData<void(QTableWidgetItem *)>(19, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 20, 21 },
         }}),
     };
     QtMocHelpers::UintData qt_properties {
@@ -109,6 +131,12 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 5: _t->onTaskChanged(); break;
         case 6: _t->onBackupModeChanged((*reinterpret_cast< std::add_pointer_t<int>>(_a[1]))); break;
         case 7: _t->handleScheduledBackup((*reinterpret_cast< std::add_pointer_t<QString>>(_a[1])),(*reinterpret_cast< std::add_pointer_t<QString>>(_a[2]))); break;
+        case 8: _t->onGcsConnectButtonClicked(); break;
+        case 9: _t->onGcsTestConnectionClicked(); break;
+        case 10: _t->onFileViewerRefreshClicked(); break;
+        case 11: _t->onFileViewerDownloadClicked(); break;
+        case 12: _t->onFileViewerDeleteClicked(); break;
+        case 13: _t->onFileTableItemDoubleClicked((*reinterpret_cast< std::add_pointer_t<QTableWidgetItem*>>(_a[1]))); break;
         default: ;
         }
     }
@@ -133,14 +161,14 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 8)
+        if (_id < 14)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 8;
+        _id -= 14;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 8)
+        if (_id < 14)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 8;
+        _id -= 14;
     }
     return _id;
 }

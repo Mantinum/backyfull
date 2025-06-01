@@ -4,9 +4,9 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DQT_CORE_LIB -DQT_NO_DEBUG
 
-CXX_INCLUDES = -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/backy_x_cli_autogen/include -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include -isystem /opt/homebrew/lib/QtCore.framework/Headers -iframework /opt/homebrew/lib -isystem /opt/homebrew/share/qt/mkspecs/macx-clang -isystem /opt/homebrew/include
+CXX_INCLUDES = -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/backy_x_cli_autogen/include -I/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include -isystem /opt/homebrew/lib/QtCore.framework/Headers -iframework /opt/homebrew/lib -isystem /opt/homebrew/share/qt/mkspecs/macx-clang -isystem /opt/homebrew/include -isystem /opt/homebrew/Cellar/curl/8.14.0/include
 
-CXX_FLAGSarm64 = -O3 -DNDEBUG -std=c++17 -arch arm64
+CXX_FLAGSarm64 = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -pedantic
 
-CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -arch arm64
+CXX_FLAGS = -O3 -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -pedantic
 

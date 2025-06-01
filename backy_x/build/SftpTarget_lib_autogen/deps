@@ -241,6 +241,42 @@ SftpTarget_lib_autogen/timestamp: \
 	/opt/homebrew/lib/cmake/Qt6GuiTools/Qt6GuiToolsTargets-release.cmake \
 	/opt/homebrew/lib/cmake/Qt6GuiTools/Qt6GuiToolsTargets.cmake \
 	/opt/homebrew/lib/cmake/Qt6GuiTools/Qt6GuiToolsVersionlessTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkConfigVersion.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkConfigVersionImpl.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkDependencies.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkPlugins.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6NetworkVersionlessAliasTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QGlibNetworkInformationPluginAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QGlibNetworkInformationPluginConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QGlibNetworkInformationPluginTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QGlibNetworkInformationPluginTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSCNetworkReachabilityNetworkInformationPluginAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSCNetworkReachabilityNetworkInformationPluginConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSCNetworkReachabilityNetworkInformationPluginTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSCNetworkReachabilityNetworkInformationPluginTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSecureTransportBackendPluginAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSecureTransportBackendPluginConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSecureTransportBackendPluginTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QSecureTransportBackendPluginTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendCertOnlyPluginAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendCertOnlyPluginConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendCertOnlyPluginTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendCertOnlyPluginTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendOpenSSLPluginAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendOpenSSLPluginConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendOpenSSLPluginTargets-release.cmake \
+	/opt/homebrew/lib/cmake/Qt6Network/Qt6QTlsBackendOpenSSLPluginTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateAdditionalTargetInfo.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateConfig.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateConfigVersion.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateConfigVersionImpl.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateDependencies.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateTargets.cmake \
+	/opt/homebrew/lib/cmake/Qt6NetworkPrivate/Qt6NetworkPrivateVersionlessAliasTargets.cmake \
 	/opt/homebrew/lib/cmake/Qt6Test/Qt6TestAdditionalTargetInfo.cmake \
 	/opt/homebrew/lib/cmake/Qt6Test/Qt6TestConfig.cmake \
 	/opt/homebrew/lib/cmake/Qt6Test/Qt6TestConfigVersion.cmake \

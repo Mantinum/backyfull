@@ -112,8 +112,10 @@ backy_x_cli: CMakeFiles/backy_x_cli.dir/backy_x_cli_autogen/mocs_compilation.cpp
 backy_x_cli: CMakeFiles/backy_x_cli.dir/src/cli/main_cli.cpp.o
 backy_x_cli: CMakeFiles/backy_x_cli.dir/build.make
 backy_x_cli: libLocalTarget_lib.a
+backy_x_cli: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
 backy_x_cli: libbacky_x_core.a
 backy_x_cli: /opt/homebrew/lib/QtCore.framework/Versions/A/QtCore
+backy_x_cli: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
 backy_x_cli: CMakeFiles/backy_x_cli.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking CXX executable backy_x_cli"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/backy_x_cli.dir/link.txt --verbose=$(VERBOSE)

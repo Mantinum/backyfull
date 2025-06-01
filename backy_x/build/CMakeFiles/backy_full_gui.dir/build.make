@@ -131,11 +131,14 @@ backy_full_gui: /opt/homebrew/lib/QtWidgets.framework/Versions/A/QtWidgets
 backy_full_gui: /opt/homebrew/lib/QtConcurrent.framework/Versions/A/QtConcurrent
 backy_full_gui: libLocalTarget_lib.a
 backy_full_gui: libSftpTarget_lib.a
+backy_full_gui: libGcsTarget_lib.a
 backy_full_gui: libCredentialManager_lib.a
+backy_full_gui: /opt/homebrew/lib/QtNetwork.framework/Versions/A/QtNetwork
 backy_full_gui: /opt/homebrew/lib/QtGui.framework/Versions/A/QtGui
 backy_full_gui: libbacky_x_core.a
 backy_full_gui: /opt/homebrew/lib/QtCore.framework/Versions/A/QtCore
-backy_full_gui: /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libcurl.tbd
+backy_full_gui: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
+backy_full_gui: /opt/homebrew/Cellar/curl/8.14.0/lib/libcurl.dylib
 backy_full_gui: CMakeFiles/backy_full_gui.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/alexmoll/Desktop/backy_x/backyfull/backy_x/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable backy_full_gui"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/backy_full_gui.dir/link.txt --verbose=$(VERBOSE)

@@ -625,9 +625,9 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                        }
 
                        updateLog(QString("Error backing up: %1. Error: %2")
-                                     .arg(QString::fromStdString(relativePathStr))
-                                     .arg(QString::fromStdString(err_msg)),
-                                 true);
+              .arg(QString::fromStdString(relativePathStr))
+              .arg(QString::fromStdString(err_msg)));
+
                        QMessageBox::critical(this, "Backup Error",
                                              QString("Failed to back up: %1\nError: %2")
                                                  .arg(QString::fromStdString(relativePathStr))
@@ -954,12 +954,8 @@ void MainWindow::displayRemoteFiles(const std::vector<FileMetadata>& files) {
                               file.modificationTime.time_since_epoch()).count());
 
         QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(secs);
-    #if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
-      auto dateFmt = Qt::SystemLocaleShortDate;
-    #else
-      auto dateFmt = Qt::DefaultLocaleShortDate;
-    #endif
-        QString formattedDate = modDateTime.toString(dateFmt);
+    QString formattedDate = modDateTime.toString(Qt::TextDate);
+
 
         DateTimeTableWidgetItem *dateItem =
                 new DateTimeTableWidgetItem(formattedDate, secs); // New line using qint64 secs

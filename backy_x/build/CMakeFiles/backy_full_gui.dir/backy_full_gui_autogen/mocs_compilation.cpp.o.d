@@ -1142,7 +1142,11 @@ CMakeFiles/backy_full_gui.dir/backy_full_gui_autogen/mocs_compilation.cpp.o: \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qgroupbox.h \
   /opt/homebrew/lib/QtWidgets.framework/Headers/QCheckBox \
   /opt/homebrew/lib/QtWidgets.framework/Headers/qcheckbox.h \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/QLabel \
+  /opt/homebrew/lib/QtWidgets.framework/Headers/qlabel.h \
+  /opt/homebrew/include/QtGui/qpicture.h \
   /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/util/CredentialManager.h \
+  /Users/alexmoll/Desktop/backy_x/backyfull/backy_x/include/core/IStorageTarget.h \
   /opt/homebrew/include/QtCore/qtmochelpers.h \
   /opt/homebrew/include/QtCore/qtmocconstants.h \
   /opt/homebrew/include/QtCore/q20algorithm.h \

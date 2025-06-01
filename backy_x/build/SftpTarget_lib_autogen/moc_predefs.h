@@ -1,4 +1,5 @@
 #define QT_CORE_LIB 1
+#define QT_NETWORK_LIB 1
 #define QT_NO_DEBUG 1
 #define SIZEOF_DPTR (sizeof(void*))
 #define _LP64 1
