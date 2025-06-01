@@ -1,7 +1,9 @@
 #include <iostream>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <filesystem> // Required for checking if source is a file or directory
+#include <chrono>     // Required for time conversions
 #include <curl/curl.h> // For libcurl global init/cleanup
 
 // It's good practice to include headers from your own project with a path
@@ -70,22 +72,41 @@ int main(int argc, char* argv[]) {
     try {
         std::filesystem::path srcFsPath(sourcePath);
         if (std::filesystem::is_regular_file(srcFsPath)) {
-            // In M0, metadata is an empty string for LocalTarget.
-            // As per LocalTarget M0 implementation, pass the full sourcePath as the first argument.
-            if (!localTarget.sendFile(sourcePath, "")) {
+            std::string filename = srcFsPath.filename().string();
+            uint64_t fileSize = std::filesystem::file_size(srcFsPath);
+            auto lastWriteTime = std::filesystem::last_write_time(srcFsPath);
+            auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                lastWriteTime - std::filesystem::file_time_type::clock::now()
+                + std::chrono::system_clock::now()
+            );
+            FileMetadata fileMeta(filename, fileSize, sctp, false);
+            // Pass the original sourcePath as the first argument (source for copy)
+            // and filename as the relative path for storage (metadata.name)
+            if (!localTarget.sendFile(sourcePath, fileMeta)) {
                 std::cerr << "Error: Failed to backup file " << sourcePath << std::endl;
                 localTarget.endSession();
                 return 1;
             }
         } else if (std::filesystem::is_directory(srcFsPath)) {
-            // For M0, if it's a directory, we'll just iterate over immediate files.
-            // No recursive behavior for now.
             std::cout << "Source is a directory. Backing up immediate files (non-recursive M0 behavior)..." << std::endl;
+            std::filesystem::path baseFsPath(sourcePath); // Base path for relative calculation
             for (const auto& entry : std::filesystem::directory_iterator(srcFsPath)) {
+                // For now, only backup regular files directly within the source directory
                 if (entry.is_regular_file()) {
-                    // As per LocalTarget M0 implementation, pass the full path of the file.
-                    if (!localTarget.sendFile(entry.path().string(), "")) {
-                        std::cerr << "Error: Failed to backup file " << entry.path().string() << std::endl;
+                    std::string fullPathStr = entry.path().string();
+                    std::string iterFilename = entry.path().filename().string(); // This will be used as metadata.name
+                    uint64_t iterFileSize = std::filesystem::file_size(entry.path());
+                    auto iterLastWriteTime = std::filesystem::last_write_time(entry.path());
+                    auto iter_sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                        iterLastWriteTime - std::filesystem::file_time_type::clock::now()
+                        + std::chrono::system_clock::now()
+                    );
+                    // For LocalTarget, metadata.name is the relative path used for storage.
+                    // If backing up files from a directory, iterFilename is appropriate for metadata.name
+                    FileMetadata iterFileMeta(iterFilename, iterFileSize, iter_sctp, false);
+                    // The first argument to sendFile is the *source* path to copy from.
+                    if (!localTarget.sendFile(fullPathStr, iterFileMeta)) {
+                        std::cerr << "Error: Failed to backup file " << fullPathStr << std::endl;
                         // Decide if one file failure should stop the whole backup for M0
                     }
                 }
