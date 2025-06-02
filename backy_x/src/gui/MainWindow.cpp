@@ -383,10 +383,19 @@ void MainWindow::runBackupNow() {
     bool sftpMode = (currentModeText == tr("SFTP Backup"));
     bool gcsMode = (currentModeText == tr("Google Cloud Storage"));
 
-    IStorageTarget* currentTarget = nullptr;
-    delete localTarget_; localTarget_ = nullptr;
-    delete sftpTarget_; sftpTarget_ = nullptr;
-    delete gcsTarget_; gcsTarget_ = nullptr;
+    IStorageTarget* backupOperationTarget = nullptr; // Use a local variable for the backup operation
+    // Do NOT delete this->sftpTarget_ or this->gcsTarget_ here as they are used by the viewer.
+    // this->localTarget_ is not used by a viewer, so it can be managed/deleted if it was from a previous runBackupNow.
+    // For simplicity and consistency, we'll create temporary targets for all modes in this function.
+    // If this->localTarget_ was used by a previous runBackupNow, it will be orphaned if not deleted.
+    // However, the current design deletes it in the destructor or if runBackupNow is called again for local.
+    // Let's ensure it's cleared if it's specific to this one-off backup.
+    // A cleaner approach is to always use temporary for runBackupNow for all types.
+    if (this->localTarget_) { // If it's from a previous runBackupNow call specifically for local.
+        delete this->localTarget_;
+        this->localTarget_ = nullptr;
+    }
+
 
     if (localMode) {
         updateLog("Local Mode selected for manual backup.");
@@ -399,8 +408,8 @@ void MainWindow::runBackupNow() {
         std::filesystem::path fsSourcePath(sourcePath.toStdString());
         std::filesystem::path fsDestinationPathFromUI(destPath.toStdString());
         std::filesystem::path backupRootForTarget = fsDestinationPathFromUI / fsSourcePath.filename();
-        localTarget_ = new LocalTarget(backupRootForTarget.string());
-        currentTarget = localTarget_;
+        LocalTarget* tempLocalTarget = new LocalTarget(backupRootForTarget.string()); // Temporary instance
+        backupOperationTarget = tempLocalTarget;
         updateLog(QString("Manual Local backup started: From '%1' to '%2'.").arg(sourcePath, destPath));
 
     } else if (sftpMode) {
@@ -417,8 +426,8 @@ void MainWindow::runBackupNow() {
         sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
         QString qPasswordFromField = sftpPasswordLineEdit_->text();
         if (!qPasswordFromField.isEmpty()) sftpConfig["password"] = qPasswordFromField.toStdString();
-        sftpTarget_ = new SftpTarget(sftpConfig);
-        currentTarget = sftpTarget_;
+        SftpTarget* tempSftpTarget = new SftpTarget(sftpConfig); // Temporary instance
+        backupOperationTarget = tempSftpTarget;
         updateLog(QString("Manual SFTP backup started: From '%1' to host '%2'.").arg(sourcePath, QString::fromStdString(sftpConfig["host"])));
 
     } else if (gcsMode) {
@@ -433,11 +442,10 @@ void MainWindow::runBackupNow() {
         std::map<std::string, std::string> gcsConfig;
         gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
         gcsConfig["gcs_account_identifier"] = accountId.toStdString();
-        gcsConfig["gcs_object_prefix"] = "";
+        gcsConfig["gcs_object_prefix"] = ""; // For backups, prefix might be source folder name, handled by target.
 
-        delete this->gcsTarget_;
-        this->gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
-        currentTarget = this->gcsTarget_;
+        GcsTarget* tempGcsTarget = new GcsTarget(gcsConfig, m_credentialManager.get()); // Temporary instance
+        backupOperationTarget = tempGcsTarget;
         updateLog(QString("Manual GCS backup started: From '%1' to GCS Bucket '%2' (Account: '%3')")
                       .arg(sourcePath, bucketName, accountId));
     } else {
@@ -446,13 +454,18 @@ void MainWindow::runBackupNow() {
         return;
     }
 
-    if (!currentTarget) {
+    if (!backupOperationTarget) { // Check the local variable
         QMessageBox::critical(this, tr("Backup Error"), tr("Failed to initialize backup target."));
         updateLog("Error: Manual backup failed. Target initialization failed.");
         return;
     }
     
-    performBackupInternal(sourcePath, currentTarget);
+    performBackupInternal(sourcePath, backupOperationTarget);
+
+    // Clean up the temporary target used for this backup operation
+    // performBackupInternal calls endSession on the target.
+    delete backupOperationTarget;
+    backupOperationTarget = nullptr;
 }
 
 void MainWindow::onGcsConnectButtonClicked() {
@@ -520,70 +533,72 @@ void MainWindow::onGcsConnectButtonClicked() {
 void MainWindow::onSftpConnectToggleClicked()
 {
     if (sftpTarget_) { // Connected for listing -> Disconnect
-        updateLog(tr("SFTP 'Disconnect' button clicked. Closing session for listing."));
+        updateLog(tr("SFTP 'Disconnect' (viewer) button clicked. Closing viewer session."));
         sftpTarget_->endSession();
         delete sftpTarget_;
         sftpTarget_ = nullptr;
-        fileTableWidget_->setRowCount(0);
+        if (fileTableWidget_) { // Check if table exists
+            fileTableWidget_->setRowCount(0);
+        }
         currentRemotePath_ = "/";
-        if (currentPathLabel_) { // Ensure label exists
+        if (currentPathLabel_) {
             currentPathLabel_->setText(tr("Path: /"));
         }
-        sftpConnectToggleButton_->setText(tr("Connect"));
-        updateLog(tr("SFTP session closed for listing."));
+        if (sftpConnectToggleButton_) { // Check if button exists
+            sftpConnectToggleButton_->setText(tr("Connect"));
+        }
+        updateLog(tr("SFTP viewer session closed.")); // Specific log message
         return;
     }
 
     // Not connected for listing -> Connect
-    updateLog(tr("SFTP 'Connect' button clicked. Attempting to open session for listing."));
+    updateLog(tr("SFTP 'Connect' (viewer) button clicked. Attempting to open viewer session."));
     std::map<std::string, std::string> cfg{
         {"host", sftpHostLineEdit_->text().toStdString()},
         {"port", sftpPortLineEdit_->text().toStdString()},
         {"username", sftpUsernameLineEdit_->text().toStdString()},
         {"remoteBasePath", sftpRemotePathLineEdit_->text().toStdString()}
-        // Password should be fetched by SftpTarget from CredentialManager if saved, or if entered in the field.
-        // If password field is not empty and not saved, SftpTarget might need it directly.
-        // For now, relying on SftpTarget's existing password handling.
+        // Password handling relies on SftpTarget's constructor/CredentialManager
     };
 
     if (cfg["host"].empty() || cfg["username"].empty()) {
         QMessageBox::warning(this, tr("SFTP Configuration"), tr("SFTP Host and Username are required to connect for listing."));
-        updateLog(tr("SFTP connection for listing failed: Host or Username empty."));
-        // Ensure UI is in a consistent disconnected state
-        sftpConnectToggleButton_->setText(tr("Connect"));
-        fileTableWidget_->setRowCount(0);
+        updateLog(tr("SFTP viewer connection failed: Host or Username empty."));
+        // Ensure UI is in a consistent disconnected state (button text might already be "Connect")
+        if (sftpConnectToggleButton_) { sftpConnectToggleButton_->setText(tr("Connect")); }
+        if (fileTableWidget_) { fileTableWidget_->setRowCount(0); }
         currentRemotePath_ = "/";
-        if (currentPathLabel_) {
-            currentPathLabel_->setText(tr("Path: /"));
-        }
+        if (currentPathLabel_) { currentPathLabel_->setText(tr("Path: /")); }
         return;
     }
 
-    sftpTarget_ = new SftpTarget(cfg);
+    // Ensure this sftpTarget_ is exclusively for the viewer.
+    // If any old instance exists (should not happen if logic is correct), delete it.
+    // delete sftpTarget_; // Not strictly needed here if logic elsewhere is perfect, but safe.
+    // sftpTarget_ = nullptr; //
+
+    sftpTarget_ = new SftpTarget(cfg); // MainWindow::sftpTarget_ is for the viewer
     if (!sftpTarget_->beginSession()) {
-        QString err = tr("SFTP Connect for listing failed: %1")
-                      .arg(QString::fromStdString(sftpTarget_->getLastError()));
-        QMessageBox::critical(this, tr("SFTP Error"), err);
-        updateLog(err);
+        QString err_msg = sftpTarget_->getLastError(); // Get error before deleting target
+        QMessageBox::critical(this, tr("SFTP Error"), tr("SFTP viewer connection failed: %1").arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
+        updateLog(tr("SFTP viewer connection failed: %1").arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
         delete sftpTarget_;
         sftpTarget_ = nullptr;
         // Ensure UI is in a consistent disconnected state
-        sftpConnectToggleButton_->setText(tr("Connect"));
-        fileTableWidget_->setRowCount(0);
+        if (sftpConnectToggleButton_) { sftpConnectToggleButton_->setText(tr("Connect")); }
+        if (fileTableWidget_) { fileTableWidget_->setRowCount(0); }
         currentRemotePath_ = "/";
-        if (currentPathLabel_) {
-            currentPathLabel_->setText(tr("Path: /"));
-        }
+        if (currentPathLabel_) { currentPathLabel_->setText(tr("Path: /")); }
         return;
     }
 
-    sftpConnectToggleButton_->setText(tr("Disconnect"));
-    currentRemotePath_ = "/"; // Set before browse
-    if (currentPathLabel_) {
-        currentPathLabel_->setText(tr("Path: /"));
+    if (sftpConnectToggleButton_) {
+        sftpConnectToggleButton_->setText(tr("Disconnect"));
     }
-    browseRemotePath(currentRemotePath_); // This will also update the label via its own logic
-    updateLog(tr("SFTP session opened successfully for listing. Root directory displayed."));
+    currentRemotePath_ = "/";
+    // browseRemotePath will update currentPathLabel_
+    browseRemotePath(currentRemotePath_);
+    updateLog(tr("SFTP viewer session opened.")); // Specific log message
 }
 
 void MainWindow::onGcsConnectToggleClicked()
@@ -1071,10 +1086,12 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
     updateLog(QString("Scheduled backup triggered by Scheduler: Source '%1', Dest/ID '%2'")
                   .arg(sourcePath, destinationOrIdentifier));
 
-    IStorageTarget* currentTarget = nullptr;
-    delete localTarget_; localTarget_ = nullptr;
-    delete sftpTarget_; sftpTarget_ = nullptr;
-    delete gcsTarget_; gcsTarget_ = nullptr;
+    IStorageTarget* currentTarget = nullptr; // Local variable for this backup operation
+    // Do not delete this->sftpTarget_ or this->gcsTarget_ (viewer targets)
+    // localTarget_ can be deleted if it's only for one-off local backups from UI/scheduler
+    // For consistency, all scheduled backups will use temporary targets.
+    // If this->localTarget_ was set by runBackupNow, it's already deleted there or by destructor.
+    // If scheduler uses its own parameters, it should always create a new target.
 
     if (scheduler_->isGcsMode()) {
         updateLog("Scheduled task is GCS Mode.");
@@ -1092,9 +1109,8 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
         gcsConfig["gcs_account_identifier"] = accountId.toStdString();
         gcsConfig["gcs_object_prefix"] = "";
 
-        delete this->gcsTarget_;
-        this->gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
-        currentTarget = this->gcsTarget_;
+        GcsTarget* scheduledGcsTarget = new GcsTarget(gcsConfig, m_credentialManager.get());
+        currentTarget = scheduledGcsTarget;
         updateLog(QString("Scheduled GCS backup started: From '%1' to GCS Bucket '%2' (Account: '%3')")
                       .arg(sourcePath, bucketName, accountId));
 
@@ -1105,21 +1121,22 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
         sftpConfig["port"] = QString::number(scheduler_->sftpPort()).toStdString();
         sftpConfig["username"] = scheduler_->sftpUsername().toStdString();
         sftpConfig["remoteBasePath"] = scheduler_->sftpRemotePath().toStdString();
-        sftpTarget_ = new SftpTarget(sftpConfig);
-        currentTarget = sftpTarget_;
+        // Password for scheduled SFTP should be retrieved by SftpTarget from CredentialManager
+        SftpTarget* scheduledSftpTarget = new SftpTarget(sftpConfig);
+        currentTarget = scheduledSftpTarget;
         updateLog(QString("Scheduled SFTP backup: From '%1' to host '%2'")
                       .arg(sourcePath, scheduler_->sftpHost()));
-    } else {
+    } else { // Local Mode
         updateLog("Scheduled task is Local Mode.");
         if (destinationOrIdentifier.isEmpty()) {
             updateLog("Error: Scheduled local backup triggered but destination path is empty in Scheduler.");
             QMessageBox::critical(this, tr("Scheduled Backup Error"), tr("Destination path for scheduled local backup is missing."));
             return;
         }
-        std::filesystem::path fsSourcePath(sourcePath.toStdString());
         std::filesystem::path fsDestinationPathFromScheduler(destinationOrIdentifier.toStdString());
-        localTarget_ = new LocalTarget(fsDestinationPathFromScheduler.string());
-        currentTarget = localTarget_;
+        // For local scheduled backup, ensure it uses the full destination path from scheduler, not a sub-folder based on source.
+        LocalTarget* scheduledLocalTarget = new LocalTarget(fsDestinationPathFromScheduler.string());
+        currentTarget = scheduledLocalTarget;
         updateLog(QString("Scheduled Local backup: From '%1' to '%2'")
                       .arg(sourcePath, destinationOrIdentifier));
     }
@@ -1131,6 +1148,10 @@ void MainWindow::handleScheduledBackup(const QString& sourcePath, const QString&
     }
     
     performBackupInternal(sourcePath, currentTarget);
+
+    // Clean up the temporary target used for this scheduled backup operation
+    delete currentTarget;
+    currentTarget = nullptr;
 }
 
 // New slots implementation & Remote file viewer methods
@@ -1227,12 +1248,20 @@ void MainWindow::browseRemotePath(const QString& path) {
             // files will be empty or partially filled, displayRemoteFiles will show what was returned.
         }
     } else if (currentModeText == tr("SFTP Backup")) {
-        if (!sftpTarget_) { // Check if SFTP target for listing exists
-            updateLog(tr("SFTP browse attempted but not connected. Please use the 'Connect' button first."));
-            displayRemoteFiles({}); // Ensure view is empty
+        if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
+            updateLog(tr("SFTP viewer not connected or session invalid. Please use the 'Connect' button."));
+            if (fileTableWidget_) { // Ensure table exists before modifying
+                displayRemoteFiles({}); // Clear view by displaying an empty list
+            }
+            // Optional: Consider if sftpConnectToggleButton_ text should be reset to "Connect" here.
+            // If sftpTarget_ exists but session is not open, it implies an inconsistent state.
+            // For now, the primary goal is to prevent listFiles on an invalid session and clear the view.
+            // if (sftpConnectToggleButton_ && sftpTarget_ && !sftpTarget_->isSessionOpen()) {
+            //     sftpConnectToggleButton_->setText(tr("Connect"));
+            // }
             return;
         }
-        // If sftpTarget_ exists, assume it's connected
+        // If sftpTarget_ exists AND session is open...
         files = sftpTarget_->listFiles(path.toStdString());
         if (!sftpTarget_->getLastError().empty()) { // Assuming SftpTarget gets a getLastError()
             QMessageBox::critical(this, tr("SFTP Error"), tr("Failed to list files: %1").arg(QString::fromStdString(sftpTarget_->getLastError())));
