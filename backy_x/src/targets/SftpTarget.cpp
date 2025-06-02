@@ -32,7 +32,8 @@ static std::chrono::system_clock::time_point parseSftpDate(const QString& monthT
 
 // Helper functions for SFTP path and URL construction
 static std::string buildSftpAbsolutePath(const std::string& basePath, const std::string& relativePath);
-static std::string buildSftpUrl(const std::string& host, int port, const std::string& basePath, const std::string& relativePath);
+// Simplified: builds only the sftp://host:port part. Path will be appended after escaping.
+static std::string buildSftpBaseUrl(const std::string& host, int port);
 
 // Helper function to parse SSH authentication types string
 static long parseSshAuthTypes(const std::string& authTypesStr) {
@@ -108,30 +109,9 @@ static std::string buildSftpAbsolutePath(const std::string& basePath, const std:
     return joinPaths(basePath, relativePath);
 }
 
-static std::string buildSftpUrl(const std::string& host, int port, const std::string& basePath, const std::string& relativePath) {
-    std::string path = joinPaths(basePath, relativePath);
-    std::string url_str = "sftp://" + host + ":" + std::to_string(port);
-
-    if (path == "/") {
-        url_str += "/"; // For root, URL is sftp://host:port/
-    } else {
-        // For non-root paths like "/foo/bar" or "/file with space"
-        // path comes from joinPaths, so it's absolute, e.g., "/foo" or "/foo/file name"
-        // We need to encode the part *after* the initial "/"
-        // QString::fromUtf8 can handle potentially broken UTF-8 sequences gracefully.
-        QString pathSuffixToEncode = QString::fromUtf8(path.c_str() + 1); // Skip the leading '/'
-
-        // Define characters to be percent-encoded. Includes space, quotes, accented chars, and crucially '/'
-        // if it can appear in filenames/directory names that are not actual path separators.
-        // joinPaths should have already created a canonical path structure.
-        QByteArray charsToIncludeInEncoding = " /'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ";
-
-        QByteArray percentEncodedSuffixBytes = QUrl::toPercentEncoding(pathSuffixToEncode, QByteArray(), charsToIncludeInEncoding);
-        std::string encodedSuffix = std::string(percentEncodedSuffixBytes.constData(), percentEncodedSuffixBytes.length());
-
-        url_str += "/" + encodedSuffix;
-    }
-    return url_str;
+// Simplified: builds only the sftp://host:port part. Path will be appended after escaping.
+static std::string buildSftpBaseUrl(const std::string& host, int port) {
+    return "sftp://" + host + ":" + std::to_string(port);
 }
 
 SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
@@ -198,103 +178,255 @@ SftpTarget::~SftpTarget() {
 }
 
 bool SftpTarget::beginSession() {
-    if (!m_properlyConfigured) { std::cerr << "SftpTarget: Cannot begin session due to missing critical configuration." << std::endl; return false; }
-    if (m_curlHandle) { curl_easy_cleanup(m_curlHandle); m_curlHandle = nullptr; }
+    lastError_.clear();
+    if (!m_properlyConfigured) {
+        lastError_ = "SFTP Target not properly configured.";
+        // std::cerr is kept for now, but lastError_ is the primary mechanism.
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+    if (m_curlHandle) {
+        curl_easy_cleanup(m_curlHandle);
+        m_curlHandle = nullptr;
+    }
     m_curlHandle = curl_easy_init();
-    if (!m_curlHandle) { std::cerr << "SftpTarget: curl_easy_init() failed." << std::endl; return false; }
+    if (!m_curlHandle) {
+        lastError_ = "curl_easy_init() failed.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
 
-    // TODO: Replace with a secure SSH host key verification mechanism (e.g., user-provided known_hosts file)
-    curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, "/dev/null");
+    CURLcode res_setopt; // Renamed from 'res' to avoid conflict if any other 'res' is used locally
 
-    CURLcode res;
-    auto setopt_check = [&](CURLoption opt, auto val, const char* name) {
-        res = curl_easy_setopt(m_curlHandle, opt, val);
-        if (res != CURLE_OK) std::cerr << "SftpTarget: Failed to set " << name << ": " << curl_easy_strerror(res) << std::endl;
-        return res == CURLE_OK;
+    // SSH host key verification logic:
+    // If skipping verification, set known_hosts to NULL (or /dev/null as fallback).
+    // Otherwise, if a path is provided, use it. Otherwise, rely on libcurl's default.
+    if (m_sshSkipHostVerification) {
+        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, NULL);
+        if (res_setopt != CURLE_OK) { // If NULL is not accepted, try /dev/null
+            res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, "/dev/null");
+        }
+        if (res_setopt != CURLE_OK) {
+             std::cerr << "SftpTarget: Warning - Could not set CURLOPT_SSH_KNOWNHOSTS to NULL or /dev/null to skip host verification: " << curl_easy_strerror(res_setopt) << std::endl;
+        } else {
+            std::cout << "SftpTarget: SSH host verification is being skipped." << std::endl;
+        }
+    } else if (!m_sshKnownHostsPath.empty()) {
+        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, m_sshKnownHostsPath.c_str());
+        if (res_setopt != CURLE_OK) {
+            std::cerr << "SftpTarget: Warning - Failed to set custom CURLOPT_SSH_KNOWNHOSTS path: " << m_sshKnownHostsPath << " Error: " << curl_easy_strerror(res_setopt) << std::endl;
+        }
+    } else {
+        // Using default known_hosts file. No specific setopt for this, libcurl handles it.
+        std::cout << "SftpTarget: SSH host verification using default known_hosts file." << std::endl;
+    }
+
+
+    auto setopt_check = [&](CURLoption opt, auto val, const char* name, bool critical = true) {
+        res_setopt = curl_easy_setopt(m_curlHandle, opt, val);
+        if (res_setopt != CURLE_OK) {
+            // Set lastError_ only if it's a critical option or if lastError_ is currently empty (to avoid overwriting a critical error with a non-critical one)
+            if (critical || lastError_.empty()) {
+                lastError_ = "Failed to set SFTP option " + std::string(name) + ": " + curl_easy_strerror(res_setopt);
+            }
+            std::cerr << "SftpTarget: Failed to set " << name << ": " << curl_easy_strerror(res_setopt) << (critical ? " (Critical)" : " (Non-critical)") << std::endl;
+        }
+        return res_setopt == CURLE_OK;
     };
+
     if (!setopt_check(CURLOPT_USERNAME, m_username.c_str(), "CURLOPT_USERNAME")) goto error;
     if (!m_password.empty() && !setopt_check(CURLOPT_PASSWORD, m_password.c_str(), "CURLOPT_PASSWORD")) goto error;
     if (!setopt_check(CURLOPT_PORT, (long)m_port, "CURLOPT_PORT")) goto error;
-    setopt_check(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE");
-    if (m_sshAuthTypes != CURLSSH_AUTH_ANY && !setopt_check(CURLOPT_SSH_AUTH_TYPES, m_sshAuthTypes, "CURLOPT_SSH_AUTH_TYPES")) {}
-    if (!m_sshPrivateKeyPath.empty() && !setopt_check(CURLOPT_SSH_PRIVATE_KEYFILE, m_sshPrivateKeyPath.c_str(), "CURLOPT_SSH_PRIVATE_KEYFILE")) {}
-    if (!m_sshPublicKeyPath.empty() && !setopt_check(CURLOPT_SSH_PUBLIC_KEYFILE, m_sshPublicKeyPath.c_str(), "CURLOPT_SSH_PUBLIC_KEYFILE")) {}
-    if (!m_sshKeyPassphrase.empty() && !m_sshPrivateKeyPath.empty() && !setopt_check(CURLOPT_KEYPASSWD, m_sshKeyPassphrase.c_str(), "CURLOPT_KEYPASSWD")) {}
-    if (!m_sshSkipHostVerification && !m_sshKnownHostsPath.empty() && !setopt_check(CURLOPT_SSH_KNOWNHOSTS, m_sshKnownHostsPath.c_str(), "CURLOPT_SSH_KNOWNHOSTS")) {}
-    else if (m_sshSkipHostVerification) {
-         // For disabling host key check, libcurl uses these options with SSH backend:
-         // This is insecure and should be used with caution.
-        // A more common way if the above internal option isn't available/working is to use:
-        // curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYPEER, 0L); // Not for SSH host key
-        // curl_easy_setopt(m_curlHandle, CURLOPT_SSL_VERIFYHOST, 0L); // Not for SSH host key
-        // The correct way for SSH host keys if KNOWNHOSTS is not used and strict checking is off,
-        // is often to rely on libcurl's default behavior when no known_hosts file is specified
-        // or by setting specific options if the libcurl version supports them (like CURLOPT_SSH_VERIFYHOST).
-        // Forcing via an "insecure" option if available:
-        // curl_easy_setopt(m_curlHandle, CURLOPT_SSH_OPTIONS, CURLSSHOPT_SKIP_HOSTKEY_CHECK); // This is hypothetical
-        // The most reliable way to skip host key check if truly needed and supported by underlying libssh2:
-        // This often means NOT setting CURLOPT_SSH_KNOWNHOSTS and ensuring strict checking is off.
-        // Libcurl's behavior can be complex here. The placeholder above is a common internal one.
-        // If specific libcurl versions have a documented way, that should be used.
-        // For now, the absence of CURLOPT_SSH_KNOWNHOSTS and strict checks might lead to prompt or failure.
-        // The m_sshSkipHostVerification is a hint that we might want to bypass strict checks.
-    }
 
-    std::cout << "SftpTarget: Session begun successfully." << std::endl;
+    setopt_check(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE", false); // Verbose is not critical
+
+    if (m_sshAuthTypes != CURLSSH_AUTH_ANY) {
+        if (!setopt_check(CURLOPT_SSH_AUTH_TYPES, m_sshAuthTypes, "CURLOPT_SSH_AUTH_TYPES")) goto error;
+    }
+    if (!m_sshPrivateKeyPath.empty()) {
+        if (!setopt_check(CURLOPT_SSH_PRIVATE_KEYFILE, m_sshPrivateKeyPath.c_str(), "CURLOPT_SSH_PRIVATE_KEYFILE")) goto error;
+    }
+    if (!m_sshPublicKeyPath.empty()) {
+        if (!setopt_check(CURLOPT_SSH_PUBLIC_KEYFILE, m_sshPublicKeyPath.c_str(), "CURLOPT_SSH_PUBLIC_KEYFILE")) goto error;
+    }
+    if (!m_sshKeyPassphrase.empty() && !m_sshPrivateKeyPath.empty()) {
+        if (!setopt_check(CURLOPT_KEYPASSWD, m_sshKeyPassphrase.c_str(), "CURLOPT_KEYPASSWD")) goto error;
+    }
+    // Note: CURLOPT_SSH_KNOWNHOSTS is handled above, not part of the main setopt_check loop with goto error for critical failure.
+    // Its failure is logged as a warning but doesn't necessarily stop the session attempt.
+
+    std::cout << "SftpTarget: Session options configured. Connection will be established on first operation." << std::endl;
+    // If we reached here, critical options were set. Clear lastError_ if it was set by a non-critical option.
+    // However, the setopt_check lambda logic with `critical || lastError_.empty()` should prevent overwriting critical errors.
+    // If a critical error occurred, `goto error` would have been taken.
+    // So, if lastError_ is set here, it must be from a non-critical option that we allowed to pass.
+    // For a truly "successful" beginSession configuration, lastError_ should be clear.
+    if (!lastError_.empty()) { // Implies a non-critical setopt failed (e.g. verbose)
+        std::cout << "SftpTarget: Note - some non-critical options failed to set. Last recorded non-critical error: " << lastError_ << std::endl;
+        // Decide if this should be cleared or not. If getLastError() is called now, it would show this.
+        // Let's clear it to indicate readiness for operations, as critical ones passed.
+        lastError_.clear();
+    }
     return true;
 error:
-    if (m_curlHandle) { curl_easy_cleanup(m_curlHandle); m_curlHandle = nullptr; }
+    // lastError_ should have been set by the failing critical setopt_check
+    if (m_curlHandle) {
+        curl_easy_cleanup(m_curlHandle);
+        m_curlHandle = nullptr;
+    }
     return false;
 }
 
 bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
+    lastError_.clear();
     std::cout << "SftpTarget: sendFile(" << localPath << ", remote_path: " << metadata.name << ") called." << std::endl;
-    if (!m_curlHandle) { std::cerr << "SftpTarget: Session not begun or curl handle not initialized." << std::endl; return false; }
+    if (!m_curlHandle) {
+        lastError_ = "SFTP sendFile: Session not begun or curl handle not initialized.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
     std::ifstream sourceFile(localPath, std::ios::binary);
-    if (!sourceFile.is_open()) { std::cerr << "SftpTarget: Failed to open source file: " << localPath << std::endl; return false; }
+    if (!sourceFile.is_open()) {
+        lastError_ = "SFTP sendFile: Failed to open local source file: " + localPath;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
     sourceFile.seekg(0, std::ios::end);
     curl_off_t fileSize = sourceFile.tellg();
     sourceFile.seekg(0, std::ios::beg);
-    if (fileSize < 0) { std::cerr << "SftpTarget: Failed to get size of source file: " << localPath << std::endl; sourceFile.close(); return false; }
+    if (fileSize < 0) {
+        lastError_ = "SFTP sendFile: Failed to get size of local source file: " + localPath;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        sourceFile.close();
+        return false;
+    }
     
-    std::string remoteUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, metadata.name);
+    std::string full_logical_path = joinPaths(m_remoteBasePath, metadata.name);
+    if (full_logical_path.empty() && metadata.name != "/") { // Allow "/" for specific root operations if any, but generally expect non-empty
+        lastError_ = "SFTP sendFile: Generated logical path is empty for remote item: " + metadata.name;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        sourceFile.close();
+        return false;
+    }
+
+    // curl_easy_escape requires an initialized curl handle.
+    if (!m_curlHandle) { // Should have been caught earlier, but as a safeguard here.
+        lastError_ = "SFTP sendFile: curl handle not initialized before escaping path.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        sourceFile.close();
+        return false;
+    }
+
+    char* escaped_path_c = curl_easy_escape(m_curlHandle, full_logical_path.c_str(), 0);
+    if (!escaped_path_c) {
+        lastError_ = "SFTP sendFile: curl_easy_escape failed for path: " + full_logical_path;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        sourceFile.close();
+        return false;
+    }
+    std::string escaped_path(escaped_path_c);
+    curl_free(escaped_path_c);
+
+    // The escaped_path will start with %2F if full_logical_path started with /.
+    // Base URL should be sftp://host:port
+    std::string remoteUrl = buildSftpBaseUrl(m_host, m_port) + escaped_path;
     std::cout << "SftpTarget: Uploading to URL: " << remoteUrl << std::endl;
 
-    CURLcode res;
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, remoteUrl.c_str());
+    CURLcode res_setopt_url = curl_easy_setopt(m_curlHandle, CURLOPT_URL, remoteUrl.c_str());
+    if (res_setopt_url != CURLE_OK) {
+        lastError_ = "SFTP sendFile: Failed to set URL '" + remoteUrl + "': " + std::string(curl_easy_strerror(res_setopt_url));
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        sourceFile.close();
+        return false;
+    }
+
     curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 1L);
+    // CURLOPT_FTP_CREATE_MISSING_DIRS is useful for SFTP too, creates parent dirs for the file.
     curl_easy_setopt(m_curlHandle, CURLOPT_FTP_CREATE_MISSING_DIRS, (long)CURLFTP_CREATE_DIR_RETRY);
     curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, read_callback);
     curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, &sourceFile);
     curl_easy_setopt(m_curlHandle, CURLOPT_INFILESIZE_LARGE, fileSize);
-    res = curl_easy_perform(m_curlHandle);
+
+    CURLcode res_perform = curl_easy_perform(m_curlHandle);
+
     sourceFile.close();
+    // It's good practice to reset options that might affect other types of requests if the handle is reused.
     curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
-    if (res != CURLE_OK) { std::cerr << "SftpTarget: curl_easy_perform() failed for sendFile: " << curl_easy_strerror(res) << std::endl; return false; }
+    curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, NULL); // Reset read callback
+    curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, NULL);    // Reset read data pointer
+
+    if (res_perform != CURLE_OK) {
+        lastError_ = "SFTP sendFile: Upload failed for " + remoteUrl + ": " + curl_easy_strerror(res_perform);
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
     std::cout << "SftpTarget: File sent successfully." << std::endl;
     return true;
 }
 
 bool SftpTarget::deleteFile(const std::string& remotePath) {
+    lastError_.clear();
     std::cout << "SftpTarget: deleteFile(" << remotePath << ") called." << std::endl;
-    if (!m_curlHandle) { std::cerr << "SftpTarget: Session not begun or curl handle not initialized." << std::endl; return false; }
-    std::string connectionUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, "");
+    if (!m_curlHandle) {
+        lastError_ = "SFTP deleteFile: Session not begun or curl handle not initialized.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    // The URL for QUOTE commands is typically the base SFTP URL sftp://host:port/
+    // The path for 'rm' is specified in the command itself and should be absolute on the server.
+    std::string contextUrl = buildSftpBaseUrl(m_host, m_port) + "/"; // Context URL for QUOTE commands.
+
     std::string absolutePathForRm = buildSftpAbsolutePath(m_remoteBasePath, remotePath);
-    std::string rmCommand = "rm \"" + absolutePathForRm + "\"";
-    struct curl_slist *headerlist = curl_slist_append(NULL, rmCommand.c_str());
-    CURLcode res;
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, connectionUrl.c_str());
-    curl_easy_setopt(m_curlHandle, CURLOPT_QUOTE, headerlist);
-    std::cout << "SftpTarget: Attempting to delete. URL: " << connectionUrl << ", Cmd: " << rmCommand << std::endl;
-    res = curl_easy_perform(m_curlHandle);
-    curl_slist_free_all(headerlist);
-    curl_easy_setopt(m_curlHandle, CURLOPT_QUOTE, NULL);
-    if (res != CURLE_OK) { std::cerr << "SftpTarget: curl_easy_perform() failed for deleteFile (" << remotePath << "). Error: " << curl_easy_strerror(res) << std::endl; return false; }
+    // Escape quotes within the absolutePathForRm if any, though filenames typically don't have them.
+    // For simplicity, assuming paths don't contain double quotes that would break the command string.
+    // A more robust solution would escape characters in absolutePathForRm if needed.
+    std::string rmCommand = "rm \"" + absolutePathForRm + "\""; // Quoting handles spaces
+
+    struct curl_slist *customCommands = NULL;
+    customCommands = curl_slist_append(customCommands, rmCommand.c_str());
+    if (!customCommands) {
+        lastError_ = "SFTP deleteFile: Failed to create slist for QUOTE command.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    CURLcode res_setopt_url = curl_easy_setopt(m_curlHandle, CURLOPT_URL, contextUrl.c_str());
+    if (res_setopt_url != CURLE_OK) {
+        lastError_ = "SFTP deleteFile: Failed to set context URL: " + std::string(curl_easy_strerror(res_setopt_url));
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        curl_slist_free_all(customCommands);
+        return false;
+    }
+
+    curl_easy_setopt(m_curlHandle, CURLOPT_QUOTE, customCommands);
+    // Ensure other modes that might conflict with QUOTE are off (e.g. UPLOAD)
+    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L);
+
+    std::cout << "SftpTarget: Attempting to delete. Context URL: " << contextUrl << ", Command: " << rmCommand << std::endl;
+    CURLcode res_perform = curl_easy_perform(m_curlHandle);
+
+    curl_slist_free_all(customCommands);
+    curl_easy_setopt(m_curlHandle, CURLOPT_QUOTE, NULL); // Reset QUOTE
+
+    if (res_perform != CURLE_OK) {
+        // This error might indicate issues like "file not found", "permission denied", or "is a directory".
+        lastError_ = "SFTP deleteFile command failed for path '" + remotePath + "' (absolute: '" + absolutePathForRm + "'): " + curl_easy_strerror(res_perform);
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    // Note: For SFTP, CURLE_OK for a QUOTE 'rm' command doesn't always guarantee the file was actually deleted
+    // or that it existed. Some servers might not return an error code via libcurl for "file not found" on 'rm'.
+    // True verification would involve trying to list/stat the file afterwards.
+    // For this implementation, CURLE_OK is treated as success.
     std::cout << "SftpTarget: File deletion command successfully executed for " << remotePath << std::endl;
     return true;
 }
 
 bool SftpTarget::endSession() {
+    lastError_.clear(); // Clearing error on successful endSession or if no session to end.
     std::cout << "SftpTarget: endSession() called." << std::endl;
     if (m_curlHandle) { curl_easy_cleanup(m_curlHandle); m_curlHandle = nullptr; }
     std::cout << "SftpTarget: Session ended." << std::endl;
@@ -363,21 +495,76 @@ static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*u
 }
 
 std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
+    lastError_.clear();
     std::vector<FileMetadata> resultFiles;
-    if (!m_curlHandle) { std::cerr << "SftpTarget: listFiles - Session not begun or curl handle not initialized." << std::endl; return resultFiles; }
-    std::string dirUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, remotePath);
-    if (dirUrl.back() != '/') dirUrl += '/';
+    if (!m_curlHandle) {
+        lastError_ = "SFTP listFiles: Session not begun or curl handle not initialized.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+
+    std::string logical_path_for_listing = joinPaths(m_remoteBasePath, remotePath);
+    if (logical_path_for_listing.empty() && remotePath != "/") {
+        lastError_ = "SFTP listFiles: Generated logical path is empty for remote item: " + remotePath;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+    // Ensure directory paths for listing end with a slash BEFORE escaping,
+    // unless it's the root path which is already just "/".
+    if (logical_path_for_listing != "/" && logical_path_for_listing.back() != '/') {
+        logical_path_for_listing += '/';
+    }
+
+    if (!m_curlHandle) {
+        lastError_ = "SFTP listFiles: curl handle not initialized before escaping path.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+    char* escaped_dir_path_c = curl_easy_escape(m_curlHandle, logical_path_for_listing.c_str(), 0);
+    if (!escaped_dir_path_c) {
+        lastError_ = "SFTP listFiles: curl_easy_escape failed for path: " + logical_path_for_listing;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+    std::string escaped_dir_path(escaped_dir_path_c);
+    curl_free(escaped_dir_path_c);
+
+    std::string dirUrl = buildSftpBaseUrl(m_host, m_port) + escaped_dir_path;
     // std::cout << "SftpTarget: Listing directory URL: " << dirUrl << std::endl; // Can be verbose
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, dirUrl.c_str());
+
+    CURLcode res_opt = curl_easy_setopt(m_curlHandle, CURLOPT_URL, dirUrl.c_str());
+    if (res_opt != CURLE_OK) {
+        lastError_ = "SFTP listFiles: Failed to set URL '" + dirUrl + "': " + std::string(curl_easy_strerror(res_opt));
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+
     std::string listingData;
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, sftpListWriteCallback);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &listingData);
+    // For full listing like 'ls -l', CURLOPT_DIRLISTONLY should be 0L.
+    // If only names are needed, it would be 1L.
     curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L);
-    CURLcode res = curl_easy_perform(m_curlHandle);
+    // Ensure no prior custom request (like for deleteFile's QUOTE) interferes.
     curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, NULL);
+    // Ensure UPLOAD mode is off, as this is a listing operation.
+    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
+
+
+    CURLcode res_perform = curl_easy_perform(m_curlHandle);
+
+    // Reset options that were specific to this request for cleanliness,
+    // though curl_easy_perform itself should handle state for each call.
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
-    if (res != CURLE_OK) { std::cerr << "SftpTarget: listFiles - curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl; return resultFiles; }
+    // No need to reset CURLOPT_DIRLISTONLY or CURLOPT_CUSTOMREQUEST if they are set per-call basis.
+
+    if (res_perform != CURLE_OK) {
+        lastError_ = "SFTP listFiles: curl_easy_perform() failed for URL " + dirUrl + ": " + curl_easy_strerror(res_perform);
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return resultFiles;
+    }
+
     // std::cout << "SftpTarget: Raw listing data:\n" << listingData << std::endl; // Very verbose
     std::istringstream iss(listingData); std::string line;
     while (std::getline(iss, line)) {
@@ -406,24 +593,82 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
 }
 
 bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& localPath) {
-    if (!m_curlHandle) { std::cerr << "SftpTarget: downloadFile - Session not begun or curl handle not initialized." << std::endl; return false; }
-    std::string fileUrl = buildSftpUrl(m_host, m_port, m_remoteBasePath, remotePath);
+    lastError_.clear();
+    if (!m_curlHandle) {
+        lastError_ = "SFTP downloadFile: Session not begun or curl handle not initialized.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    std::string full_logical_path = joinPaths(m_remoteBasePath, remotePath);
+    if (full_logical_path.empty() && remotePath != "/") {
+        lastError_ = "SFTP downloadFile: Generated logical path is empty for remote item: " + remotePath;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    if (!m_curlHandle) {
+        lastError_ = "SFTP downloadFile: curl handle not initialized before escaping path.";
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+    char* escaped_path_c = curl_easy_escape(m_curlHandle, full_logical_path.c_str(), 0);
+    if (!escaped_path_c) {
+        lastError_ = "SFTP downloadFile: curl_easy_escape failed for path: " + full_logical_path;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+    std::string escaped_path(escaped_path_c);
+    curl_free(escaped_path_c);
+
+    std::string fileUrl = buildSftpBaseUrl(m_host, m_port) + escaped_path;
     std::cout << "SftpTarget: Downloading from URL: " << fileUrl << " to local path: " << localPath << std::endl;
+
     std::ofstream outFile(localPath, std::ios::binary);
-    if (!outFile.is_open()) { std::cerr << "SftpTarget: Failed to open local file for writing: " << localPath << std::endl; return false; }
-    CURLcode res;
-    curl_easy_setopt(m_curlHandle, CURLOPT_URL, fileUrl.c_str());
+    if (!outFile.is_open()) {
+        lastError_ = "SFTP downloadFile: Failed to open local file for writing: " + localPath;
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
+
+    CURLcode res_opt_url = curl_easy_setopt(m_curlHandle, CURLOPT_URL, fileUrl.c_str());
+    if (res_opt_url != CURLE_OK) {
+        lastError_ = "SFTP downloadFile: Failed to set URL '" + fileUrl + "': " + std::string(curl_easy_strerror(res_opt_url));
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        outFile.close();
+        std::remove(localPath.c_str()); // Clean up empty/partially written local file
+        return false;
+    }
+
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, fileWriteCallback);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &outFile);
-    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L); // Should be default for sftp GET
+    curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L); // Ensure UPLOAD is off
+    // For SFTP GET, CURLOPT_HTTPGET is not strictly necessary, but doesn't hurt.
+    // It's more for HTTP. SFTP direction is inferred from UPLOAD flag.
+    // curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 1L);
     curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L); // Ensure not in dirlist mode
-    curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, NULL); // Ensure no custom request like LIST
-    res = curl_easy_perform(m_curlHandle);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL); // Reset
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);    // Reset
-    outFile.close();
-    if (res != CURLE_OK) { std::cerr << "SftpTarget: curl_easy_perform() failed for downloadFile: " << curl_easy_strerror(res) << std::endl; std::remove(localPath.c_str()); return false; }
+    curl_easy_setopt(m_curlHandle, CURLOPT_CUSTOMREQUEST, NULL); // Ensure no custom request
+
+    CURLcode res_perform = curl_easy_perform(m_curlHandle);
+
+    // Reset options that were specific to this request
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+
+    outFile.close(); // Close file before checking result, to flush buffers.
+
+    if (res_perform != CURLE_OK) {
+        lastError_ = "SFTP downloadFile: curl_easy_perform() failed for URL " + fileUrl + ": " + curl_easy_strerror(res_perform);
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        std::remove(localPath.c_str()); // Clean up potentially incomplete local file
+        return false;
+    }
+
+    // Additionally, check if fileWriteCallback encountered an error (e.g., disk full)
+    // This is implicitly handled by outFile.good() in the callback, returning less than requested bytes,
+    // which libcurl would typically interpret as an error (CURLE_WRITE_ERROR).
+    // So, res_perform should reflect this. Explicit check here might be redundant if callback correctly signals error.
+
     std::cout << "SftpTarget: File downloaded successfully to " << localPath << std::endl;
     return true;
 }

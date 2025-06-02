@@ -612,49 +612,70 @@ void MainWindow::performBackupInternal(const QString& sourcePath, IStorageTarget
                    if (target->sendFile(fullEntryPath.string(), meta)) {
                        updateLog(QString("Backed up: %1").arg(QString::fromStdString(relativePathStr)));
                    } else {
-                       std::string err_msg;
-                       GcsTarget* gcs = dynamic_cast<GcsTarget*>(target); // Assuming target is IStorageTarget*
-                       SftpTarget* sftp = dynamic_cast<SftpTarget*>(target);
+                       all_ok = false; // Set all_ok to false on sendFile failure
 
-                       if (gcs) {
-                           err_msg = gcs->getLastError();
-                       } else if (sftp) {
-                           err_msg = sftp->getLastError();
+                       std::string err_msg;
+                       // Attempt to get specific error message using dynamic_cast
+                       if (auto sftpTarget = dynamic_cast<SftpTarget*>(target)) {
+                           err_msg = sftpTarget->getLastError();
+                       } else if (auto gcsTarget = dynamic_cast<GcsTarget*>(target)) {
+                           err_msg = gcsTarget->getLastError();
+                       } else if (auto localTarget = dynamic_cast<LocalTarget*>(target)) {
+                           // Assuming LocalTarget might also have getLastError() or a similar mechanism
+                           // If LocalTarget does not have getLastError(), this will need adjustment
+                           // For now, let's assume it might return a generic error if getLastError() isn't present.
+                           // err_msg = localTarget->getLastError(); // Uncomment if LocalTarget has this
+                           if (err_msg.empty()) err_msg = "File operation failed with LocalTarget.";
                        } else {
-                           err_msg = "unknown error"; // Changed part
+                           err_msg = "Unknown target type or error during sendFile.";
+                       }
+                       if (err_msg.empty()) { // Fallback if getLastError() returned empty
+                           err_msg = "target->sendFile() failed with no specific error message provided by the target.";
                        }
 
                        updateLog(QString("Error backing up: %1. Error: %2")
-              .arg(QString::fromStdString(relativePathStr))
-              .arg(QString::fromStdString(err_msg)));
+                                     .arg(QString::fromStdString(relativePathStr))
+                                     .arg(QString::fromStdString(err_msg)));
 
                        QMessageBox::critical(this, "Backup Error",
                                              QString("Failed to back up: %1\nError: %2")
                                                  .arg(QString::fromStdString(relativePathStr))
                                                  .arg(QString::fromStdString(err_msg)));
-                       return; // Stop backup if one file fails
+                       return; // Stop backup if one file fails (as per original logic)
                    }
                }
            }
        } catch (const std::filesystem::filesystem_error& e) {
             updateLog(QString("Error accessing path %1: %2").arg(QString::fromStdString(currentPathInSource.string()), QString::fromStdString(e.what())));
-            all_ok = false;
+            all_ok = false; // This is already correct
        }
     };
 
     recursiveCopy(fsSourcePath); 
 
     if (!target->endSession()) {
-        std::string specificError;
-        GcsTarget* currentGcsTarget = dynamic_cast<GcsTarget*>(target);
-        if (currentGcsTarget) {
-            specificError = currentGcsTarget->getLastError();
-        }
-        QString errorDetails = QString::fromStdString(specificError);
-        if (errorDetails.isEmpty()) errorDetails = tr("Check target logs.");
+        all_ok = false; // Ensure all_ok is set if endSession fails
 
+        std::string specificError;
+        // Retrieve error from specific target type for endSession failure
+        if (auto sftpTarget = dynamic_cast<SftpTarget*>(target)) {
+            specificError = sftpTarget->getLastError();
+        } else if (auto gcsTarget = dynamic_cast<GcsTarget*>(target)) {
+            specificError = gcsTarget->getLastError();
+        } else if (auto localTarget = dynamic_cast<LocalTarget*>(target)) {
+            // Assuming LocalTarget might also have getLastError()
+            // specificError = localTarget->getLastError(); // Uncomment if LocalTarget has this
+             if (specificError.empty()) specificError = "Failed to end session with LocalTarget.";
+        } else {
+            specificError = "Unknown target type or error during endSession.";
+        }
+        if (specificError.empty()) {
+             specificError = "target->endSession() failed with no specific error message provided by the target.";
+        }
+
+        QString errorDetails = QString::fromStdString(specificError);
         updateLog(QString("Error: Could not properly end backup session with target. Target error: %1").arg(errorDetails));
-        all_ok = false; 
+        // No QMessageBox here as the final summary will indicate errors.
     }
 
     if (all_ok) {

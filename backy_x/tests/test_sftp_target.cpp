@@ -367,6 +367,20 @@ TEST_F(SftpTargetOnlineTest, UploadDeleteSpecialCharFile_FileNameWithSlash) {
     EXPECT_TRUE(target.endSession());
 }
 
+TEST_F(SftpTargetOnlineTest, UploadDeleteDotFile) {
+    if (!configured) { GTEST_SKIP() << "SFTP server not configured. Skipping test."; return; }
+    SftpTarget target(onlineConfig);
+    ASSERT_TRUE(target.beginSession());
+
+    FileMetadata meta;
+    meta.name = ".DS_Store";
+
+    EXPECT_TRUE(target.sendFile(dummyFilePath, meta)) << "Failed to upload dotfile '.DS_Store'.";
+    EXPECT_TRUE(target.deleteFile(meta.name)) << "Failed to delete dotfile '.DS_Store'.";
+
+    EXPECT_TRUE(target.endSession());
+}
+
 
 // Main function for Google Test (if not linking with gtest_main)
 // int main(int argc, char **argv) {
