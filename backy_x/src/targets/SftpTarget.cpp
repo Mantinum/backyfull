@@ -498,6 +498,7 @@ static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*u
 
 std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
     lastError_.clear();
+    bool parsingErrorOccurred = false;
     std::vector<FileMetadata> resultFiles;
     if (!m_curlHandle) {
         lastError_ = "SFTP listFiles: Session not begun or curl handle not initialized.";
@@ -573,7 +574,14 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
             if (tokens.size() == 1 && tokens[0] != "." && tokens[0] != "..") {
                  resultFiles.emplace_back(tokens[0], 0, std::chrono::system_clock::from_time_t(0), false);
                  qWarning() << "SftpTarget: listFiles - Parsed simple entry (1 token):" << QString::fromStdString(tokens[0]);
-            } else qWarning() << "SftpTarget: listFiles - Skipping line due to insufficient tokens:" << QString::fromStdString(line);
+                 // This case is a simple parse, might not be an "error" unless it's unexpected.
+                 // Not setting parsingErrorOccurred = true; for this specific simple parse.
+            } else {
+                qWarning() << "SftpTarget: listFiles - Skipping line due to insufficient tokens:" << QString::fromStdString(line);
+                if (!line.empty() && line.find_first_not_of(" \t\r\n") != std::string::npos) { // Check if line wasn't just whitespace
+                    parsingErrorOccurred = true;
+                }
+            }
             continue;
         }
         FileMetadata meta; char type = tokens[0][0]; meta.isDirectory = (type == 'd');
@@ -581,9 +589,22 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
         if (filename == "." || filename == "..") continue;
         meta.name = filename;
         try { meta.size = std::stoull(tokens[4]); }
-        catch (const std::exception& e) { qWarning() << "SftpTarget: listFiles - Failed to parse size for" << QString::fromStdString(meta.name) << ". Error:" << e.what(); meta.size = 0; }
+        catch (const std::exception& e) {
+            qWarning() << "SftpTarget: listFiles - Failed to parse size for" << QString::fromStdString(meta.name) << ". Error:" << e.what();
+            meta.size = 0;
+            parsingErrorOccurred = true;
+        }
+        // Assuming parseSftpDate also uses qWarning internally on failure and returns time_t(0)
         meta.modificationTime = parseSftpDate(QString::fromStdString(tokens[5]), QString::fromStdString(tokens[6]), QString::fromStdString(tokens[7]));
+        if (meta.modificationTime == std::chrono::system_clock::from_time_t(0) && tokens[0] != "total") { // if parseSftpDate failed (returned epoch 0)
+             // and it's not a "total" line which might not have a date
+            parsingErrorOccurred = true; // Count date parsing failure as a parsing error
+        }
         resultFiles.push_back(meta);
+    }
+
+    if (resultFiles.empty() && !listingData.empty() && parsingErrorOccurred && lastError_.empty()) {
+        lastError_ = "Failed to parse any entries from the directory listing. The server's `ls` format might be incompatible or the listing was unusual.";
     }
     return resultFiles;
 }
