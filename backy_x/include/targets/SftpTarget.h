@@ -25,6 +25,7 @@ public:
     bool endSession() override;
 
     std::string getLastError() const;
+    std::string buildSftpUrl(const std::string& relativePath) const; // New method
 
 private:
     std::string m_host;

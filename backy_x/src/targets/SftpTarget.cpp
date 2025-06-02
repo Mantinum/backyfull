@@ -32,8 +32,7 @@ static std::chrono::system_clock::time_point parseSftpDate(const QString& monthT
 
 // Helper functions for SFTP path and URL construction
 static std::string buildSftpAbsolutePath(const std::string& basePath, const std::string& relativePath);
-// Simplified: builds only the sftp://host:port part. Path will be appended after escaping.
-static std::string buildSftpBaseUrl(const std::string& host, int port);
+// static std::string buildSftpBaseUrl(const std::string& host, int port); // Definition to be removed
 
 // Helper function to parse SSH authentication types string
 static long parseSshAuthTypes(const std::string& authTypesStr) {
@@ -109,10 +108,7 @@ static std::string buildSftpAbsolutePath(const std::string& basePath, const std:
     return joinPaths(basePath, relativePath);
 }
 
-// Simplified: builds only the sftp://host:port part. Path will be appended after escaping.
-static std::string buildSftpBaseUrl(const std::string& host, int port) {
-    return "sftp://" + host + ":" + std::to_string(port);
-}
+// Definition of buildSftpBaseUrl is removed.
 
 SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
     : m_port(22),
@@ -125,8 +121,18 @@ SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
     m_curlHandle = nullptr; 
     m_credentialManager = std::unique_ptr<CredentialManager>(createPlatformCredentialManager());
     auto itHost = config.find("host");
-    if (itHost != config.end() && !itHost->second.empty()) m_host = itHost->second;
-    else { std::cerr << "SftpTarget: Critical configuration 'host' is missing or empty." << std::endl; m_properlyConfigured = false; }
+    if (itHost != config.end() && !itHost->second.empty()) {
+        m_host = itHost->second;
+        if (!m_host.empty()) { // Only clean if m_host is not empty after assignment
+            // Remove newline characters
+            m_host.erase(std::remove(m_host.begin(), m_host.end(), '\n'), m_host.end());
+            // Remove carriage return characters
+            m_host.erase(std::remove(m_host.begin(), m_host.end(), '\r'), m_host.end());
+        }
+    } else {
+        std::cerr << "SftpTarget: Critical configuration 'host' is missing or empty." << std::endl;
+        m_properlyConfigured = false;
+    }
     auto itUser = config.find("username");
     if (itUser != config.end() && !itUser->second.empty()) m_username = itUser->second;
     else { std::cerr << "SftpTarget: Critical configuration 'username' is missing or empty." << std::endl; m_properlyConfigured = false; }
@@ -302,39 +308,28 @@ bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& meta
     }
     
     std::string full_logical_path = joinPaths(m_remoteBasePath, metadata.name);
-    if (full_logical_path.empty() && metadata.name != "/") { // Allow "/" for specific root operations if any, but generally expect non-empty
-        lastError_ = "SFTP sendFile: Generated logical path is empty for remote item: " + metadata.name;
+    // Note: empty check for full_logical_path is implicitly handled by buildSftpUrl,
+    // as it defaults empty input to "/" or ensures a leading "/".
+    // If buildSftpUrl returns empty, it means an error occurred there (e.g. m_curlHandle null or escape failed)
+
+    std::string remoteUrl = this->buildSftpUrl(full_logical_path);
+    if (remoteUrl.empty()) {
+        // lastError_ might be set by buildSftpUrl if m_curlHandle was null or curl_easy_escape failed.
+        // If it's not set, provide a generic error.
+        if (lastError_.empty()) {
+            lastError_ = "SFTP sendFile: Failed to construct remote URL for path: " + full_logical_path;
+        }
         std::cerr << "SftpTarget: " << lastError_ << std::endl;
         sourceFile.close();
         return false;
     }
-
-    // curl_easy_escape requires an initialized curl handle.
-    if (!m_curlHandle) { // Should have been caught earlier, but as a safeguard here.
-        lastError_ = "SFTP sendFile: curl handle not initialized before escaping path.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        sourceFile.close();
-        return false;
-    }
-
-    char* escaped_path_c = curl_easy_escape(m_curlHandle, full_logical_path.c_str(), 0);
-    if (!escaped_path_c) {
-        lastError_ = "SFTP sendFile: curl_easy_escape failed for path: " + full_logical_path;
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        sourceFile.close();
-        return false;
-    }
-    std::string escaped_path(escaped_path_c);
-    curl_free(escaped_path_c);
-
-    // The escaped_path will start with %2F if full_logical_path started with /.
-    // Base URL should be sftp://host:port
-    std::string remoteUrl = buildSftpBaseUrl(m_host, m_port) + escaped_path;
     std::cout << "SftpTarget: Uploading to URL: " << remoteUrl << std::endl;
 
     CURLcode res_setopt_url = curl_easy_setopt(m_curlHandle, CURLOPT_URL, remoteUrl.c_str());
     if (res_setopt_url != CURLE_OK) {
-        lastError_ = "SFTP sendFile: Failed to set URL '" + remoteUrl + "': " + std::string(curl_easy_strerror(res_setopt_url));
+        // Note: buildSftpUrl might have already set lastError_ if it failed.
+        // Overwrite if this specific error is more relevant.
+        lastError_ = "SFTP sendFile: Failed to set CURLOPT_URL for '" + remoteUrl + "': " + std::string(curl_easy_strerror(res_setopt_url));
         std::cerr << "SftpTarget: " << lastError_ << std::endl;
         sourceFile.close();
         return false;
@@ -375,7 +370,14 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
 
     // The URL for QUOTE commands is typically the base SFTP URL sftp://host:port/
     // The path for 'rm' is specified in the command itself and should be absolute on the server.
-    std::string contextUrl = buildSftpBaseUrl(m_host, m_port) + "/"; // Context URL for QUOTE commands.
+    std::string contextUrl = this->buildSftpUrl("/"); // Generate sftp://host:port/
+    if (contextUrl.empty()) {
+        if (lastError_.empty()) { // Check if buildSftpUrl set it
+             lastError_ = "SFTP deleteFile: Failed to construct context URL.";
+        }
+        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        return false;
+    }
 
     std::string absolutePathForRm = buildSftpAbsolutePath(m_remoteBasePath, remotePath);
     // Escape quotes within the absolutePathForRm if any, though filenames typically don't have them.
@@ -515,21 +517,15 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
         logical_path_for_listing += '/';
     }
 
-    if (!m_curlHandle) {
-        lastError_ = "SFTP listFiles: curl handle not initialized before escaping path.";
+    // The m_curlHandle check for buildSftpUrl itself is inside buildSftpUrl.
+    std::string dirUrl = this->buildSftpUrl(logical_path_for_listing);
+    if (dirUrl.empty()) {
+        if (lastError_.empty()) { // Check if buildSftpUrl set it
+            lastError_ = "SFTP listFiles: Failed to construct remote URL for path: " + logical_path_for_listing;
+        }
         std::cerr << "SftpTarget: " << lastError_ << std::endl;
         return resultFiles;
     }
-    char* escaped_dir_path_c = curl_easy_escape(m_curlHandle, logical_path_for_listing.c_str(), 0);
-    if (!escaped_dir_path_c) {
-        lastError_ = "SFTP listFiles: curl_easy_escape failed for path: " + logical_path_for_listing;
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        return resultFiles;
-    }
-    std::string escaped_dir_path(escaped_dir_path_c);
-    curl_free(escaped_dir_path_c);
-
-    std::string dirUrl = buildSftpBaseUrl(m_host, m_port) + escaped_dir_path;
     // std::cout << "SftpTarget: Listing directory URL: " << dirUrl << std::endl; // Can be verbose
 
     CURLcode res_opt = curl_easy_setopt(m_curlHandle, CURLOPT_URL, dirUrl.c_str());
@@ -601,27 +597,17 @@ bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& 
     }
 
     std::string full_logical_path = joinPaths(m_remoteBasePath, remotePath);
-    if (full_logical_path.empty() && remotePath != "/") {
-        lastError_ = "SFTP downloadFile: Generated logical path is empty for remote item: " + remotePath;
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        return false;
-    }
+    // Note: empty check for full_logical_path is implicitly handled by buildSftpUrl
 
-    if (!m_curlHandle) {
-        lastError_ = "SFTP downloadFile: curl handle not initialized before escaping path.";
+    std::string fileUrl = this->buildSftpUrl(full_logical_path);
+    if (fileUrl.empty()) {
+        if (lastError_.empty()) { // Check if buildSftpUrl set it
+            lastError_ = "SFTP downloadFile: Failed to construct remote URL for path: " + full_logical_path;
+        }
         std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        // No local file opened yet, so no need to close/remove
         return false;
     }
-    char* escaped_path_c = curl_easy_escape(m_curlHandle, full_logical_path.c_str(), 0);
-    if (!escaped_path_c) {
-        lastError_ = "SFTP downloadFile: curl_easy_escape failed for path: " + full_logical_path;
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        return false;
-    }
-    std::string escaped_path(escaped_path_c);
-    curl_free(escaped_path_c);
-
-    std::string fileUrl = buildSftpBaseUrl(m_host, m_port) + escaped_path;
     std::cout << "SftpTarget: Downloading from URL: " << fileUrl << " to local path: " << localPath << std::endl;
 
     std::ofstream outFile(localPath, std::ios::binary);
@@ -675,4 +661,68 @@ bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& 
 
 std::string SftpTarget::getLastError() const {
     return lastError_;
+}
+
+// New method for segment-wise path escaping
+std::string SftpTarget::buildSftpUrl(const std::string& relativePath) const {
+    if (!m_curlHandle) {
+        // lastError_ cannot be set directly in a const method unless mutable.
+        // Logging to cerr and returning empty string is an alternative.
+        std::cerr << "SftpTarget::buildSftpUrl: m_curlHandle is null. Cannot escape path." << std::endl;
+        // Consider setting a global error or having a non-const version if lastError_ must be set.
+        return ""; // Indicates error
+    }
+
+    std::stringstream url_ss;
+    url_ss << "sftp://" << m_host << ":" << m_port;
+
+    std::string path_to_process = relativePath;
+    if (path_to_process.empty()) {
+        path_to_process = "/"; // Default to root if empty
+    }
+    // Ensure path starts with a slash if it's not already (unless it's empty, handled above)
+    if (path_to_process.front() != '/') {
+        path_to_process = "/" + path_to_process;
+    }
+
+    if (path_to_process == "/") {
+        url_ss << "/";
+    } else {
+        // Path is like "/foo/bar" or "/foo/bar/"
+        // We process segments between slashes.
+        // The first character is '/', so we start processing from the char after it.
+        std::string content_to_segment = path_to_process.substr(1);
+        std::stringstream segment_stream(content_to_segment);
+        std::string segment;
+
+        // Keep track if the original path (after initial normalization) had a trailing slash
+        bool has_trailing_slash = (content_to_segment.length() > 0 && content_to_segment.back() == '/');
+
+        while(std::getline(segment_stream, segment, '/')) {
+            url_ss << '/'; // Append segment separator
+            if (!segment.empty()) {
+                char *escaped_segment = curl_easy_escape(m_curlHandle, segment.c_str(), 0);
+                if (escaped_segment) {
+                    url_ss << escaped_segment;
+                    curl_free(escaped_segment);
+                } else {
+                    std::cerr << "SftpTarget::buildSftpUrl: curl_easy_escape failed for segment: " << segment << std::endl;
+                    return ""; // Error case
+                }
+            }
+            // If segment is empty (e.g. from path "//" or "/path//seg/"), it means consecutive slashes.
+            // An empty segment is appended after the '/', effectively preserving multiple slashes if needed (e.g. /foo//bar -> /foo//bar).
+            // curl_easy_escape("") results in "", so `url_ss << ""` is a no-op, which is fine for empty segments.
+        }
+
+        // If the original path (content_to_segment) had a trailing slash,
+        // and std::getline consumed the last segment *before* that slash,
+        // the loop finishes. We need to add that trailing slash back.
+        // This happens if the path was like "segment/" -> getline gives "segment", then loop ends.
+        // If path was "segment//", getline gives "segment", then "", then loop ends.
+        if (has_trailing_slash && url_ss.str().back() != '/') {
+            url_ss << '/';
+        }
+    }
+    return url_ss.str();
 }
