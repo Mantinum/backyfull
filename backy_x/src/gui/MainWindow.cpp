@@ -579,7 +579,7 @@ void MainWindow::onSftpConnectToggleClicked()
     
     sftpTarget_ = new SftpTarget(cfg); // MainWindow::sftpTarget_ is for the viewer
     if (!sftpTarget_->beginSession()) {
-        QString err_msg = sftpTarget_->getLastError(); // Get error before deleting target
+        QString err_msg = QString::fromStdString(sftpTarget_->getLastError()); // Get error before deleting target
         QMessageBox::critical(this, tr("SFTP Error"), tr("SFTP viewer connection failed: %1").arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
         updateLog(tr("SFTP viewer connection failed: %1").arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
         delete sftpTarget_;
