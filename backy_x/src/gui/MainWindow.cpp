@@ -483,7 +483,7 @@ void MainWindow::onGcsConnectButtonClicked() {
     std::map<std::string, std::string> gcsConfig;
     gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
     gcsConfig["gcs_account_identifier"] = accountId.toStdString();
-
+    
     GcsTarget tempGcsTargetForOAuth(gcsConfig, m_credentialManager.get()); // Create a temporary target for OAuth
 
     gcsAuthStatusLabel_->setText(tr("Status: Authenticating..."));
@@ -511,7 +511,7 @@ void MainWindow::onGcsConnectButtonClicked() {
         QMessageBox::critical(this, tr("GCS Authentication Failed"),
                               tr("Could not authenticate with Google Cloud Storage for account '%1'. Error: %2")
                               .arg(accountId, gcsError));
-
+        
         // Reset UI related to listing, as it cannot proceed if OAuth fails
         if (gcsConnectToggleButton_) { // Ensure button exists
             gcsConnectToggleButton_->setText(tr("Connect"));
@@ -524,7 +524,7 @@ void MainWindow::onGcsConnectButtonClicked() {
             currentPathLabel_->setText(tr("Path: /"));
         }
         // QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
-        // settings.remove("GCS/gcs_last_authenticated_account");
+        // settings.remove("GCS/gcs_last_authenticated_account"); 
     }
     // tempGcsTargetForOAuth goes out of scope here.
     // The main gcsTarget_ (for listing) is managed by onGcsConnectToggleClicked.
@@ -541,7 +541,7 @@ void MainWindow::onSftpConnectToggleClicked()
             fileTableWidget_->setRowCount(0);
         }
         currentRemotePath_ = "/";
-        if (currentPathLabel_) {
+        if (currentPathLabel_) { 
             currentPathLabel_->setText(tr("Path: /"));
         }
         if (sftpConnectToggleButton_) { // Check if button exists
@@ -576,7 +576,7 @@ void MainWindow::onSftpConnectToggleClicked()
     // If any old instance exists (should not happen if logic is correct), delete it.
     // delete sftpTarget_; // Not strictly needed here if logic elsewhere is perfect, but safe.
     // sftpTarget_ = nullptr; //
-
+    
     sftpTarget_ = new SftpTarget(cfg); // MainWindow::sftpTarget_ is for the viewer
     if (!sftpTarget_->beginSession()) {
         QString err_msg = sftpTarget_->getLastError(); // Get error before deleting target
@@ -595,9 +595,9 @@ void MainWindow::onSftpConnectToggleClicked()
     if (sftpConnectToggleButton_) {
         sftpConnectToggleButton_->setText(tr("Disconnect"));
     }
-    currentRemotePath_ = "/";
+    currentRemotePath_ = "/"; 
     // browseRemotePath will update currentPathLabel_
-    browseRemotePath(currentRemotePath_);
+    browseRemotePath(currentRemotePath_); 
     updateLog(tr("SFTP viewer session opened.")); // Specific log message
 }
 
@@ -663,7 +663,7 @@ void MainWindow::onGcsConnectToggleClicked()
         }
         return;
     }
-
+    
     // Check if token is still valid (GcsTarget might do this in beginSession)
     // For now, we assume if lastAuthAccount matches, we can proceed.
     // GcsTarget::beginSession() should fail if token is invalid/expired.
@@ -678,7 +678,7 @@ void MainWindow::onGcsConnectToggleClicked()
     // If a backup is running with gcsTarget_, this could interfere.
     // For simplicity now, we assume this gcsTarget_ is primarily for listing.
     // A more advanced setup might use separate target instances or a ref-counted session.
-    delete gcsTarget_;
+    delete gcsTarget_; 
     gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
 
     if (!gcsTarget_->beginSession()) { // beginSession should verify token and connectivity
