@@ -57,14 +57,8 @@ MainWindow::MainWindow(QWidget *parent)
       gcsAccountIdentifierLineEdit_(nullptr),
       gcsConnectButton_(nullptr),
       gcsTestConnectionButton_(nullptr), // Initialize new GCS Test Connection button
-      gcsConnectToggleButton_(nullptr),
       gcsAuthStatusLabel_(nullptr),
-      scheduler_(nullptr),
-      localTarget_(nullptr),
-      sftpTarget_(nullptr),
-      gcsTarget_(nullptr),            // Initialize GCS target member
-      m_credentialManager(nullptr),
-      fileDialog_(nullptr),
+      gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
       fileViewerGroupBox_(nullptr),
       fileTableWidget_(nullptr),
@@ -72,7 +66,15 @@ MainWindow::MainWindow(QWidget *parent)
       downloadButton_(nullptr),
       deleteButton_(nullptr),
       currentPathLabel_(nullptr),
-      currentRemotePath_("/") // Initialize currentRemotePath_
+      currentRemotePath_("/"), // Initialize currentRemotePath_
+      // Core components
+      scheduler_(nullptr),
+      localTarget_(nullptr),
+      sftpTarget_(nullptr),
+      gcsTarget_(nullptr),            // Initialize GCS target member
+      m_credentialManager(nullptr),
+      // Helper for file dialogs
+      fileDialog_(nullptr)
 {
     if (QCoreApplication::organizationName().isEmpty()) {
         QCoreApplication::setOrganizationName("BackyFullOrg");
@@ -592,9 +594,7 @@ void MainWindow::onGcsConnectToggleClicked()
         // but for listing, it's okay. However, GcsTarget::endSession might not do much
         // if it's just a flag. The main thing is to delete the target for listing.
         // Let's assume GcsTarget destructor or endSession handles any necessary cleanup.
-        if (gcsTarget_->isSessionActive()) { // Check if a session was even active
-             gcsTarget_->endSession();
-        }
+        gcsTarget_->endSession(); // Call directly
         delete gcsTarget_;
         gcsTarget_ = nullptr;
         fileTableWidget_->setRowCount(0);
@@ -953,9 +953,7 @@ void MainWindow::onBackupModeChanged(int index) {
     // End active GCS listing session if switching away from GCS mode
     if (!gcsSelected && gcsTarget_) {
         updateLog(tr("Switched away from GCS mode. Closing active GCS listing session."));
-        if (gcsTarget_->isSessionActive()) {
-            gcsTarget_->endSession();
-        }
+        gcsTarget_->endSession(); // Call directly
         delete gcsTarget_;
         gcsTarget_ = nullptr;
         if (gcsConnectToggleButton_) { // Ensure button exists
