@@ -1263,6 +1263,9 @@ void MainWindow::browseRemotePath(const QString& path) {
         }
         // If sftpTarget_ exists AND session is open...
         files = sftpTarget_->listFiles(path.toStdString());
+        // Temporary diagnostic log for SFTP
+        updateLog(QString("SFTP listFiles returned %1 items").arg(files.size()));
+
         if (!sftpTarget_->getLastError().empty()) { // Assuming SftpTarget gets a getLastError()
             QMessageBox::critical(this, tr("SFTP Error"), tr("Failed to list files: %1").arg(QString::fromStdString(sftpTarget_->getLastError())));
             updateLog(tr("SFTP listFiles failed for path '%1': %2").arg(path, QString::fromStdString(sftpTarget_->getLastError())));
