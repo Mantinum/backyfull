@@ -406,6 +406,19 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L);
     curl_easy_setopt(m_curlHandle, CURLOPT_DIRLISTONLY, 0L);
 
+    // Ensure options that expect a data response body are reset or off,
+    // as QUOTE commands typically don't return one.
+    curl_easy_setopt(m_curlHandle, CURLOPT_NOBODY, 0L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 0L); 
+    curl_easy_setopt(m_curlHandle, CURLOPT_POST, 0L);    
+
+    // Reset write/read functions and data, just in case they were set by another operation
+    // and not properly cleared if that operation failed before its usual cleanup.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, NULL);
+    curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, NULL);
+
     std::cout << "SftpTarget: Attempting to delete. Context URL: " << contextUrl << ", Command: " << rmCommand << std::endl;
     CURLcode res_perform = curl_easy_perform(m_curlHandle);
 
