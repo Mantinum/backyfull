@@ -684,6 +684,12 @@ std::string SftpTarget::getLastError() const {
     return lastError_;
 }
 
+bool SftpTarget::isSessionOpen() const {
+    // A session is considered "open" or "active" if the CURL handle 
+    // has been initialized (by beginSession()) and not yet cleaned up (by endSession() or destructor).
+    return m_curlHandle != nullptr;
+}
+
 // New method for segment-wise path escaping
 std::string SftpTarget::buildSftpUrl(const std::string& relativePath) const {
     if (!m_curlHandle) {
