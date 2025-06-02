@@ -51,11 +51,13 @@ MainWindow::MainWindow(QWidget *parent)
       sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr),
       sftpSavePasswordCheckBox_(nullptr),
+      sftpConnectToggleButton_(nullptr),
       gcsSettingsGroupBox_(nullptr),
       gcsBucketNameLineEdit_(nullptr),
       gcsAccountIdentifierLineEdit_(nullptr),
       gcsConnectButton_(nullptr),
       gcsTestConnectionButton_(nullptr), // Initialize new GCS Test Connection button
+      gcsConnectToggleButton_(nullptr),
       gcsAuthStatusLabel_(nullptr),
       scheduler_(nullptr),
       localTarget_(nullptr),
@@ -168,6 +170,9 @@ void MainWindow::setupUI() {
     sftpFormLayout->addRow(sftpSavePasswordCheckBox_);
     sftpRemotePathLineEdit_ = new QLineEdit();
     sftpFormLayout->addRow(new QLabel(tr("SFTP Remote Path:")), sftpRemotePathLineEdit_);
+    sftpConnectToggleButton_ = new QPushButton(tr("Connect"));
+    sftpFormLayout->addRow(sftpConnectToggleButton_);
+    connect(sftpConnectToggleButton_, &QPushButton::clicked, this, &MainWindow::onSftpConnectToggleClicked);
     mainLayout->addWidget(sftpSettingsGroupBox_);
 
     gcsSettingsGroupBox_ = new QGroupBox(tr("Google Cloud Storage Configuration"));
@@ -184,6 +189,9 @@ void MainWindow::setupUI() {
     gcsTestConnectionButton_ = new QPushButton(tr("Test Connection")); // Instantiate and add
     gcsFormLayout->addRow(gcsTestConnectionButton_);
     connect(gcsTestConnectionButton_, &QPushButton::clicked, this, &MainWindow::onGcsTestConnectionClicked);
+    gcsConnectToggleButton_ = new QPushButton(tr("Connect")); // For listing session
+    gcsFormLayout->addRow(gcsConnectToggleButton_);
+    connect(gcsConnectToggleButton_, &QPushButton::clicked, this, &MainWindow::onGcsConnectToggleClicked);
     mainLayout->addWidget(gcsSettingsGroupBox_);
 
     connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onBackupModeChanged);
@@ -446,14 +454,14 @@ void MainWindow::runBackupNow() {
 }
 
 void MainWindow::onGcsConnectButtonClicked() {
-    updateLog("GCS Connect button clicked.");
+    updateLog(tr("GCS 'Connect to Google Account' button clicked (OAuth process)."));
     QString bucketName = gcsBucketNameLineEdit_->text();
     QString accountId = gcsAccountIdentifierLineEdit_->text();
 
     if (bucketName.isEmpty() || accountId.isEmpty()) {
         QMessageBox::warning(this, tr("GCS Configuration Error"),
-                             tr("GCS Bucket Name and Account Identifier must be provided before connecting."));
-        updateLog("GCS Connect: Bucket Name or Account Identifier missing.");
+                             tr("GCS Bucket Name and Account Identifier must be provided before connecting for OAuth."));
+        updateLog(tr("GCS OAuth: Bucket Name or Account Identifier missing."));
         return;
     }
 
@@ -461,32 +469,233 @@ void MainWindow::onGcsConnectButtonClicked() {
     gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
     gcsConfig["gcs_account_identifier"] = accountId.toStdString();
 
-    delete gcsTarget_;
-    gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+    GcsTarget tempGcsTargetForOAuth(gcsConfig, m_credentialManager.get()); // Create a temporary target for OAuth
 
     gcsAuthStatusLabel_->setText(tr("Status: Authenticating..."));
-    updateLog(QString("GCS Connect: Attempting authentication for account '%1' with bucket '%2'.").arg(accountId, bucketName));
+    updateLog(QString("GCS OAuth: Attempting authentication for account '%1' (bucket '%2' context for token).").arg(accountId, bucketName));
 
-    if (gcsTarget_->initiateOAuthAndStoreToken()) {
+    if (tempGcsTargetForOAuth.initiateOAuthAndStoreToken()) { // Use the temporary target
         gcsAuthStatusLabel_->setText(tr("Status: Authentication Successful for %1").arg(accountId));
-        updateLog(QString("GCS Connect: Authentication successful for account '%1'.").arg(accountId));
+        updateLog(QString("GCS OAuth: Authentication successful for account '%1'.").arg(accountId));
 
         QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
         settings.beginGroup("GCS");
         settings.setValue("gcs_last_authenticated_account", accountId);
         settings.endGroup();
-        updateLog(QString("GCS Connect: Stored '%1' as last authenticated account.").arg(accountId));
+        updateLog(QString("GCS OAuth: Stored '%1' as last authenticated account.").arg(accountId));
+
+        // IMPORTANT: DO NOT automatically connect for listing or browseRemotePath here.
+        // User must click the new gcsConnectToggleButton_ for that.
+        // Also, DO NOT change gcsConnectToggleButton_ text here.
 
     } else {
         gcsAuthStatusLabel_->setText(tr("Status: Authentication Failed. Check logs."));
-        updateLog(QString("GCS Connect: Authentication failed for account '%1'. Error: %2")
-                      .arg(accountId, QString::fromStdString(gcsTarget_->getLastError())));
+        QString gcsError = QString::fromStdString(tempGcsTargetForOAuth.getLastError());
+        updateLog(QString("GCS OAuth: Authentication failed for account '%1'. Error: %2")
+                      .arg(accountId, gcsError));
         QMessageBox::critical(this, tr("GCS Authentication Failed"),
-                              tr("Could not authenticate with Google Cloud Storage. Error: %1")
-                              .arg(QString::fromStdString(gcsTarget_->getLastError())));
+                              tr("Could not authenticate with Google Cloud Storage for account '%1'. Error: %2")
+                              .arg(accountId, gcsError));
+
+        // Reset UI related to listing, as it cannot proceed if OAuth fails
+        if (gcsConnectToggleButton_) { // Ensure button exists
+            gcsConnectToggleButton_->setText(tr("Connect"));
+        }
+        if (fileTableWidget_) { // Ensure table exists
+            fileTableWidget_->setRowCount(0);
+        }
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) { // Ensure label exists
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        // QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+        // settings.remove("GCS/gcs_last_authenticated_account");
     }
+    // tempGcsTargetForOAuth goes out of scope here.
+    // The main gcsTarget_ (for listing) is managed by onGcsConnectToggleClicked.
+}
+
+void MainWindow::onSftpConnectToggleClicked()
+{
+    if (sftpTarget_) { // Connected for listing -> Disconnect
+        updateLog(tr("SFTP 'Disconnect' button clicked. Closing session for listing."));
+        sftpTarget_->endSession();
+        delete sftpTarget_;
+        sftpTarget_ = nullptr;
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) { // Ensure label exists
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        sftpConnectToggleButton_->setText(tr("Connect"));
+        updateLog(tr("SFTP session closed for listing."));
+        return;
+    }
+
+    // Not connected for listing -> Connect
+    updateLog(tr("SFTP 'Connect' button clicked. Attempting to open session for listing."));
+    std::map<std::string, std::string> cfg{
+        {"host", sftpHostLineEdit_->text().toStdString()},
+        {"port", sftpPortLineEdit_->text().toStdString()},
+        {"username", sftpUsernameLineEdit_->text().toStdString()},
+        {"remoteBasePath", sftpRemotePathLineEdit_->text().toStdString()}
+        // Password should be fetched by SftpTarget from CredentialManager if saved, or if entered in the field.
+        // If password field is not empty and not saved, SftpTarget might need it directly.
+        // For now, relying on SftpTarget's existing password handling.
+    };
+
+    if (cfg["host"].empty() || cfg["username"].empty()) {
+        QMessageBox::warning(this, tr("SFTP Configuration"), tr("SFTP Host and Username are required to connect for listing."));
+        updateLog(tr("SFTP connection for listing failed: Host or Username empty."));
+        // Ensure UI is in a consistent disconnected state
+        sftpConnectToggleButton_->setText(tr("Connect"));
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        return;
+    }
+
+    sftpTarget_ = new SftpTarget(cfg);
+    if (!sftpTarget_->beginSession()) {
+        QString err = tr("SFTP Connect for listing failed: %1")
+                      .arg(QString::fromStdString(sftpTarget_->getLastError()));
+        QMessageBox::critical(this, tr("SFTP Error"), err);
+        updateLog(err);
+        delete sftpTarget_;
+        sftpTarget_ = nullptr;
+        // Ensure UI is in a consistent disconnected state
+        sftpConnectToggleButton_->setText(tr("Connect"));
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        return;
+    }
+
+    sftpConnectToggleButton_->setText(tr("Disconnect"));
+    currentRemotePath_ = "/"; // Set before browse
+    if (currentPathLabel_) {
+        currentPathLabel_->setText(tr("Path: /"));
+    }
+    browseRemotePath(currentRemotePath_); // This will also update the label via its own logic
+    updateLog(tr("SFTP session opened successfully for listing. Root directory displayed."));
+}
+
+void MainWindow::onGcsConnectToggleClicked()
+{
+    if (gcsTarget_) { // Connected for listing -> Disconnect
+        updateLog(tr("GCS 'Disconnect' button clicked. Closing session for listing."));
+        // We don't call endSession() if GCS target is used for active backup,
+        // but for listing, it's okay. However, GcsTarget::endSession might not do much
+        // if it's just a flag. The main thing is to delete the target for listing.
+        // Let's assume GcsTarget destructor or endSession handles any necessary cleanup.
+        if (gcsTarget_->isSessionActive()) { // Check if a session was even active
+             gcsTarget_->endSession();
+        }
+        delete gcsTarget_;
+        gcsTarget_ = nullptr;
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        gcsConnectToggleButton_->setText(tr("Connect"));
+        updateLog(tr("GCS session closed for listing. OAuth status is separate."));
+        // gcsAuthStatusLabel_ should NOT be changed here.
+        return;
+    }
+
+    // Not connected for listing -> Connect
+    updateLog(tr("GCS 'Connect' button clicked. Attempting to open session for listing."));
+
+    QString accountIdFromUI = gcsAccountIdentifierLineEdit_->text();
+    QString bucketNameFromUI = gcsBucketNameLineEdit_->text();
+
+    if (accountIdFromUI.isEmpty() || bucketNameFromUI.isEmpty()) {
+        QMessageBox::warning(this, tr("GCS Configuration"),
+                             tr("GCS Account Identifier and Bucket Name are required to connect for listing."));
+        updateLog(tr("GCS connection for listing failed: Account ID or Bucket Name empty."));
+        // Ensure UI is consistent
+        gcsConnectToggleButton_->setText(tr("Connect"));
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        return;
+    }
+
+    // Check if OAuth has been done for this account
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    QString lastAuthAccount = settings.value("GCS/gcs_last_authenticated_account").toString();
+    // A more robust check might involve GcsTarget itself having a method to check current auth status
+    // or MainWindow having a flag like `m_gcsOAuthSuccessfulForCurrentUser`
+    if (lastAuthAccount != accountIdFromUI) {
+        QMessageBox::warning(this, tr("GCS Authentication Required"),
+                             tr("Please use the 'Connect to Google Account' button to authenticate for account '%1' before attempting to list files.")
+                             .arg(accountIdFromUI));
+        updateLog(tr("GCS connection for listing aborted: Account '%1' not authenticated via 'Connect to Google Account' button, or does not match last authenticated user ('%2').")
+                      .arg(accountIdFromUI, lastAuthAccount));
+        // Ensure UI is consistent
+        gcsConnectToggleButton_->setText(tr("Connect"));
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        return;
+    }
+
+    // Check if token is still valid (GcsTarget might do this in beginSession)
+    // For now, we assume if lastAuthAccount matches, we can proceed.
+    // GcsTarget::beginSession() should fail if token is invalid/expired.
+
+    std::map<std::string, std::string> gcsConfig;
+    gcsConfig["gcs_bucket_name"] = bucketNameFromUI.toStdString();
+    gcsConfig["gcs_account_identifier"] = accountIdFromUI.toStdString();
+    // gcs_object_prefix for listing is implicitly handled by browseRemotePath starting at "/" relative to bucket root.
+
+    // Ensure no previous gcsTarget_ instance is active from other operations (e.g. backup)
+    // This toggle button should manage its own gcsTarget_ instance for listing.
+    // If a backup is running with gcsTarget_, this could interfere.
+    // For simplicity now, we assume this gcsTarget_ is primarily for listing.
+    // A more advanced setup might use separate target instances or a ref-counted session.
     delete gcsTarget_;
-    gcsTarget_ = nullptr;
+    gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
+
+    if (!gcsTarget_->beginSession()) { // beginSession should verify token and connectivity
+        QString err = tr("GCS Connect for listing failed: %1")
+                      .arg(QString::fromStdString(gcsTarget_->getLastError()));
+        QMessageBox::critical(this, tr("GCS Error"), err);
+        updateLog(err);
+        delete gcsTarget_;
+        gcsTarget_ = nullptr;
+        // Ensure UI is consistent
+        gcsConnectToggleButton_->setText(tr("Connect"));
+        fileTableWidget_->setRowCount(0);
+        currentRemotePath_ = "/";
+        if (currentPathLabel_) {
+            currentPathLabel_->setText(tr("Path: /"));
+        }
+        // Potentially update gcsAuthStatusLabel_ if error indicates auth failure,
+        // but the plan says this button doesn't directly change it.
+        // However, if beginSession fails due to auth, the user should know.
+        // Perhaps GcsTarget::getLastError() can distinguish auth errors.
+        // For now, keeping gcsAuthStatusLabel_ unchanged by this button directly.
+        return;
+    }
+
+    gcsConnectToggleButton_->setText(tr("Disconnect"));
+    currentRemotePath_ = "/"; // Set before browse
+    if (currentPathLabel_) {
+        currentPathLabel_->setText(tr("Path: /"));
+    }
+    browseRemotePath(currentRemotePath_);
+    updateLog(tr("GCS session opened successfully for listing. Root directory displayed for bucket '%1'.")
+                  .arg(bucketNameFromUI));
 }
 
 void MainWindow::onGcsTestConnectionClicked() {
@@ -728,52 +937,59 @@ void MainWindow::onBackupModeChanged(int index) {
     bool sftpSelected = (currentModeText == tr("SFTP Backup"));
     bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 
+    updateLog(QString("Backup mode changing. Selected: %1").arg(currentModeText));
+
+    // End active SFTP listing session if switching away from SFTP mode
+    if (!sftpSelected && sftpTarget_) {
+        updateLog(tr("Switched away from SFTP mode. Closing active SFTP listing session."));
+        sftpTarget_->endSession();
+        delete sftpTarget_;
+        sftpTarget_ = nullptr;
+        if (sftpConnectToggleButton_) { // Ensure button exists
+            sftpConnectToggleButton_->setText(tr("Connect"));
+        }
+    }
+
+    // End active GCS listing session if switching away from GCS mode
+    if (!gcsSelected && gcsTarget_) {
+        updateLog(tr("Switched away from GCS mode. Closing active GCS listing session."));
+        if (gcsTarget_->isSessionActive()) {
+            gcsTarget_->endSession();
+        }
+        delete gcsTarget_;
+        gcsTarget_ = nullptr;
+        if (gcsConnectToggleButton_) { // Ensure button exists
+            gcsConnectToggleButton_->setText(tr("Connect"));
+        }
+        // Note: gcsAuthStatusLabel_ is NOT changed here. OAuth state persists.
+    }
+
+    // Always reset file viewer UI elements on any mode change
+    if (fileTableWidget_) {
+        fileTableWidget_->setRowCount(0);
+    }
+    currentRemotePath_ = "/";
+    if (currentPathLabel_) {
+        currentPathLabel_->setText(tr("Path: /"));
+    }
+
+    // Show/hide relevant group boxes
     if (m_localDestinationGroupBox) m_localDestinationGroupBox->setVisible(localSelected);
     if (sftpSettingsGroupBox_) sftpSettingsGroupBox_->setVisible(sftpSelected);
     if (gcsSettingsGroupBox_) gcsSettingsGroupBox_->setVisible(gcsSelected);
 
-    // Show/hide file viewer
+    // Show/hide file viewer group box (only for remote modes)
     bool remoteModeSelected = (sftpSelected || gcsSelected);
     if (fileViewerGroupBox_) {
         fileViewerGroupBox_->setVisible(remoteModeSelected);
-        if (remoteModeSelected && currentRemotePath_.isEmpty()) { // Initialize if empty
-            currentRemotePath_ = "/";
-        }
-        if (remoteModeSelected) {
-             // Check if targets are valid or create them
-            if (sftpSelected && !sftpTarget_) {
-                 std::map<std::string, std::string> sftpConfig;
-                 sftpConfig["host"] = sftpHostLineEdit_->text().toStdString();
-                 sftpConfig["port"] = sftpPortLineEdit_->text().toStdString();
-                 sftpConfig["username"] = sftpUsernameLineEdit_->text().toStdString();
-                 sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
-                 // Password should be handled by SftpTarget constructor (e.g. from CredentialManager)
-                 sftpTarget_ = new SftpTarget(sftpConfig);
-                 if(!sftpTarget_->beginSession()) {
-                     updateLog("Failed to begin SFTP session for browsing.");
-                     QMessageBox::warning(this, "SFTP Error", "Could not connect to SFTP server for browsing.");
-                     delete sftpTarget_; sftpTarget_ = nullptr;
-                 }
-            } else if (gcsSelected && !gcsTarget_) {
-                std::map<std::string, std::string> gcsConfig;
-                gcsConfig["gcs_bucket_name"] = gcsBucketNameLineEdit_->text().toStdString();
-                gcsConfig["gcs_account_identifier"] = gcsAccountIdentifierLineEdit_->text().toStdString();
-                // gcs_object_prefix is usually empty for root browsing or set by specific backup tasks, not directly from main UI fields for general browsing.
-                // For browsing, we assume the root of the bucket or a base path defined in GcsTarget if applicable.
-                // Let GcsTarget handle its m_objectPrefix internally if needed.
-                gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
-                 if(!gcsTarget_->beginSession()) {
-                    updateLog("Failed to begin GCS session for browsing. Error: " + QString::fromStdString(gcsTarget_->getLastError()));
-                    QMessageBox::warning(this, "GCS Error", "Could not connect to GCS for browsing: " + QString::fromStdString(gcsTarget_->getLastError()));
-                    delete gcsTarget_; gcsTarget_ = nullptr;
-                 }
-            }
-            browseRemotePath(currentRemotePath_); // Load initial path
-        }
     }
-    
-    updateLog(QString("Backup mode changed. Local: %1, SFTP: %2, GCS: %3, RemoteViewer: %4")
-                  .arg(localSelected ? "Yes" : "No", sftpSelected ? "Yes" : "No", gcsSelected ? "Yes" : "No", remoteModeSelected ? "Yes" : "No"));
+
+    // IMPORTANT: Automatic connection and browsing logic has been removed.
+    // The user now explicitly clicks the "Connect" button for SFTP/GCS listing.
+
+    updateLog(QString("Backup mode changed to: %1. UI adjusted. File viewer visible: %2.")
+                  .arg(currentModeText)
+                  .arg(remoteModeSelected ? "Yes" : "No"));
 }
 
 void MainWindow::loadSettings() {
@@ -988,60 +1204,50 @@ void MainWindow::displayRemoteFiles(const std::vector<FileMetadata>& files) {
 
 void MainWindow::browseRemotePath(const QString& path) {
     currentRemotePath_ = path;
-    if (currentPathLabel_) { // Ensure label is initialized
+    // Update the path label immediately. If listing fails or not connected, path still shows intent.
+    if (currentPathLabel_) {
         currentPathLabel_->setText(tr("Path: ") + currentRemotePath_);
     }
-    updateLog("Browsing remote path: " + path);
+    updateLog(tr("Attempting to browse remote path: %1").arg(path));
 
     std::vector<FileMetadata> files;
     QString currentModeText = backupModeComboBox_->currentText();
 
     if (currentModeText == tr("Google Cloud Storage")) {
-        if (!gcsTarget_) {
-            // Attempt to initialize GCS Target if not already done (e.g. user switched modes but didn't run backup)
-            std::map<std::string, std::string> gcsConfig;
-            gcsConfig["gcs_bucket_name"] = gcsBucketNameLineEdit_->text().toStdString();
-            gcsConfig["gcs_account_identifier"] = gcsAccountIdentifierLineEdit_->text().toStdString();
-            gcsTarget_ = new GcsTarget(gcsConfig, m_credentialManager.get());
-            if (!gcsTarget_->beginSession()){
-                 updateLog("Failed to begin GCS session for browsing. Error: " + QString::fromStdString(gcsTarget_->getLastError()));
-                 QMessageBox::warning(this, "GCS Error", "Could not connect to GCS: " + QString::fromStdString(gcsTarget_->getLastError()));
-                 delete gcsTarget_; gcsTarget_ = nullptr;
-                 displayRemoteFiles(files); // Display empty list
-                 return;
-            }
+        if (!gcsTarget_) { // Check if GCS target for listing exists (i.e., "Connect" was clicked)
+            updateLog(tr("GCS browse attempted but not connected for listing. Please use the 'Connect' button first."));
+            // Display empty list, user sees "Connect" button.
+            displayRemoteFiles({}); // Ensure view is empty
+            // Optionally, could show a QMessageBox::information here, but an empty table + visible Connect button is also clear.
+            return;
         }
+        // If gcsTarget_ exists, assume it's connected (beginSession was successful in onGcsConnectToggleClicked)
         files = gcsTarget_->listFiles(path.toStdString());
         if (!gcsTarget_->getLastError().empty()) {
             QMessageBox::critical(this, tr("GCS Error"), tr("Failed to list files: %1").arg(QString::fromStdString(gcsTarget_->getLastError())));
+            updateLog(tr("GCS listFiles failed for path '%1': %2").arg(path, QString::fromStdString(gcsTarget_->getLastError())));
+            // files will be empty or partially filled, displayRemoteFiles will show what was returned.
         }
     } else if (currentModeText == tr("SFTP Backup")) {
-        if (!sftpTarget_) {
-             std::map<std::string, std::string> sftpConfig;
-             sftpConfig["host"] = sftpHostLineEdit_->text().toStdString();
-             sftpConfig["port"] = sftpPortLineEdit_->text().toStdString();
-             sftpConfig["username"] = sftpUsernameLineEdit_->text().toStdString();
-             sftpConfig["remoteBasePath"] = sftpRemotePathLineEdit_->text().toStdString();
-             // Password will be attempted from CredentialManager by SftpTarget constructor
-             sftpTarget_ = new SftpTarget(sftpConfig);
-             if (!sftpTarget_->beginSession()){
-                 updateLog("Failed to begin SFTP session for browsing.");
-                 QMessageBox::warning(this, "SFTP Error", "Could not connect to SFTP server.");
-                 delete sftpTarget_; sftpTarget_ = nullptr;
-                 displayRemoteFiles(files); // Display empty list
-                 return;
-             }
+        if (!sftpTarget_) { // Check if SFTP target for listing exists
+            updateLog(tr("SFTP browse attempted but not connected. Please use the 'Connect' button first."));
+            displayRemoteFiles({}); // Ensure view is empty
+            return;
         }
+        // If sftpTarget_ exists, assume it's connected
         files = sftpTarget_->listFiles(path.toStdString());
-        // TODO: SftpTarget needs a getLastError() or similar error reporting for listFiles.
-        // For now, assume success if no crash, or files vector might be empty on error.
+        if (!sftpTarget_->getLastError().empty()) { // Assuming SftpTarget gets a getLastError()
+            QMessageBox::critical(this, tr("SFTP Error"), tr("Failed to list files: %1").arg(QString::fromStdString(sftpTarget_->getLastError())));
+            updateLog(tr("SFTP listFiles failed for path '%1': %2").arg(path, QString::fromStdString(sftpTarget_->getLastError())));
+        }
     } else {
-        updateLog("BrowseRemotePath called in non-remote mode: " + currentModeText);
-        // Clear table if not in a remote mode
-        displayRemoteFiles(files);
+        // This case should ideally not be reached if fileViewerGroupBox is only visible in remote modes
+        updateLog(tr("BrowseRemotePath called in non-remote mode: %1. Clearing view.").arg(currentModeText));
+        displayRemoteFiles({}); // Display empty list
         return;
     }
     displayRemoteFiles(files);
+    updateLog(tr("Displayed %1 files/folders for path: %2").arg(files.size()).arg(path));
 }
 
 void MainWindow::onFileViewerRefreshClicked() {

@@ -53,6 +53,8 @@ private slots:
     void handleScheduledBackup(const QString& sourcePath, const QString& destinationOrIdentifier);
     void onGcsConnectButtonClicked();
     void onGcsTestConnectionClicked(); // Slot for GCS Test Connection
+    void onSftpConnectToggleClicked();
+    void onGcsConnectToggleClicked();
     // Slots for File Viewer
     void onFileViewerRefreshClicked();
     void onFileViewerDownloadClicked();
@@ -88,6 +90,7 @@ private:
     QLineEdit *sftpPasswordLineEdit_;
     QLineEdit *sftpRemotePathLineEdit_;
     QCheckBox *sftpSavePasswordCheckBox_;
+    QPushButton *sftpConnectToggleButton_{nullptr};
 
     // GCS Settings
     QGroupBox *gcsSettingsGroupBox_;
@@ -96,6 +99,7 @@ private:
     QPushButton *gcsConnectButton_;
     QPushButton *gcsTestConnectionButton_; // Added
     QLabel *gcsAuthStatusLabel_;
+    QPushButton *gcsConnectToggleButton_{nullptr};
 
     // File Viewer UI Elements
     QGroupBox *fileViewerGroupBox_ = nullptr;
