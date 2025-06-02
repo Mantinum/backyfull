@@ -1283,6 +1283,29 @@ void MainWindow::onFileViewerRefreshClicked() {
 }
 
 void MainWindow::onFileViewerDownloadClicked() {
+    // Session Checks
+    QString currentModeText = backupModeComboBox_->currentText(); // Get current mode
+
+    if (currentModeText == tr("SFTP Backup")) {
+        if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
+            updateLog(tr("SFTP Download: Not connected or session invalid. Please connect viewer session."));
+            QMessageBox::warning(this, tr("SFTP Download Error"), tr("SFTP session is not active. Please use the 'Connect' button for the SFTP viewer first."));
+            return;
+        }
+    } else if (currentModeText == tr("Google Cloud Storage")) {
+        if (!gcsTarget_) { // For GCS, gcsTarget_ existing implies an attempt to connect for listing was made.
+                           // Actual token validity is handled by GCS operations.
+            updateLog(tr("GCS Download: Not connected for listing. Please use the GCS 'Connect' button for listing first."));
+            QMessageBox::warning(this, tr("GCS Download Error"), tr("GCS session for listing is not active. Please use the 'Connect' (for listing) button first."));
+            return;
+        }
+    } else {
+        // Should not happen if download button is only enabled for remote modes, but good to have.
+        updateLog(tr("Download Error: Download is not available for the current backup mode."));
+        QMessageBox::warning(this, tr("Download Error"), tr("Download is not available for the current backup mode."));
+        return;
+    }
+
     QList<QTableWidgetItem*> selectedItems = fileTableWidget_->selectedItems();
     if (selectedItems.isEmpty() || selectedItems.first()->row() < 0) {
         QMessageBox::information(this, tr("Download"), tr("No file selected or invalid selection."));
@@ -1325,23 +1348,17 @@ void MainWindow::onFileViewerDownloadClicked() {
 
     bool success = false;
     QString errorMsg;
-    QString currentModeText = backupModeComboBox_->currentText();
+    // currentModeText is already defined and checked at the top of the function.
 
     if (currentModeText == tr("Google Cloud Storage")) {
-        if (!gcsTarget_) {
-            QMessageBox::critical(this, tr("GCS Error"), tr("GCS target not initialized. Cannot download."));
-            return;
-        }
+        // Redundant check removed: if (!gcsTarget_)
         if (gcsTarget_->downloadFile(remoteFilePath.toStdString(), localPath.toStdString())) {
             success = true;
         } else {
             errorMsg = QString::fromStdString(gcsTarget_->getLastError());
         }
     } else if (currentModeText == tr("SFTP Backup")) {
-        if (!sftpTarget_) {
-            QMessageBox::critical(this, tr("SFTP Error"), tr("SFTP target not initialized. Cannot download."));
-            return;
-        }
+        // Redundant check removed: if (!sftpTarget_)
         // SFTP downloadFile expects path relative to its base.
         // Our currentRemotePath_ is already relative to SFTP base if m_objectPrefix is used correctly by SftpTarget.
         // Or, if currentRemotePath_ is absolute from SFTP root, then SftpTarget's remotePath needs that.
@@ -1349,12 +1366,13 @@ void MainWindow::onFileViewerDownloadClicked() {
         if (sftpTarget_->downloadFile(remoteFilePath.toStdString(), localPath.toStdString())) {
             success = true;
         } else {
-            errorMsg = tr("SFTP download failed. Check logs."); // SftpTarget needs getLastError()
+            errorMsg = QString::fromStdString(sftpTarget_->getLastError());
+            if (errorMsg.isEmpty()) { // Fallback if getLastError was empty but download still failed
+                errorMsg = tr("SFTP download failed. Please check logs or ensure the file path is correct and accessible.");
+            }
         }
-    } else {
-        QMessageBox::warning(this, tr("Download Error"), tr("Download is not supported for the current backup mode."));
-        return;
     }
+    // The 'else' case for unsupported modes is handled by the checks at the top of the function.
 
     if (success) {
         QMessageBox::information(this, tr("Download Complete"), tr("File '%1' downloaded successfully to '%2'.").arg(actualFileName, localPath));
