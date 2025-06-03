@@ -1402,6 +1402,11 @@ void MainWindow::onFileViewerDeleteClicked() {
     QString actualFileName = nameItemWidget->data(Qt::UserRole + 1).toString();
     bool isDirectory = nameItemWidget->data(Qt::UserRole).toBool();
 
+    if (actualFileName.isEmpty()) {
+        QMessageBox::warning(this, tr("Delete Error"), tr("Invalid or empty file name selected."));
+        updateLog(tr("SFTP Delete: Attempted to delete an item with an empty name."));
+        return;
+    }
     if (actualFileName == "..") {
         QMessageBox::information(this, tr("Delete Error"), tr("Cannot delete the parent directory navigation entry."));
         return;
