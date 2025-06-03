@@ -26,6 +26,13 @@ static size_t read_callback(char *ptr, size_t size, size_t nmemb, void *stream);
 static size_t sftpListWriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp);
 // Generic file write callback for libcurl
 static size_t fileWriteCallback(void*contents, size_t size, size_t nmemb, void*userp);
+// Static no-op callback function for libcurl to safely discard write data
+static size_t noop_write_callback(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    (void)ptr;      // Unused
+    (void)userdata; // Unused
+    // Report that all data was "handled" to prevent libcurl from erroring out
+    return size * nmemb;
+}
 // Helper function to parse date strings from SFTP listing
 static std::chrono::system_clock::time_point parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken);
 
@@ -193,6 +200,29 @@ bool SftpTarget::setupCurlHandleForOperation() {
     // Set non-critical options
     setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE");
 
+    // Set a default no-op write callback to prevent libcurl from using internal fwrite
+    // on potentially invalid streams if an operation unexpectedly produces data.
+    // Operations that need to capture output (listFiles, downloadFile) will override this.
+    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, noop_write_callback);
+    if (res_setopt != CURLE_OK) {
+        // This is unlikely to fail, but handle it for completeness
+        lastError_ = "Failed to set CURLOPT_WRITEFUNCTION to noop_write_callback: " + std::string(curl_easy_strerror(res_setopt));
+        std::cerr << "SftpTarget::setupCurlHandleForOperation: CRITICAL - " << lastError_ << std::endl; // Log as critical as it's part of a core fix
+        curl_easy_cleanup(m_curlHandle);
+        m_curlHandle = nullptr;
+        return false; // Critical failure
+    }
+
+    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr);
+    if (res_setopt != CURLE_OK) {
+        // This is also unlikely to fail
+        lastError_ = "Failed to set CURLOPT_WRITEDATA to nullptr for noop_write_callback: " + std::string(curl_easy_strerror(res_setopt));
+        std::cerr << "SftpTarget::setupCurlHandleForOperation: CRITICAL - " << lastError_ << std::endl; // Log as critical
+        curl_easy_cleanup(m_curlHandle);
+        m_curlHandle = nullptr;
+        return false; // Critical failure
+    }
+
     // If all critical options were set successfully, m_curlHandle is valid and configured.
     return true;
 }
@@ -293,13 +323,14 @@ bool SftpTarget::beginSession() {
 }
 
 bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
-    lastError_.clear();
-    std::cout << "SftpTarget: sendFile(" << localPath << ", remote_path: " << metadata.name << ") called." << std::endl;
-    if (!m_curlHandle) {
-        lastError_ = "SFTP sendFile: Session not begun or curl handle not initialized.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+    lastError_.clear(); // Clear previous errors for this new operation
+    if (!this->setupCurlHandleForOperation()) {
+        // lastError_ is set by setupCurlHandleForOperation
+        std::cerr << "SftpTarget: sendFile setup failed: " << getLastError() << std::endl; // Or use qWarning
+        // sourceFile is not open yet, so no need to close it here
         return false;
     }
+    std::cout << "SftpTarget: sendFile(" << localPath << ", remote_path: " << metadata.name << ") called." << std::endl;
     std::ifstream sourceFile(localPath, std::ios::binary);
     if (!sourceFile.is_open()) {
         lastError_ = "SFTP sendFile: Failed to open local source file: " + localPath;
@@ -525,10 +556,15 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
     lastError_.clear();
     bool parsingErrorOccurred = false;
     std::vector<FileMetadata> resultFiles;
-    if (!m_curlHandle) {
-        lastError_ = "SFTP listFiles: Session not begun or curl handle not initialized.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        return resultFiles;
+    // Clear previous errors for this new operation (already done by setupCurlHandleForOperation if it was called, but good practice)
+    // lastError_.clear();
+    // No, setupCurlHandleForOperation does not clear lastError_ at its start.
+    // It only sets it on failure. The caller should clear it.
+    lastError_.clear();
+    if (!this->setupCurlHandleForOperation()) {
+        // lastError_ is set by setupCurlHandleForOperation
+        std::cerr << "SftpTarget: listFiles setup failed: " << getLastError() << std::endl; // Or use qWarning
+        return resultFiles; // resultFiles is empty at this point
     }
 
     std::string logical_path_for_listing = joinPaths(m_remoteBasePath, remotePath);
@@ -562,6 +598,7 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
     }
 
     std::string listingData;
+    // Specific callbacks for listFiles, overriding the noop_write_callback set in setupCurlHandleForOperation
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, sftpListWriteCallback);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &listingData);
     // For full listing like 'ls -l', CURLOPT_DIRLISTONLY should be 0L.
@@ -577,8 +614,11 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
 
     // Reset options that were specific to this request for cleanliness,
     // though curl_easy_perform itself should handle state for each call.
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+    // Reset write function to default (noop) after use, good practice if handle is reused by other logic not expecting this specific callback.
+    // However, with setupCurlHandleForOperation called each time, this might be redundant.
+    // For now, let's keep it to ensure no leftover state if setupCurlHandleForOperation logic changes.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, noop_write_callback); // Reset to default
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr);     // Reset data pointer for default
     // No need to reset CURLOPT_DIRLISTONLY or CURLOPT_CUSTOMREQUEST if they are set per-call basis.
 
     if (res_perform != CURLE_OK) {
@@ -635,10 +675,11 @@ std::vector<FileMetadata> SftpTarget::listFiles(const std::string& remotePath) {
 }
 
 bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& localPath) {
-    lastError_.clear();
-    if (!m_curlHandle) {
-        lastError_ = "SFTP downloadFile: Session not begun or curl handle not initialized.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+    lastError_.clear(); // Clear previous errors for this new operation
+    if (!this->setupCurlHandleForOperation()) {
+        // lastError_ is set by setupCurlHandleForOperation
+        std::cerr << "SftpTarget: downloadFile setup failed: " << getLastError() << std::endl; // Or use qWarning
+        // outFile is not open yet, so no need to close/remove
         return false;
     }
 
@@ -672,6 +713,7 @@ bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& 
         return false;
     }
 
+    // Specific callbacks for downloadFile, overriding noop_write_callback
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, fileWriteCallback);
     curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, &outFile);
     curl_easy_setopt(m_curlHandle, CURLOPT_UPLOAD, 0L); // Ensure UPLOAD is off
@@ -684,8 +726,9 @@ bool SftpTarget::downloadFile(const std::string& remotePath, const std::string& 
     CURLcode res_perform = curl_easy_perform(m_curlHandle);
 
     // Reset options that were specific to this request
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+    // Reset write function to default (noop) after use.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, noop_write_callback); // Reset to default
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr);    // Reset data pointer for default
 
     outFile.close(); // Close file before checking result, to flush buffers.
 
