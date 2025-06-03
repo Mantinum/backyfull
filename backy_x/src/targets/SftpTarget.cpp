@@ -139,6 +139,15 @@ bool SftpTarget::setupCurlHandleForOperation() {
     }
 
     m_curlHandle = curl_easy_init();
+
+static FILE* s_curlNull = []{
+    FILE* f = fopen("/dev/null", "w");
+    return f ? f : stderr;           // repli de sécurité
+}();
+curl_easy_setopt(m_curlHandle, CURLOPT_STDERR, s_curlNull);
+curl_easy_setopt(m_curlHandle, CURLOPT_DEBUGFUNCTION, nullptr);   // pas de callback custom
+curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE,   0L);            // déjà fait
+
     if (!m_curlHandle) {
         lastError_ = "curl_easy_init() failed in setupCurlHandleForOperation.";
         std::cerr << "SftpTarget::setupCurlHandleForOperation: " << lastError_ << std::endl;
