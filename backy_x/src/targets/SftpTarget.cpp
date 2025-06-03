@@ -361,10 +361,10 @@ bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& meta
 
 bool SftpTarget::deleteFile(const std::string& remotePath) {
     lastError_.clear();
-    std::cout << "SftpTarget: deleteFile(" << remotePath << ") called." << std::endl;
+    qDebug() << "SftpTarget: deleteFile(" << QString::fromStdString(remotePath) << ") called.";
     if (!m_curlHandle) {
         lastError_ = "SFTP deleteFile: Session not begun or curl handle not initialized.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
         return false;
     }
 
@@ -375,7 +375,7 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
         if (lastError_.empty()) { // Check if buildSftpUrl set it
              lastError_ = "SFTP deleteFile: Failed to construct context URL.";
         }
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
         return false;
     }
 
@@ -389,14 +389,14 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     customCommands = curl_slist_append(customCommands, rmCommand.c_str());
     if (!customCommands) {
         lastError_ = "SFTP deleteFile: Failed to create slist for QUOTE command.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
         return false;
     }
 
     CURLcode res_setopt_url = curl_easy_setopt(m_curlHandle, CURLOPT_URL, contextUrl.c_str());
     if (res_setopt_url != CURLE_OK) {
         lastError_ = "SFTP deleteFile: Failed to set context URL: " + std::string(curl_easy_strerror(res_setopt_url));
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
         curl_slist_free_all(customCommands);
         return false;
     }
@@ -409,8 +409,8 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     // Ensure options that expect a data response body are reset or off,
     // as QUOTE commands typically don't return one.
     curl_easy_setopt(m_curlHandle, CURLOPT_NOBODY, 0L);
-    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 0L); 
-    curl_easy_setopt(m_curlHandle, CURLOPT_POST, 0L);    
+    curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 0L);
+    curl_easy_setopt(m_curlHandle, CURLOPT_POST, 0L);
 
     // Reset write/read functions and data, just in case they were set by another operation
     // and not properly cleared if that operation failed before its usual cleanup.
@@ -419,7 +419,7 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, NULL);
     curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, NULL);
 
-    std::cout << "SftpTarget: Attempting to delete. Context URL: " << contextUrl << ", Command: " << rmCommand << std::endl;
+    qDebug() << "SftpTarget: Attempting to delete. Context URL:" << QString::fromStdString(contextUrl) << ", Command:" << QString::fromStdString(rmCommand);
     CURLcode res_perform = curl_easy_perform(m_curlHandle);
 
     curl_slist_free_all(customCommands);
@@ -428,7 +428,7 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     if (res_perform != CURLE_OK) {
         // This error might indicate issues like "file not found", "permission denied", or "is a directory".
         lastError_ = "SFTP deleteFile command failed for path '" + remotePath + "' (absolute: '" + absolutePathForRm + "'): " + curl_easy_strerror(res_perform);
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
         return false;
     }
 
@@ -436,7 +436,7 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     // or that it existed. Some servers might not return an error code via libcurl for "file not found" on 'rm'.
     // True verification would involve trying to list/stat the file afterwards.
     // For this implementation, CURLE_OK is treated as success.
-    std::cout << "SftpTarget: File deletion command successfully executed for " << remotePath << std::endl;
+    qDebug() << "SftpTarget: File deletion command successfully executed for" << QString::fromStdString(remotePath);
     return true;
 }
 

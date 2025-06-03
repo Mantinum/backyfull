@@ -1452,8 +1452,10 @@ void MainWindow::onFileViewerDeleteClicked() {
             errorMsg = QString::fromStdString(gcsTarget_->getLastError());
         }
     } else if (currentModeText == tr("SFTP Backup")) {
-        if (!sftpTarget_) {
-            QMessageBox::critical(this, tr("SFTP Error"), tr("SFTP target not initialized. Cannot delete."));
+        // Add this new, more comprehensive check:
+        if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
+            QMessageBox::warning(this, tr("SFTP Delete Error"), tr("SFTP session is not active or invalid. Please connect first."));
+            updateLog(tr("SFTP Delete: Attempted to delete when session was not active for file '%1'.").arg(actualFileName));
             return;
         }
         if (isDirectory) {
