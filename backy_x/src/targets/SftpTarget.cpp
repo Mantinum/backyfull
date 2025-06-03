@@ -360,13 +360,17 @@ bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& meta
 }
 
 bool SftpTarget::deleteFile(const std::string& remotePath) {
-    lastError_.clear();
-    qDebug() << "SftpTarget: deleteFile(" << QString::fromStdString(remotePath) << ") called.";
+    // CRITICAL CHECK: Ensure m_curlHandle is valid before ANY other operation.
     if (!m_curlHandle) {
-        lastError_ = "SFTP deleteFile: Session not begun or curl handle not initialized.";
-        qWarning() << "SftpTarget:" << QString::fromStdString(lastError_);
+        // Set lastError_ first, as logging might use it or it's good practice.
+        lastError_ = "SFTP deleteFile: Attempted to operate with a null curl handle. Session not begun or previously failed.";
+        qWarning() << "SftpTarget: deleteFile call aborted: " << QString::fromStdString(lastError_);
         return false;
     }
+
+    // Existing initial log and lastError_.clear() can follow *after* the critical handle check.
+    lastError_.clear();
+    qDebug() << "SftpTarget: deleteFile(" << QString::fromStdString(remotePath) << ") called.";
 
     // The URL for QUOTE commands is typically the base SFTP URL sftp://host:port/
     // The path for 'rm' is specified in the command itself and should be absolute on the server.
