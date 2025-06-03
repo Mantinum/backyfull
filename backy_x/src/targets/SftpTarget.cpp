@@ -110,6 +110,93 @@ static std::string buildSftpAbsolutePath(const std::string& basePath, const std:
 
 // Definition of buildSftpBaseUrl is removed.
 
+// Implementation of the new helper function
+bool SftpTarget::setupCurlHandleForOperation() {
+    // If handle exists, clean it up first to ensure a fresh state
+    if (m_curlHandle) {
+        curl_easy_cleanup(m_curlHandle);
+        m_curlHandle = nullptr;
+    }
+
+    m_curlHandle = curl_easy_init();
+    if (!m_curlHandle) {
+        lastError_ = "curl_easy_init() failed in setupCurlHandleForOperation.";
+        std::cerr << "SftpTarget::setupCurlHandleForOperation: " << lastError_ << std::endl;
+        return false;
+    }
+
+    CURLcode res_setopt; // Variable to store result of setopt calls
+
+    // SSH host key verification logic (non-critical for setup function's success/failure)
+    if (m_sshSkipHostVerification) {
+        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, NULL);
+        if (res_setopt != CURLE_OK) { // Try /dev/null as a fallback if NULL is not accepted
+            res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, "/dev/null");
+        }
+        if (res_setopt != CURLE_OK) {
+            std::cerr << "SftpTarget::setupCurlHandleForOperation: Warning - Could not set CURLOPT_SSH_KNOWNHOSTS to NULL or /dev/null to skip host verification: " << curl_easy_strerror(res_setopt) << std::endl;
+        }
+    } else if (!m_sshKnownHostsPath.empty()) {
+        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, m_sshKnownHostsPath.c_str());
+        if (res_setopt != CURLE_OK) {
+            std::cerr << "SftpTarget::setupCurlHandleForOperation: Warning - Failed to set custom CURLOPT_SSH_KNOWNHOSTS path '" << m_sshKnownHostsPath << "': " << curl_easy_strerror(res_setopt) << std::endl;
+        }
+    }
+    // If neither skip nor path is set, libcurl uses its default behavior.
+
+    // Helper lambda for setting critical options.
+    // On failure, it sets lastError_, cleans up m_curlHandle, and returns false.
+    auto setopt_critical = [&](CURLoption opt, auto val, const char* opt_name) -> bool {
+        res_setopt = curl_easy_setopt(m_curlHandle, opt, val);
+        if (res_setopt != CURLE_OK) {
+            lastError_ = "Failed to set critical SFTP option " + std::string(opt_name) + ": " + curl_easy_strerror(res_setopt);
+            std::cerr << "SftpTarget::setupCurlHandleForOperation: CRITICAL - " << lastError_ << std::endl;
+            curl_easy_cleanup(m_curlHandle);
+            m_curlHandle = nullptr;
+            return false;
+        }
+        return true;
+    };
+
+    // Helper lambda for setting non-critical options.
+    // On failure, it logs a warning. lastError_ is not set here to avoid overwriting a critical error.
+    auto setopt_non_critical = [&](CURLoption opt, auto val, const char* opt_name) {
+        res_setopt = curl_easy_setopt(m_curlHandle, opt, val);
+        if (res_setopt != CURLE_OK) {
+            std::cerr << "SftpTarget::setupCurlHandleForOperation: WARNING - Failed to set non-critical SFTP option " + std::string(opt_name) + ": " << curl_easy_strerror(res_setopt) << std::endl;
+        }
+    };
+
+    // Set critical options
+    if (!setopt_critical(CURLOPT_USERNAME, m_username.c_str(), "CURLOPT_USERNAME")) return false;
+    if (!m_password.empty()) { // Password might not be used if public key auth is primary
+        if (!setopt_critical(CURLOPT_PASSWORD, m_password.c_str(), "CURLOPT_PASSWORD")) return false;
+    }
+    if (!setopt_critical(CURLOPT_PORT, (long)m_port, "CURLOPT_PORT")) return false;
+
+    // Set SSH auth type if specified (critical)
+    if (m_sshAuthTypes != CURLSSH_AUTH_ANY) {
+        if (!setopt_critical(CURLOPT_SSH_AUTH_TYPES, m_sshAuthTypes, "CURLOPT_SSH_AUTH_TYPES")) return false;
+    }
+    // Set SSH key paths if specified (critical)
+    if (!m_sshPrivateKeyPath.empty()) {
+        if (!setopt_critical(CURLOPT_SSH_PRIVATE_KEYFILE, m_sshPrivateKeyPath.c_str(), "CURLOPT_SSH_PRIVATE_KEYFILE")) return false;
+    }
+    if (!m_sshPublicKeyPath.empty()) {
+        if (!setopt_critical(CURLOPT_SSH_PUBLIC_KEYFILE, m_sshPublicKeyPath.c_str(), "CURLOPT_SSH_PUBLIC_KEYFILE")) return false;
+    }
+    // Set SSH key passphrase if specified (critical, but only if private key is also set)
+    if (!m_sshKeyPassphrase.empty() && !m_sshPrivateKeyPath.empty()) {
+        if (!setopt_critical(CURLOPT_KEYPASSWD, m_sshKeyPassphrase.c_str(), "CURLOPT_KEYPASSWD")) return false;
+    }
+
+    // Set non-critical options
+    setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE");
+
+    // If all critical options were set successfully, m_curlHandle is valid and configured.
+    return true;
+}
+
 SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
     : m_port(22),
       m_curlHandle(nullptr),
@@ -184,103 +271,25 @@ SftpTarget::~SftpTarget() {
 }
 
 bool SftpTarget::beginSession() {
-    lastError_.clear();
+    lastError_.clear(); // Clear any errors from previous operations/sessions.
     if (!m_properlyConfigured) {
         lastError_ = "SFTP Target not properly configured.";
-        // std::cerr is kept for now, but lastError_ is the primary mechanism.
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
-        return false;
-    }
-    if (m_curlHandle) {
-        curl_easy_cleanup(m_curlHandle);
-        m_curlHandle = nullptr;
-    }
-    m_curlHandle = curl_easy_init();
-    if (!m_curlHandle) {
-        lastError_ = "curl_easy_init() failed.";
-        std::cerr << "SftpTarget: " << lastError_ << std::endl;
+        std::cerr << "SftpTarget::beginSession: " << lastError_ << std::endl;
         return false;
     }
 
-    CURLcode res_setopt; // Renamed from 'res' to avoid conflict if any other 'res' is used locally
-
-    // SSH host key verification logic:
-    // If skipping verification, set known_hosts to NULL (or /dev/null as fallback).
-    // Otherwise, if a path is provided, use it. Otherwise, rely on libcurl's default.
-    if (m_sshSkipHostVerification) {
-        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, NULL);
-        if (res_setopt != CURLE_OK) { // If NULL is not accepted, try /dev/null
-            res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, "/dev/null");
-        }
-        if (res_setopt != CURLE_OK) {
-             std::cerr << "SftpTarget: Warning - Could not set CURLOPT_SSH_KNOWNHOSTS to NULL or /dev/null to skip host verification: " << curl_easy_strerror(res_setopt) << std::endl;
-        } else {
-            std::cout << "SftpTarget: SSH host verification is being skipped." << std::endl;
-        }
-    } else if (!m_sshKnownHostsPath.empty()) {
-        res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_SSH_KNOWNHOSTS, m_sshKnownHostsPath.c_str());
-        if (res_setopt != CURLE_OK) {
-            std::cerr << "SftpTarget: Warning - Failed to set custom CURLOPT_SSH_KNOWNHOSTS path: " << m_sshKnownHostsPath << " Error: " << curl_easy_strerror(res_setopt) << std::endl;
-        }
-    } else {
-        // Using default known_hosts file. No specific setopt for this, libcurl handles it.
-        std::cout << "SftpTarget: SSH host verification using default known_hosts file." << std::endl;
+    // setupCurlHandleForOperation will clean up an existing handle if present.
+    if (!this->setupCurlHandleForOperation()) {
+        // lastError_ is set by setupCurlHandleForOperation if it fails critically.
+        // m_curlHandle will be nullptr if setupCurlHandleForOperation failed.
+        std::cerr << "SftpTarget::beginSession: Failed to setup CURL handle and options. Error: " << getLastError() << std::endl;
+        return false;
     }
 
-
-    auto setopt_check = [&](CURLoption opt, auto val, const char* name, bool critical = true) {
-        res_setopt = curl_easy_setopt(m_curlHandle, opt, val);
-        if (res_setopt != CURLE_OK) {
-            // Set lastError_ only if it's a critical option or if lastError_ is currently empty (to avoid overwriting a critical error with a non-critical one)
-            if (critical || lastError_.empty()) {
-                lastError_ = "Failed to set SFTP option " + std::string(name) + ": " + curl_easy_strerror(res_setopt);
-            }
-            std::cerr << "SftpTarget: Failed to set " << name << ": " << curl_easy_strerror(res_setopt) << (critical ? " (Critical)" : " (Non-critical)") << std::endl;
-        }
-        return res_setopt == CURLE_OK;
-    };
-
-    if (!setopt_check(CURLOPT_USERNAME, m_username.c_str(), "CURLOPT_USERNAME")) goto error;
-    if (!m_password.empty() && !setopt_check(CURLOPT_PASSWORD, m_password.c_str(), "CURLOPT_PASSWORD")) goto error;
-    if (!setopt_check(CURLOPT_PORT, (long)m_port, "CURLOPT_PORT")) goto error;
-
-    setopt_check(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE", false); // Verbose is not critical
-
-    if (m_sshAuthTypes != CURLSSH_AUTH_ANY) {
-        if (!setopt_check(CURLOPT_SSH_AUTH_TYPES, m_sshAuthTypes, "CURLOPT_SSH_AUTH_TYPES")) goto error;
-    }
-    if (!m_sshPrivateKeyPath.empty()) {
-        if (!setopt_check(CURLOPT_SSH_PRIVATE_KEYFILE, m_sshPrivateKeyPath.c_str(), "CURLOPT_SSH_PRIVATE_KEYFILE")) goto error;
-    }
-    if (!m_sshPublicKeyPath.empty()) {
-        if (!setopt_check(CURLOPT_SSH_PUBLIC_KEYFILE, m_sshPublicKeyPath.c_str(), "CURLOPT_SSH_PUBLIC_KEYFILE")) goto error;
-    }
-    if (!m_sshKeyPassphrase.empty() && !m_sshPrivateKeyPath.empty()) {
-        if (!setopt_check(CURLOPT_KEYPASSWD, m_sshKeyPassphrase.c_str(), "CURLOPT_KEYPASSWD")) goto error;
-    }
-    // Note: CURLOPT_SSH_KNOWNHOSTS is handled above, not part of the main setopt_check loop with goto error for critical failure.
-    // Its failure is logged as a warning but doesn't necessarily stop the session attempt.
-
-    std::cout << "SftpTarget: Session options configured. Connection will be established on first operation." << std::endl;
-    // If we reached here, critical options were set. Clear lastError_ if it was set by a non-critical option.
-    // However, the setopt_check lambda logic with `critical || lastError_.empty()` should prevent overwriting critical errors.
-    // If a critical error occurred, `goto error` would have been taken.
-    // So, if lastError_ is set here, it must be from a non-critical option that we allowed to pass.
-    // For a truly "successful" beginSession configuration, lastError_ should be clear.
-    if (!lastError_.empty()) { // Implies a non-critical setopt failed (e.g. verbose)
-        std::cout << "SftpTarget: Note - some non-critical options failed to set. Last recorded non-critical error: " << lastError_ << std::endl;
-        // Decide if this should be cleared or not. If getLastError() is called now, it would show this.
-        // Let's clear it to indicate readiness for operations, as critical ones passed.
-        lastError_.clear();
-    }
+    std::cout << "SftpTarget::beginSession: Session options configured. Connection will be established on first operation." << std::endl;
+    // If setupCurlHandleForOperation returned true, the handle is ready for use.
+    // lastError_ might contain warnings from non-critical options in setup, but the session is considered ready.
     return true;
-error:
-    // lastError_ should have been set by the failing critical setopt_check
-    if (m_curlHandle) {
-        curl_easy_cleanup(m_curlHandle);
-        m_curlHandle = nullptr;
-    }
-    return false;
 }
 
 bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
@@ -360,17 +369,16 @@ bool SftpTarget::sendFile(const std::string& localPath, const FileMetadata& meta
 }
 
 bool SftpTarget::deleteFile(const std::string& remotePath) {
-    // CRITICAL CHECK: Ensure m_curlHandle is valid before ANY other operation.
-    if (!m_curlHandle) {
-        // Set lastError_ first, as logging might use it or it's good practice.
-        lastError_ = "SFTP deleteFile: Attempted to operate with a null curl handle. Session not begun or previously failed.";
-        qWarning() << "SftpTarget: deleteFile call aborted: " << QString::fromStdString(lastError_);
+    lastError_.clear(); // Clear previous operational errors.
+    qDebug() << "SftpTarget: deleteFile(" << QString::fromStdString(remotePath) << ") called.";
+
+    // Ensure m_curlHandle is (re)initialized with all necessary common options.
+    if (!this->setupCurlHandleForOperation()) {
+        // lastError_ is set by setupCurlHandleForOperation if it fails critically.
+        // m_curlHandle will be nullptr if setupCurlHandleForOperation failed.
+        qWarning() << "SftpTarget: deleteFile call aborted due to setupCurlHandleForOperation failure: " << QString::fromStdString(getLastError());
         return false;
     }
-
-    // Existing initial log and lastError_.clear() can follow *after* the critical handle check.
-    lastError_.clear();
-    qDebug() << "SftpTarget: deleteFile(" << QString::fromStdString(remotePath) << ") called.";
 
     // The URL for QUOTE commands is typically the base SFTP URL sftp://host:port/
     // The path for 'rm' is specified in the command itself and should be absolute on the server.

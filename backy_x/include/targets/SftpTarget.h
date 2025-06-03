@@ -48,6 +48,8 @@ private:
     bool m_verboseLogging;
     bool m_properlyConfigured; // True if essential configuration (host, user) is present
     std::string lastError_;
+
+    bool setupCurlHandleForOperation(); // New helper function
 };
 
 #endif // SFTPTARGET_H
