@@ -33,6 +33,19 @@ static size_t noop_write_callback(char *ptr, size_t size, size_t nmemb, void *us
     // Report that all data was "handled" to prevent libcurl from erroring out
     return size * nmemb;
 }
+// Static no-op debug callback function for libcurl to safely discard verbose/debug information.
+static int noop_debug_callback(CURL *handle,
+                               curl_infotype type,
+                               char *data,
+                               size_t size,
+                               void *userptr) {
+    (void)handle;    // Unused
+    (void)type;      // Unused
+    (void)data;      // Unused
+    (void)size;      // Unused
+    (void)userptr;   // Unused
+    return 0; // Return 0 as per libcurl documentation for this callback
+}
 // Helper function to parse date strings from SFTP listing
 static std::chrono::system_clock::time_point parseSftpDate(const QString& monthToken, const QString& dayToken, const QString& timeOrYearToken);
 
@@ -200,21 +213,20 @@ bool SftpTarget::setupCurlHandleForOperation() {
     // Set non-critical options
     // setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE"); // This line is intentionally removed/commented.
 
-    // CRITICAL FIX: Disable CURLOPT_VERBOSE to prevent libcurl from writing to stderr.
-    // This is the primary fix for the reported crash where stderr might be closed.
-    // If verbose logging is needed in the future, it must be implemented via
-    // CURLOPT_DEBUGFUNCTION and a safe callback, not via libcurl's default stderr output.
-    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE, 0L);
+    // Enable CURLOPT_VERBOSE so that the CURLOPT_DEBUGFUNCTION is called.
+    // The noop_debug_callback will then discard the actual verbose output.
+    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE, 1L);
     if (res_setopt != CURLE_OK) {
-        // While disabling verbose seems trivial, handle failure for completeness.
-        lastError_ = "Failed to disable CURLOPT_VERBOSE: " + std::string(curl_easy_strerror(res_setopt));
-        // Not logging this as CRITICAL to stderr itself, as that's the stream we're avoiding.
-        // Log it to our internal error state.
-        // Depending on how critical this is deemed, could return false.
-        // For now, let's consider it a non-fatal warning if disabling verbose fails,
-        // as other callbacks are in place. But it's highly unlikely to fail.
-            std::cerr << "SftpTarget: Warning - Could not disable CURLOPT_VERBOSE: " << curl_easy_strerror(res_setopt) << std::endl;
+        lastError_ = "Failed to enable CURLOPT_VERBOSE (for debug callback): " + std::string(curl_easy_strerror(res_setopt));
+        // Log as a warning, as other callbacks might still prevent crashes.
+        std::cerr << "SftpTarget: Warning - Could not enable CURLOPT_VERBOSE: " << curl_easy_strerror(res_setopt) << std::endl;
+        // Decide if this should be a fatal error. For now, let it continue.
     }
+
+    // Set up a no-op debug callback to intercept and discard all verbose/debug information.
+    // This is a comprehensive way to prevent libcurl from writing to potentially invalid streams.
+    if (!setopt_critical(CURLOPT_DEBUGFUNCTION, noop_debug_callback, "CURLOPT_DEBUGFUNCTION_NOOP")) return false;
+    if (!setopt_critical(CURLOPT_DEBUGDATA, nullptr, "CURLOPT_DEBUGDATA_NOOP")) return false;
 
     // Set a default no-op write callback to prevent libcurl from using internal fwrite
     // on potentially invalid streams if an operation unexpectedly produces data.
@@ -295,9 +307,8 @@ SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
         std::string val = config.at("verbose_logging"); std::transform(val.begin(), val.end(), val.begin(), ::tolower);
         if (val == "true" || val == "1") m_verboseLogging = true;
     }
-    if (m_verboseLogging) {
-        std::cout << "SftpTarget: Configuration 'verbose_logging' is true. Note: libcurl's internal CURLOPT_VERBOSE output to stderr is now disabled by default for stability. This flag may be used for future internal SftpTarget logging." << std::endl;
-    }
+    // New concise log message regarding verbose logging behavior
+    std::cout << "SftpTarget: Initialized. Note: libcurl's CURLOPT_VERBOSE is always enabled to activate a silencing debug callback; all verbose output is discarded by this callback for stability. The 'verbose_logging' configuration flag is parsed but currently does not alter this libcurl behavior." << std::endl;
 }
 
 SftpTarget::~SftpTarget() {
