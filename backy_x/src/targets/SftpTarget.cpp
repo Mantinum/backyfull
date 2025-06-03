@@ -198,30 +198,33 @@ bool SftpTarget::setupCurlHandleForOperation() {
     }
 
     // Set non-critical options
-    setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE");
+    // setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE"); // This line is intentionally removed/commented.
+
+    // CRITICAL FIX: Disable CURLOPT_VERBOSE to prevent libcurl from writing to stderr.
+    // This is the primary fix for the reported crash where stderr might be closed.
+    // If verbose logging is needed in the future, it must be implemented via
+    // CURLOPT_DEBUGFUNCTION and a safe callback, not via libcurl's default stderr output.
+    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE, 0L);
+    if (res_setopt != CURLE_OK) {
+        // While disabling verbose seems trivial, handle failure for completeness.
+        lastError_ = "Failed to disable CURLOPT_VERBOSE: " + std::string(curl_easy_strerror(res_setopt));
+        // Not logging this as CRITICAL to stderr itself, as that's the stream we're avoiding.
+        // Log it to our internal error state.
+        // Depending on how critical this is deemed, could return false.
+        // For now, let's consider it a non-fatal warning if disabling verbose fails,
+        // as other callbacks are in place. But it's highly unlikely to fail.
+            std::cerr << "SftpTarget: Warning - Could not disable CURLOPT_VERBOSE: " << curl_easy_strerror(res_setopt) << std::endl;
+    }
 
     // Set a default no-op write callback to prevent libcurl from using internal fwrite
     // on potentially invalid streams if an operation unexpectedly produces data.
     // Operations that need to capture output (listFiles, downloadFile) will override this.
-    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, noop_write_callback);
-    if (res_setopt != CURLE_OK) {
-        // This is unlikely to fail, but handle it for completeness
-        lastError_ = "Failed to set CURLOPT_WRITEFUNCTION to noop_write_callback: " + std::string(curl_easy_strerror(res_setopt));
-        std::cerr << "SftpTarget::setupCurlHandleForOperation: CRITICAL - " << lastError_ << std::endl; // Log as critical as it's part of a core fix
-        curl_easy_cleanup(m_curlHandle);
-        m_curlHandle = nullptr;
-        return false; // Critical failure
-    }
+    if (!setopt_critical(CURLOPT_WRITEFUNCTION, noop_write_callback, "CURLOPT_WRITEFUNCTION_NOOP")) return false;
+    if (!setopt_critical(CURLOPT_WRITEDATA, nullptr, "CURLOPT_WRITEDATA_NOOP")) return false;
 
-    res_setopt = curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr);
-    if (res_setopt != CURLE_OK) {
-        // This is also unlikely to fail
-        lastError_ = "Failed to set CURLOPT_WRITEDATA to nullptr for noop_write_callback: " + std::string(curl_easy_strerror(res_setopt));
-        std::cerr << "SftpTarget::setupCurlHandleForOperation: CRITICAL - " << lastError_ << std::endl; // Log as critical
-        curl_easy_cleanup(m_curlHandle);
-        m_curlHandle = nullptr;
-        return false; // Critical failure
-    }
+    // Add Safe Callbacks for Headers
+    if (!setopt_critical(CURLOPT_HEADERFUNCTION, noop_write_callback, "CURLOPT_HEADERFUNCTION_NOOP")) return false;
+    if (!setopt_critical(CURLOPT_HEADERDATA, nullptr, "CURLOPT_HEADERDATA_NOOP")) return false;
 
     // If all critical options were set successfully, m_curlHandle is valid and configured.
     return true;
@@ -292,7 +295,9 @@ SftpTarget::SftpTarget(const std::map<std::string, std::string>& config)
         std::string val = config.at("verbose_logging"); std::transform(val.begin(), val.end(), val.begin(), ::tolower);
         if (val == "true" || val == "1") m_verboseLogging = true;
     }
-    if (m_verboseLogging) std::cout << "SftpTarget: Verbose logging enabled." << std::endl;
+    if (m_verboseLogging) {
+        std::cout << "SftpTarget: Configuration 'verbose_logging' is true. Note: libcurl's internal CURLOPT_VERBOSE output to stderr is now disabled by default for stability. This flag may be used for future internal SftpTarget logging." << std::endl;
+    }
 }
 
 SftpTarget::~SftpTarget() {
