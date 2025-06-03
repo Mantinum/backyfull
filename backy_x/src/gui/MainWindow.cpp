@@ -1392,10 +1392,11 @@ void MainWindow::onFileViewerDeleteClicked() {
         QMessageBox::information(this, tr("Delete"), tr("No file selected or invalid selection."));
         return;
     }
+    int selectedRow = selectedItems.first()->row();
 
-    QTableWidgetItem* nameItemWidget = fileTableWidget_->item(selectedItems.first()->row(), 0); // Name is in column 0
+    QTableWidgetItem* nameItemWidget = fileTableWidget_->item(selectedRow, 0); // Name is in column 0
     if (!nameItemWidget) {
-        QMessageBox::warning(this, tr("Delete Error"), tr("Could not retrieve item data."));
+        QMessageBox::warning(this, tr("Delete Error"), tr("Could not retrieve item data for selected row %1.").arg(selectedRow));
         return;
     }
 
@@ -1485,7 +1486,13 @@ void MainWindow::onFileViewerDeleteClicked() {
     if (success) {
         QMessageBox::information(this, tr("Delete Successful"), tr("'%1' deleted successfully.").arg(actualFileName));
         updateLog(tr("Successfully deleted '%1'.").arg(fullRemotePath));
-        onFileViewerRefreshClicked(); // Refresh the view
+        if (selectedRow >= 0 && selectedRow < fileTableWidget_->rowCount()) {
+            fileTableWidget_->removeRow(selectedRow);
+            updateLog(tr("Removed item from view at row %1.").arg(selectedRow));
+        } else {
+            updateLog(tr("Could not remove item from view, row %1 invalid or table changed. Forcing refresh.").arg(selectedRow));
+            onFileViewerRefreshClicked(); // Fallback to refresh
+        }
     } else {
         QMessageBox::critical(this, tr("Delete Failed"), tr("Failed to delete '%1'. Error: %2").arg(actualFileName, errorMsg));
         updateLog(tr("Failed to delete '%1'. Error: %2").arg(fullRemotePath, errorMsg));
