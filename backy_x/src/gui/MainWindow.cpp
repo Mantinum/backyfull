@@ -60,8 +60,7 @@ MainWindow::MainWindow(QWidget *parent)
       currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
       fileViewerDockWidget_(nullptr), watchGroupBox_(nullptr),
-      watchEnableCheckBox_(nullptr), watchDirEdit_(nullptr),
-      watchDirButton_(nullptr), watchStatusLabel_(nullptr),
+      watchEnableCheckBox_(nullptr), watchStatusLabel_(nullptr),
       dirWatcher_(nullptr), watchTriggerTimer_(nullptr),
       // Core components
       scheduler_(nullptr), localTarget_(nullptr), sftpTarget_(nullptr),
@@ -157,14 +156,10 @@ void MainWindow::setupUI() {
   watchEnableCheckBox_ =
       new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
   watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
-  watchLayout->addWidget(new QLabel(tr("Dossier à surveiller:")), 1, 0);
-  watchDirEdit_ = new QLineEdit();
-  watchDirEdit_->setReadOnly(true);
-  watchLayout->addWidget(watchDirEdit_, 1, 1);
-  watchDirButton_ = new QPushButton(tr("Browse..."));
-  watchLayout->addWidget(watchDirButton_, 1, 2);
   watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
-  watchLayout->addWidget(watchStatusLabel_, 2, 0, 1, 3);
+  watchLayout->addWidget(watchStatusLabel_, 1, 0, 1, 3);
+  connect(watchEnableCheckBox_, &QCheckBox::toggled, this,
+          &MainWindow::onAutoWatchToggled);
   sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
   mainLayout->addWidget(sourceGroupBox);
 
@@ -352,6 +347,9 @@ void MainWindow::selectSourceDirectory() {
   if (!directory.isEmpty()) {
     sourceDirEdit_->setText(QDir::toNativeSeparators(directory));
     updateLog(QString("Source directory selected: %1").arg(directory));
+    if (watchEnableCheckBox_->isChecked()) {
+      onAutoWatchToggled(true);
+    }
   }
 }
 
@@ -397,6 +395,11 @@ void MainWindow::onAddBackupTimeClicked() {
     display += " (" + dayNames.join(',') + ")";
   else
     display += tr(" (All)");
+  QString srcDisp = shortenPathForDisplay(sourceDirEdit_->text());
+  QString destDisp = shortenPathForDisplay(currentDestinationForDisplay());
+  if (!srcDisp.isEmpty() && !destDisp.isEmpty()) {
+    display += QString(" | %1 \u2192 %2").arg(srcDisp, destDisp);
+  }
   QListWidgetItem *item = new QListWidgetItem(display);
   item->setData(Qt::UserRole, dataString);
   timeListWidget_->addItem(item);
@@ -415,34 +418,21 @@ void MainWindow::onRemoveBackupTimeClicked() {
   }
 }
 
-void MainWindow::selectWatchDirectory() {
-  fileDialog_->setWindowTitle(tr("Select Directory to Watch"));
-  fileDialog_->setFileMode(QFileDialog::Directory);
-  fileDialog_->setOption(QFileDialog::ShowDirsOnly, true);
-  QString initialPath =
-      watchDirEdit_->text().isEmpty()
-          ? QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
-          : watchDirEdit_->text();
-  QString directory = fileDialog_->getExistingDirectory(
-      this, tr("Select Directory to Watch"), initialPath);
-  if (!directory.isEmpty()) {
-    watchDirEdit_->setText(QDir::toNativeSeparators(directory));
-    if (watchEnableCheckBox_->isChecked()) {
-      onAutoWatchToggled(true);
-    }
-  }
-}
-
 void MainWindow::onAutoWatchToggled(bool checked) {
   dirWatcher_->removePaths(dirWatcher_->directories());
   if (checked) {
-    QString dir = watchDirEdit_->text();
+    QString dir = sourceDirEdit_->text();
     if (!dir.isEmpty()) {
       dirWatcher_->addPath(dir);
-      watchStatusLabel_->setText(tr("Surveillance active"));
+      watchStatusLabel_->setText(
+          QString::fromUtf8("\xF0\x9F\x93\x82 ") +
+          tr("Dossier surveill\u00e9 : %1")
+              .arg(shortenPathForDisplay(dir)));
       QString data = QStringLiteral("WATCH|") + dir;
-      QString display = QString::fromUtf8("\xF0\x9F\x93\x82 ") +
-                        tr("Surveillance: %1").arg(dir);
+      QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
+                        tr("Surveillance active | %1 \u2192 %2")
+                            .arg(shortenPathForDisplay(dir),
+                                 currentDestinationForDisplay());
       bool found = false;
       for (int i = 0; i < timeListWidget_->count(); ++i) {
         QListWidgetItem *it = timeListWidget_->item(i);
@@ -1351,6 +1341,20 @@ void MainWindow::onTaskChanged() {
       } else {
         display += tr(" (All)");
       }
+      QString srcDisp = shortenPathForDisplay(scheduler_->sourcePath());
+      QString destDisp;
+      if (scheduler_->isSftpMode()) {
+        destDisp = QString("%1:%2")
+                       .arg(scheduler_->sftpHost(), scheduler_->sftpRemotePath());
+      } else if (scheduler_->isGcsMode()) {
+        destDisp = QString("gcs://%1").arg(scheduler_->gcsBucketName());
+      } else {
+        destDisp = scheduler_->destinationPath();
+      }
+      destDisp = shortenPathForDisplay(destDisp);
+      if (!srcDisp.isEmpty() && !destDisp.isEmpty()) {
+        display += QString(" | %1 \u2192 %2").arg(srcDisp, destDisp);
+      }
       QListWidgetItem *item = new QListWidgetItem(display);
       item->setData(Qt::UserRole, data);
       timeListWidget_->addItem(item);
@@ -1451,7 +1455,6 @@ void MainWindow::loadSettings() {
 
   settings.beginGroup("AutoWatch");
   watchEnableCheckBox_->setChecked(settings.value("enabled", false).toBool());
-  watchDirEdit_->setText(settings.value("directory", "").toString());
   settings.endGroup();
 
   if (watchEnableCheckBox_->isChecked()) {
@@ -1513,7 +1516,6 @@ void MainWindow::saveSettings() {
 
   settings.beginGroup("AutoWatch");
   settings.setValue("enabled", watchEnableCheckBox_->isChecked());
-  settings.setValue("directory", watchDirEdit_->text());
   settings.endGroup();
 
   if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {
@@ -2136,4 +2138,24 @@ void MainWindow::onFileTableItemDoubleClicked(QTableWidgetItem *item) {
         QString("Double-clicked file: %1. Triggering download.").arg(itemName));
     onFileViewerDownloadClicked();
   }
+}
+
+QString MainWindow::shortenPathForDisplay(const QString &path) const {
+  QDir home = QDir::home();
+  QString relative = home.relativeFilePath(path);
+  if (!relative.startsWith("..")) {
+    return QString("~/") + relative;
+  }
+  return path;
+}
+
+QString MainWindow::currentDestinationForDisplay() const {
+  QString currentModeText = backupModeComboBox_->currentText();
+  if (currentModeText == tr("SFTP Backup")) {
+    return QString("%1:%2")
+        .arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());
+  } else if (currentModeText == tr("Google Cloud Storage")) {
+    return QString("gcs://%1").arg(gcsBucketNameLineEdit_->text());
+  }
+  return destinationDirEdit_->text();
 }

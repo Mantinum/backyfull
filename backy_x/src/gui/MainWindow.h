@@ -69,7 +69,6 @@ private slots:
   void onRemoveBackupTimeClicked();
 
   // Auto watch slots
-  void selectWatchDirectory();
   void onAutoWatchToggled(bool checked);
   void onDirectoryChanged(const QString &path);
   void onWatchTimerTimeout();
@@ -131,8 +130,6 @@ private:
   // Auto Watch UI
   QGroupBox *watchGroupBox_ = nullptr;
   QCheckBox *watchEnableCheckBox_ = nullptr;
-  QLineEdit *watchDirEdit_ = nullptr;
-  QPushButton *watchDirButton_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
@@ -155,6 +152,9 @@ private:
   // Remote File Viewer methods
   void displayRemoteFiles(const std::vector<FileMetadata> &files);
   void browseRemotePath(const QString &path);
+
+  QString shortenPathForDisplay(const QString &path) const;
+  QString currentDestinationForDisplay() const;
 };
 
 #endif // MAINWINDOW_H
