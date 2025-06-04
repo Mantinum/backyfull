@@ -480,10 +480,11 @@ bool SftpTarget::deleteFile(const std::string& remotePath) {
     curl_easy_setopt(m_curlHandle, CURLOPT_HTTPGET, 0L);
     curl_easy_setopt(m_curlHandle, CURLOPT_POST, 0L);
 
-    // Reset write/read functions and data, just in case they were set by another operation
-    // and not properly cleared if that operation failed before its usual cleanup.
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, NULL);
-    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, NULL);
+    // Reset write/read functions and data. We keep our no-op callbacks instead of
+    // using libcurl's defaults to avoid writing to stdout/stderr, which may be
+    // invalid in the GUI environment.
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEFUNCTION, noop_write_callback);
+    curl_easy_setopt(m_curlHandle, CURLOPT_WRITEDATA, nullptr);
     curl_easy_setopt(m_curlHandle, CURLOPT_READFUNCTION, NULL);
     curl_easy_setopt(m_curlHandle, CURLOPT_READDATA, NULL);
 
