@@ -22,6 +22,9 @@
 #include <QSettings>
 #include <QCoreApplication>
 #include <QCloseEvent>
+#include <QDateTime>
+#include <QFileSystemWatcher>
+#include <QTimer>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -74,6 +77,13 @@ MainWindow::MainWindow(QWidget *parent)
       currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
       fileViewerDockWidget_(nullptr),
+      watchGroupBox_(nullptr),
+      watchEnableCheckBox_(nullptr),
+      watchDirEdit_(nullptr),
+      watchDirButton_(nullptr),
+      watchStatusLabel_(nullptr),
+      dirWatcher_(nullptr),
+      watchTriggerTimer_(nullptr),
       // Core components
       scheduler_(nullptr),
       localTarget_(nullptr),
@@ -91,7 +101,13 @@ MainWindow::MainWindow(QWidget *parent)
     }
     
     m_credentialManager = std::unique_ptr<CredentialManager>(createPlatformCredentialManager());
-    scheduler_ = new Scheduler(QString(), this); 
+    scheduler_ = new Scheduler(QString(), this);
+
+    dirWatcher_ = new QFileSystemWatcher(this);
+    watchTriggerTimer_ = new QTimer(this);
+    watchTriggerTimer_->setSingleShot(true);
+    connect(dirWatcher_, &QFileSystemWatcher::directoryChanged, this, &MainWindow::onDirectoryChanged);
+    connect(watchTriggerTimer_, &QTimer::timeout, this, &MainWindow::onWatchTimerTimeout);
 
     setupUI();
     loadSettings();
@@ -233,6 +249,23 @@ void MainWindow::setupUI() {
     scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
     mainLayout->addWidget(scheduleGroupBox);
 
+    watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
+    QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
+    watchEnableCheckBox_ = new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
+    watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
+    watchLayout->addWidget(new QLabel(tr("Dossier à surveiller:")), 1, 0);
+    watchDirEdit_ = new QLineEdit();
+    watchDirEdit_->setReadOnly(true);
+    watchLayout->addWidget(watchDirEdit_, 1, 1);
+    watchDirButton_ = new QPushButton(tr("Browse..."));
+    watchLayout->addWidget(watchDirButton_, 1, 2);
+    watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
+    watchLayout->addWidget(watchStatusLabel_, 2, 0, 1, 3);
+    mainLayout->addWidget(watchGroupBox_);
+
+    connect(watchDirButton_, &QPushButton::clicked, this, &MainWindow::selectWatchDirectory);
+    connect(watchEnableCheckBox_, &QCheckBox::toggled, this, &MainWindow::onAutoWatchToggled);
+
     mainLayout->addWidget(new QLabel(tr("Logs:")));
     logDisplay_ = new QTextEdit();
     logDisplay_->setReadOnly(true);
@@ -320,6 +353,46 @@ void MainWindow::onAddBackupTimeClicked() {
 
 void MainWindow::onRemoveBackupTimeClicked() {
     qDeleteAll(timeListWidget_->selectedItems());
+}
+
+void MainWindow::selectWatchDirectory() {
+    fileDialog_->setWindowTitle(tr("Select Directory to Watch"));
+    fileDialog_->setFileMode(QFileDialog::Directory);
+    fileDialog_->setOption(QFileDialog::ShowDirsOnly, true);
+    QString initialPath = watchDirEdit_->text().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::HomeLocation) : watchDirEdit_->text();
+    QString directory = fileDialog_->getExistingDirectory(this, tr("Select Directory to Watch"), initialPath);
+    if (!directory.isEmpty()) {
+        watchDirEdit_->setText(QDir::toNativeSeparators(directory));
+        if (watchEnableCheckBox_->isChecked()) {
+            onAutoWatchToggled(true);
+        }
+    }
+}
+
+void MainWindow::onAutoWatchToggled(bool checked) {
+    dirWatcher_->removePaths(dirWatcher_->directories());
+    if (checked) {
+        QString dir = watchDirEdit_->text();
+        if (!dir.isEmpty()) {
+            dirWatcher_->addPath(dir);
+            watchStatusLabel_->setText(tr("Surveillance active"));
+        } else {
+            watchStatusLabel_->setText(tr("No directory set"));
+        }
+    } else {
+        watchStatusLabel_->setText(tr("Surveillance inactive"));
+    }
+}
+
+void MainWindow::onDirectoryChanged(const QString& path) {
+    Q_UNUSED(path);
+    watchStatusLabel_->setText(tr("Dernier changement: %1").arg(QDateTime::currentDateTime().toString()));
+    watchTriggerTimer_->start(3000);
+}
+
+void MainWindow::onWatchTimerTimeout() {
+    updateLog(tr("Modification détectée, lancement de la sauvegarde."));
+    runBackupNow();
 }
 
 void MainWindow::applySchedule() {
@@ -1069,6 +1142,17 @@ void MainWindow::loadSettings() {
     backupModeComboBox_->setCurrentIndex(settings.value("backupModeIndex", 0).toInt());
     settings.endGroup();
 
+    settings.beginGroup("AutoWatch");
+    watchEnableCheckBox_->setChecked(settings.value("enabled", false).toBool());
+    watchDirEdit_->setText(settings.value("directory", "").toString());
+    settings.endGroup();
+
+    if (watchEnableCheckBox_->isChecked()) {
+        onAutoWatchToggled(true);
+    } else {
+        watchStatusLabel_->setText(tr("Surveillance inactive"));
+    }
+
     settings.beginGroup("SFTP");
     sftpHostLineEdit_->setText(settings.value("host", "").toString());
     sftpPortLineEdit_->setText(settings.value("port", "22").toString());
@@ -1110,6 +1194,11 @@ void MainWindow::saveSettings() {
     settings.setValue("gcs_bucket_name", gcsBucketNameLineEdit_->text());
     settings.setValue("gcs_account_identifier", gcsAccountIdentifierLineEdit_->text());
     // gcs_last_authenticated_account is saved only on successful connect
+    settings.endGroup();
+
+    settings.beginGroup("AutoWatch");
+    settings.setValue("enabled", watchEnableCheckBox_->isChecked());
+    settings.setValue("directory", watchDirEdit_->text());
     settings.endGroup();
 
     if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {

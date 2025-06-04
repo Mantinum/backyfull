@@ -16,6 +16,8 @@
 #include <QDockWidget>
 #include <QCheckBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
+#include <QFileSystemWatcher>
+#include <QTimer>
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
 class QTableWidget;
@@ -64,6 +66,12 @@ private slots:
     void onFileTableItemDoubleClicked(QTableWidgetItem *item);
     void onAddBackupTimeClicked();
     void onRemoveBackupTimeClicked();
+
+    // Auto watch slots
+    void selectWatchDirectory();
+    void onAutoWatchToggled(bool checked);
+    void onDirectoryChanged(const QString& path);
+    void onWatchTimerTimeout();
 
 private:
     void setupUI();
@@ -117,6 +125,16 @@ private:
     QPushButton *deleteButton_ = nullptr;
     QLabel *currentPathLabel_ = nullptr;
     QString currentRemotePath_ = "/";
+
+    // Auto Watch UI
+    QGroupBox *watchGroupBox_ = nullptr;
+    QCheckBox *watchEnableCheckBox_ = nullptr;
+    QLineEdit *watchDirEdit_ = nullptr;
+    QPushButton *watchDirButton_ = nullptr;
+    QLabel *watchStatusLabel_ = nullptr;
+
+    QFileSystemWatcher *dirWatcher_ = nullptr;
+    QTimer *watchTriggerTimer_ = nullptr;
 
     // Core components
     Scheduler *scheduler_;
