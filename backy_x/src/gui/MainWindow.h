@@ -158,6 +158,8 @@ private:
 
   QString shortenPathForDisplay(const QString &path) const;
   QString currentDestinationForDisplay() const;
+
+  void adjustHeightToScreen();
 };
 
 #endif // MAINWINDOW_H

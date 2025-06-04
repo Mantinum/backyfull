@@ -18,6 +18,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QScreen>
 #include <QMessageBox>
 #include <QSettings>
 #include <QStandardPaths>
@@ -133,6 +134,9 @@ void MainWindow::setupUI() {
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
   setMinimumSize(800, 600);
+  if (QScreen *scr = QApplication::primaryScreen()) {
+    setMaximumHeight(scr->availableGeometry().height());
+  }
 
   QHBoxLayout *modeLayout = new QHBoxLayout();
   modeLayout->addWidget(new QLabel(tr("Backup Mode:")));
@@ -470,7 +474,7 @@ void MainWindow::onAutoWatchToggled(bool checked) {
       }
     }
   }
-  adjustSize();
+  adjustHeightToScreen();
 }
 
 void MainWindow::onDirectoryChanged(const QString &path) {
@@ -1438,7 +1442,7 @@ void MainWindow::onBackupModeChanged(int index) {
           "Backup mode changed to: %1. UI adjusted. File viewer visible: %2.")
           .arg(currentModeText)
           .arg(remoteModeSelected ? "Yes" : "No"));
-  adjustSize();
+  adjustHeightToScreen();
 }
 
 void MainWindow::loadSettings() {
@@ -2163,4 +2167,14 @@ QString MainWindow::currentDestinationForDisplay() const {
     return QString("gcs://%1").arg(gcsBucketNameLineEdit_->text());
   }
   return destinationDirEdit_->text();
+}
+
+void MainWindow::adjustHeightToScreen() {
+  adjustSize();
+  QScreen *scr = QApplication::primaryScreen();
+  if (!scr)
+    return;
+  int avail = scr->availableGeometry().height() - 40; // small margin
+  if (height() > avail)
+    resize(width(), avail);
 }
