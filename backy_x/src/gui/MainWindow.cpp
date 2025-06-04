@@ -43,7 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       applyScheduleButton_(nullptr), runBackupButton_(nullptr),
-      logDisplay_(nullptr), backupModeComboBox_(nullptr),
+      logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
@@ -55,11 +55,11 @@ MainWindow::MainWindow(QWidget *parent)
           nullptr), // Initialize new GCS Test Connection button
       gcsAuthStatusLabel_(nullptr), gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
-      fileViewerGroupBox_(nullptr), fileTableWidget_(nullptr),
-      refreshButton_(nullptr), downloadButton_(nullptr), deleteButton_(nullptr),
-      currentPathLabel_(nullptr),
+      fileViewerGroupBox_(nullptr), fileViewerDockWidget_(nullptr),
+      fileTableWidget_(nullptr), refreshButton_(nullptr),
+      downloadButton_(nullptr), deleteButton_(nullptr), currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
-      fileViewerDockWidget_(nullptr), watchGroupBox_(nullptr),
+      watchGroupBox_(nullptr),
       watchEnableCheckBox_(nullptr), watchStatusLabel_(nullptr),
       dirWatcher_(nullptr), watchTriggerTimer_(nullptr),
       // Core components
@@ -125,10 +125,14 @@ void MainWindow::setupUI() {
   // Menu bar
   QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
 
-  QWidget *centralWidget = new QWidget(this);
-  setCentralWidget(centralWidget);
+  scrollArea_ = new QScrollArea(this);
+  setCentralWidget(scrollArea_);
+  scrollArea_->setWidgetResizable(true);
+  QWidget *centralWidget = new QWidget(scrollArea_);
+  scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+  setMinimumSize(800, 600);
 
   QHBoxLayout *modeLayout = new QHBoxLayout();
   modeLayout->addWidget(new QLabel(tr("Backup Mode:")));
@@ -466,6 +470,7 @@ void MainWindow::onAutoWatchToggled(bool checked) {
       }
     }
   }
+  adjustSize();
 }
 
 void MainWindow::onDirectoryChanged(const QString &path) {
@@ -1328,7 +1333,6 @@ void MainWindow::onTaskChanged() {
       if (!se.days.isEmpty()) {
         QStringList names;
         QStringList nums;
-        int idx = 1;
         const QStringList dayLabels = {tr("Mon"), tr("Tue"), tr("Wed"),
                                        tr("Thu"), tr("Fri"), tr("Sat"),
                                        tr("Sun")};
@@ -1434,6 +1438,7 @@ void MainWindow::onBackupModeChanged(int index) {
           "Backup mode changed to: %1. UI adjusted. File viewer visible: %2.")
           .arg(currentModeText)
           .arg(remoteModeSelected ? "Yes" : "No"));
+  adjustSize();
 }
 
 void MainWindow::loadSettings() {

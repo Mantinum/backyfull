@@ -18,6 +18,7 @@
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
+#include <QScrollArea>
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
 class QTableWidget;
@@ -91,6 +92,8 @@ private:
   QPushButton *applyScheduleButton_;
   QPushButton *runBackupButton_;
   QTextEdit *logDisplay_;
+
+  QScrollArea *scrollArea_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
