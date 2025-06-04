@@ -98,6 +98,10 @@ MainWindow::MainWindow(QWidget *parent)
     if (backupModeComboBox_) {
         onBackupModeChanged(backupModeComboBox_->currentIndex());
     }
+
+    if (fileViewerDockWidget_) {
+        fileViewerDockWidget_->show();
+    }
     onTaskChanged();
 
     updateLog("BackyFull application started.");
