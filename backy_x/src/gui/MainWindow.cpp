@@ -151,6 +151,21 @@ void MainWindow::setupUI() {
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addWidget(sourceDirButton_, 0, 2);
+
+  watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
+  QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
+  watchEnableCheckBox_ =
+      new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
+  watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
+  watchLayout->addWidget(new QLabel(tr("Dossier à surveiller:")), 1, 0);
+  watchDirEdit_ = new QLineEdit();
+  watchDirEdit_->setReadOnly(true);
+  watchLayout->addWidget(watchDirEdit_, 1, 1);
+  watchDirButton_ = new QPushButton(tr("Browse..."));
+  watchLayout->addWidget(watchDirButton_, 1, 2);
+  watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
+  watchLayout->addWidget(watchStatusLabel_, 2, 0, 1, 3);
+  sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
   mainLayout->addWidget(sourceGroupBox);
 
   m_localDestinationGroupBox =
@@ -261,26 +276,6 @@ void MainWindow::setupUI() {
           &MainWindow::runBackupNow);
   scheduleLayout->addWidget(runBackupButton_, 6, 0, 1, 3);
   mainLayout->addWidget(scheduleGroupBox);
-
-  watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
-  QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
-  watchEnableCheckBox_ =
-      new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
-  watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
-  watchLayout->addWidget(new QLabel(tr("Dossier à surveiller:")), 1, 0);
-  watchDirEdit_ = new QLineEdit();
-  watchDirEdit_->setReadOnly(true);
-  watchLayout->addWidget(watchDirEdit_, 1, 1);
-  watchDirButton_ = new QPushButton(tr("Browse..."));
-  watchLayout->addWidget(watchDirButton_, 1, 2);
-  watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
-  watchLayout->addWidget(watchStatusLabel_, 2, 0, 1, 3);
-  mainLayout->addWidget(watchGroupBox_);
-
-  connect(watchDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectWatchDirectory);
-  connect(watchEnableCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onAutoWatchToggled);
 
   mainLayout->addWidget(new QLabel(tr("Logs:")));
   logDisplay_ = new QTextEdit();
@@ -410,7 +405,14 @@ void MainWindow::onAddBackupTimeClicked() {
 }
 
 void MainWindow::onRemoveBackupTimeClicked() {
-  qDeleteAll(timeListWidget_->selectedItems());
+  const QList<QListWidgetItem *> items = timeListWidget_->selectedItems();
+  for (QListWidgetItem *item : items) {
+    QString data = item->data(Qt::UserRole).toString();
+    if (data.startsWith("WATCH|")) {
+      watchEnableCheckBox_->setChecked(false);
+    }
+    delete item;
+  }
 }
 
 void MainWindow::selectWatchDirectory() {
@@ -438,11 +440,41 @@ void MainWindow::onAutoWatchToggled(bool checked) {
     if (!dir.isEmpty()) {
       dirWatcher_->addPath(dir);
       watchStatusLabel_->setText(tr("Surveillance active"));
+      QString data = QStringLiteral("WATCH|") + dir;
+      QString display = QString::fromUtf8("\xF0\x9F\x93\x82 ") +
+                        tr("Surveillance: %1").arg(dir);
+      bool found = false;
+      for (int i = 0; i < timeListWidget_->count(); ++i) {
+        QListWidgetItem *it = timeListWidget_->item(i);
+        QString d = it->data(Qt::UserRole).toString();
+        if (d.startsWith("WATCH|")) {
+          it->setText(display);
+          it->setData(Qt::UserRole, data);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        QListWidgetItem *item = new QListWidgetItem(display);
+        QFont f = item->font();
+        f.setItalic(true);
+        item->setFont(f);
+        item->setData(Qt::UserRole, data);
+        timeListWidget_->addItem(item);
+      }
     } else {
       watchStatusLabel_->setText(tr("No directory set"));
     }
   } else {
     watchStatusLabel_->setText(tr("Surveillance inactive"));
+    for (int i = 0; i < timeListWidget_->count(); ++i) {
+      QListWidgetItem *it = timeListWidget_->item(i);
+      QString d = it->data(Qt::UserRole).toString();
+      if (d.startsWith("WATCH|")) {
+        delete timeListWidget_->takeItem(i);
+        break;
+      }
+    }
   }
 }
 
@@ -463,6 +495,8 @@ void MainWindow::applySchedule() {
   QList<ScheduleEntry> entries;
   for (int i = 0; i < timeListWidget_->count(); ++i) {
     QString data = timeListWidget_->item(i)->data(Qt::UserRole).toString();
+    if (data.startsWith("WATCH|"))
+      continue;
     QStringList parts = data.split('|');
     QTime t = QTime::fromString(parts.value(0), "HH:mm");
     if (!t.isValid())
@@ -1324,6 +1358,9 @@ void MainWindow::onTaskChanged() {
     backupTimeEdit_->setTime(entries.first().time);
   } else {
     backupTimeEdit_->setTime(QTime(23, 0));
+  }
+  if (watchEnableCheckBox_->isChecked()) {
+    onAutoWatchToggled(true);
   }
   onBackupModeChanged(backupModeComboBox_->currentIndex());
   updateLog("Task details updated in UI from Scheduler state.");
