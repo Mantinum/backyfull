@@ -68,7 +68,6 @@ private slots:
     void onRemoveBackupTimeClicked();
 
     // Auto watch slots
-    void selectWatchDirectory();
     void onAutoWatchToggled(bool checked);
     void onDirectoryChanged(const QString& path);
     void onWatchTimerTimeout();
@@ -95,7 +94,8 @@ private:
     QComboBox *backupModeComboBox_;
 
     // Local Backup Settings
-    QGroupBox *m_localDestinationGroupBox;
+    QGroupBox *sourceDestGroupBox_;
+    QLabel *destDirLabel_ = nullptr;
 
     // SFTP Settings
     QGroupBox *sftpSettingsGroupBox_;
@@ -127,10 +127,7 @@ private:
     QString currentRemotePath_ = "/";
 
     // Auto Watch UI
-    QGroupBox *watchGroupBox_ = nullptr;
     QCheckBox *watchEnableCheckBox_ = nullptr;
-    QLineEdit *watchDirEdit_ = nullptr;
-    QPushButton *watchDirButton_ = nullptr;
     QLabel *watchStatusLabel_ = nullptr;
 
     QFileSystemWatcher *dirWatcher_ = nullptr;

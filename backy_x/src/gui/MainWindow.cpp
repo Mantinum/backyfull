@@ -52,7 +52,7 @@ MainWindow::MainWindow(QWidget *parent)
       runBackupButton_(nullptr),
       logDisplay_(nullptr),
       backupModeComboBox_(nullptr),
-      m_localDestinationGroupBox(nullptr),
+      sourceDestGroupBox_(nullptr),
       sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr),
       sftpPortLineEdit_(nullptr),
@@ -77,10 +77,7 @@ MainWindow::MainWindow(QWidget *parent)
       currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
       fileViewerDockWidget_(nullptr),
-      watchGroupBox_(nullptr),
       watchEnableCheckBox_(nullptr),
-      watchDirEdit_(nullptr),
-      watchDirButton_(nullptr),
       watchStatusLabel_(nullptr),
       dirWatcher_(nullptr),
       watchTriggerTimer_(nullptr),
@@ -159,27 +156,32 @@ void MainWindow::setupUI() {
     modeLayout->addStretch();
     mainLayout->addLayout(modeLayout);
 
-    QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
-    QGridLayout *sourceLayout = new QGridLayout(sourceGroupBox);
-    sourceLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
+    sourceDestGroupBox_ = new QGroupBox(tr("Source & Destination"));
+    QGridLayout *srcDestLayout = new QGridLayout(sourceDestGroupBox_);
+    srcDestLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
     sourceDirEdit_ = new QLineEdit();
     sourceDirEdit_->setReadOnly(true);
-    sourceLayout->addWidget(sourceDirEdit_, 0, 1);
+    srcDestLayout->addWidget(sourceDirEdit_, 0, 1);
     sourceDirButton_ = new QPushButton(tr("Browse..."));
     connect(sourceDirButton_, &QPushButton::clicked, this, &MainWindow::selectSourceDirectory);
-    sourceLayout->addWidget(sourceDirButton_, 0, 2);
-    mainLayout->addWidget(sourceGroupBox);
+    srcDestLayout->addWidget(sourceDirButton_, 0, 2);
 
-    m_localDestinationGroupBox = new QGroupBox(tr("Local Destination Configuration"));
-    QGridLayout *localDestLayout = new QGridLayout(m_localDestinationGroupBox);
-    localDestLayout->addWidget(new QLabel(tr("Destination Directory (Local):")), 0, 0);
+    destDirLabel_ = new QLabel(tr("Destination Directory (Local):"));
+    srcDestLayout->addWidget(destDirLabel_, 1, 0);
     destinationDirEdit_ = new QLineEdit();
     destinationDirEdit_->setReadOnly(true);
-    localDestLayout->addWidget(destinationDirEdit_, 0, 1);
+    srcDestLayout->addWidget(destinationDirEdit_, 1, 1);
     destinationDirButton_ = new QPushButton(tr("Browse..."));
     connect(destinationDirButton_, &QPushButton::clicked, this, &MainWindow::selectDestinationDirectory);
-    localDestLayout->addWidget(destinationDirButton_, 0, 2);
-    mainLayout->addWidget(m_localDestinationGroupBox);
+    srcDestLayout->addWidget(destinationDirButton_, 1, 2);
+
+    watchEnableCheckBox_ = new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
+    srcDestLayout->addWidget(watchEnableCheckBox_, 2, 0, 1, 3);
+    watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
+    srcDestLayout->addWidget(watchStatusLabel_, 3, 0, 1, 3);
+    mainLayout->addWidget(sourceDestGroupBox_);
+
+    connect(watchEnableCheckBox_, &QCheckBox::toggled, this, &MainWindow::onAutoWatchToggled);
 
     sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
     QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
@@ -224,47 +226,38 @@ void MainWindow::setupUI() {
 
     connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onBackupModeChanged);
 
-    QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
-    QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-    scheduleLayout->addWidget(new QLabel(tr("Backup Time:")), 0, 0);
+    QGroupBox *scheduleGroupBox = new QGroupBox(tr("Planification"));
+    QVBoxLayout *scheduleLayout = new QVBoxLayout(scheduleGroupBox);
+
+    QHBoxLayout *timeInputLayout = new QHBoxLayout();
+    timeInputLayout->addWidget(new QLabel(tr("Backup Time:")));
     backupTimeEdit_ = new QTimeEdit();
     backupTimeEdit_->setDisplayFormat("HH:mm");
-    scheduleLayout->addWidget(backupTimeEdit_, 0, 1);
+    timeInputLayout->addWidget(backupTimeEdit_);
     addTimeButton_ = new QPushButton(tr("Add"));
-    scheduleLayout->addWidget(addTimeButton_, 0, 2);
+    timeInputLayout->addWidget(addTimeButton_);
+    timeInputLayout->addStretch();
     connect(addTimeButton_, &QPushButton::clicked, this, &MainWindow::onAddBackupTimeClicked);
+    scheduleLayout->addLayout(timeInputLayout);
 
-    scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 1, 0, 1, 3);
     timeListWidget_ = new QListWidget();
-    scheduleLayout->addWidget(timeListWidget_, 2, 0, 1, 3);
-    removeTimeButton_ = new QPushButton(tr("Remove Selected"));
-    scheduleLayout->addWidget(removeTimeButton_, 3, 0, 1, 3);
-    connect(removeTimeButton_, &QPushButton::clicked, this, &MainWindow::onRemoveBackupTimeClicked);
+    scheduleLayout->addWidget(timeListWidget_);
 
-    applyScheduleButton_ = new QPushButton(tr("Apply Schedule"));
+    QHBoxLayout *controlsLayout = new QHBoxLayout();
+    removeTimeButton_ = new QPushButton(tr("Remove"));
+    connect(removeTimeButton_, &QPushButton::clicked, this, &MainWindow::onRemoveBackupTimeClicked);
+    controlsLayout->addWidget(removeTimeButton_);
+    applyScheduleButton_ = new QPushButton(tr("Apply"));
     connect(applyScheduleButton_, &QPushButton::clicked, this, &MainWindow::applySchedule);
-    scheduleLayout->addWidget(applyScheduleButton_, 4, 0, 1, 3);
-    runBackupButton_ = new QPushButton(tr("Run Backup Now"));
+    controlsLayout->addWidget(applyScheduleButton_);
+    runBackupButton_ = new QPushButton(tr("Backup Now"));
     connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
-    scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
+    controlsLayout->addWidget(runBackupButton_);
+    controlsLayout->addStretch();
+    scheduleLayout->addLayout(controlsLayout);
+
     mainLayout->addWidget(scheduleGroupBox);
 
-    watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
-    QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
-    watchEnableCheckBox_ = new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
-    watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
-    watchLayout->addWidget(new QLabel(tr("Dossier à surveiller:")), 1, 0);
-    watchDirEdit_ = new QLineEdit();
-    watchDirEdit_->setReadOnly(true);
-    watchLayout->addWidget(watchDirEdit_, 1, 1);
-    watchDirButton_ = new QPushButton(tr("Browse..."));
-    watchLayout->addWidget(watchDirButton_, 1, 2);
-    watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
-    watchLayout->addWidget(watchStatusLabel_, 2, 0, 1, 3);
-    mainLayout->addWidget(watchGroupBox_);
-
-    connect(watchDirButton_, &QPushButton::clicked, this, &MainWindow::selectWatchDirectory);
-    connect(watchEnableCheckBox_, &QCheckBox::toggled, this, &MainWindow::onAutoWatchToggled);
 
     mainLayout->addWidget(new QLabel(tr("Logs:")));
     logDisplay_ = new QTextEdit();
@@ -327,6 +320,9 @@ void MainWindow::selectSourceDirectory() {
     if (!directory.isEmpty()) {
         sourceDirEdit_->setText(QDir::toNativeSeparators(directory));
         updateLog(QString("Source directory selected: %1").arg(directory));
+        if (watchEnableCheckBox_->isChecked()) {
+            onAutoWatchToggled(true);
+        }
     }
 }
 
@@ -355,24 +351,10 @@ void MainWindow::onRemoveBackupTimeClicked() {
     qDeleteAll(timeListWidget_->selectedItems());
 }
 
-void MainWindow::selectWatchDirectory() {
-    fileDialog_->setWindowTitle(tr("Select Directory to Watch"));
-    fileDialog_->setFileMode(QFileDialog::Directory);
-    fileDialog_->setOption(QFileDialog::ShowDirsOnly, true);
-    QString initialPath = watchDirEdit_->text().isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::HomeLocation) : watchDirEdit_->text();
-    QString directory = fileDialog_->getExistingDirectory(this, tr("Select Directory to Watch"), initialPath);
-    if (!directory.isEmpty()) {
-        watchDirEdit_->setText(QDir::toNativeSeparators(directory));
-        if (watchEnableCheckBox_->isChecked()) {
-            onAutoWatchToggled(true);
-        }
-    }
-}
-
 void MainWindow::onAutoWatchToggled(bool checked) {
     dirWatcher_->removePaths(dirWatcher_->directories());
     if (checked) {
-        QString dir = watchDirEdit_->text();
+        QString dir = sourceDirEdit_->text();
         if (!dir.isEmpty()) {
             dirWatcher_->addPath(dir);
             watchStatusLabel_->setText(tr("Surveillance active"));
@@ -1109,8 +1091,10 @@ void MainWindow::onBackupModeChanged(int index) {
         currentPathLabel_->setText(tr("Path: /"));
     }
 
-    // Show/hide relevant group boxes
-    if (m_localDestinationGroupBox) m_localDestinationGroupBox->setVisible(localSelected);
+    // Show/hide relevant widgets
+    if (destDirLabel_) destDirLabel_->setVisible(localSelected);
+    if (destinationDirEdit_) destinationDirEdit_->setVisible(localSelected);
+    if (destinationDirButton_) destinationDirButton_->setVisible(localSelected);
     if (sftpSettingsGroupBox_) sftpSettingsGroupBox_->setVisible(sftpSelected);
     if (gcsSettingsGroupBox_) gcsSettingsGroupBox_->setVisible(gcsSelected);
 
@@ -1144,7 +1128,6 @@ void MainWindow::loadSettings() {
 
     settings.beginGroup("AutoWatch");
     watchEnableCheckBox_->setChecked(settings.value("enabled", false).toBool());
-    watchDirEdit_->setText(settings.value("directory", "").toString());
     settings.endGroup();
 
     if (watchEnableCheckBox_->isChecked()) {
@@ -1198,7 +1181,6 @@ void MainWindow::saveSettings() {
 
     settings.beginGroup("AutoWatch");
     settings.setValue("enabled", watchEnableCheckBox_->isChecked());
-    settings.setValue("directory", watchDirEdit_->text());
     settings.endGroup();
 
     if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {
