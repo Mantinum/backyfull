@@ -13,6 +13,7 @@
 #include <QFileDialog>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QDockWidget>
 #include <QCheckBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
 // Forward declarations for Qt UI elements related to File Viewer
@@ -109,6 +110,7 @@ private:
 
     // File Viewer UI Elements
     QGroupBox *fileViewerGroupBox_ = nullptr;
+    QDockWidget *fileViewerDockWidget_ = nullptr;
     QTableWidget *fileTableWidget_ = nullptr;
     QPushButton *refreshButton_ = nullptr;
     QPushButton *downloadButton_ = nullptr;
