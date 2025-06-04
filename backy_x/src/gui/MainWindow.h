@@ -9,9 +9,11 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QTimeEdit>
+#include <QListWidget>
 #include <QFileDialog>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QDockWidget>
 #include <QCheckBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
 // Forward declarations for Qt UI elements related to File Viewer
@@ -60,6 +62,8 @@ private slots:
     void onFileViewerDownloadClicked();
     void onFileViewerDeleteClicked();
     void onFileTableItemDoubleClicked(QTableWidgetItem *item);
+    void onAddBackupTimeClicked();
+    void onRemoveBackupTimeClicked();
 
 private:
     void setupUI();
@@ -72,6 +76,9 @@ private:
     QLineEdit *destinationDirEdit_;
     QPushButton *destinationDirButton_;
     QTimeEdit *backupTimeEdit_;
+    QPushButton *addTimeButton_;
+    QListWidget *timeListWidget_;
+    QPushButton *removeTimeButton_;
     QPushButton *applyScheduleButton_;
     QPushButton *runBackupButton_;
     QTextEdit *logDisplay_;
@@ -103,6 +110,7 @@ private:
 
     // File Viewer UI Elements
     QGroupBox *fileViewerGroupBox_ = nullptr;
+    QDockWidget *fileViewerDockWidget_ = nullptr;
     QTableWidget *fileTableWidget_ = nullptr;
     QPushButton *refreshButton_ = nullptr;
     QPushButton *downloadButton_ = nullptr;
