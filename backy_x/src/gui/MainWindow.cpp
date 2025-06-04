@@ -5,7 +5,8 @@
 #include "targets/SftpTarget.h"
 #include "util/CredentialManager.h"
 
-#include <QApplication> // Added include
+#include <QApplication>
+#include <QGuiApplication>
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -340,6 +341,7 @@ void MainWindow::setupUI() {
           &MainWindow::onFileTableItemDoubleClicked);
 
   fileDialog_ = new QFileDialog(this);
+  adjustHeightToScreen();
 }
 
 void MainWindow::selectSourceDirectory() {
@@ -1498,6 +1500,7 @@ void MainWindow::loadSettings() {
   settings.endGroup();
 
   updateLog("Settings loaded.");
+  adjustHeightToScreen();
 }
 
 void MainWindow::saveSettings() {
@@ -2170,11 +2173,12 @@ QString MainWindow::currentDestinationForDisplay() const {
 }
 
 void MainWindow::adjustHeightToScreen() {
-  adjustSize();
-  QScreen *scr = QApplication::primaryScreen();
+  QScreen *scr = QGuiApplication::primaryScreen();
   if (!scr)
     return;
-  int avail = scr->availableGeometry().height() - 40; // small margin
+  int avail = scr->availableGeometry().height();
+  setMaximumHeight(avail);
+  adjustSize();
   if (height() > avail)
     resize(width(), avail);
 }
