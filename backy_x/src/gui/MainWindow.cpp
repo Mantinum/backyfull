@@ -259,6 +259,7 @@ void MainWindow::setupUI() {
     fileViewerDockWidget_ = new QDockWidget(tr("Remote File Viewer"), this);
     fileViewerDockWidget_->setWidget(fileViewerGroupBox_);
     fileViewerDockWidget_->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    fileViewerDockWidget_->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
     addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
     fileViewerDockWidget_->setVisible(false);
 
