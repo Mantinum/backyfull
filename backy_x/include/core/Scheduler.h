@@ -1,15 +1,22 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-#include <QObject>
-#include <QTime>
-#include <QString> // For source/destination paths
-#include <QTimer>
-#include <QSettings> // For persistence
 #include <QList>
+#include <QObject>
+#include <QSet>
+#include <QSettings> // For persistence
+#include <QString>   // For source/destination paths
+#include <QTime>
+#include <QTimer>
+#include <Qt>
 
-// Forward declaration if BackupTask struct becomes complex, for now just basic info
-// struct BackupTask {
+struct ScheduleEntry {
+  QTime time;
+  QSet<Qt::DayOfWeek> days; // empty => all days
+};
+
+// Forward declaration if BackupTask struct becomes complex, for now just basic
+// info struct BackupTask {
 //     QString id; // Might not be needed for M1 with a single task
 //     QString sourcePath;
 //     QString destinationPath;
@@ -18,96 +25,107 @@
 // };
 
 class Scheduler : public QObject {
-    Q_OBJECT
+  Q_OBJECT
 
 public:
-    explicit Scheduler(const QString& settingsFilePath = QString(), QObject *parent = nullptr);
-    ~Scheduler() override;
+  explicit Scheduler(const QString &settingsFilePath = QString(),
+                     QObject *parent = nullptr);
+  ~Scheduler() override;
 
-    // Configures the daily backup task
-    // Configures the daily backup task
-    void setDailyBackupTask(const QString& sourcePath,
-                            const QString& destinationPathOrIdentifier, // For local, it's path. For SFTP, it might be a descriptive string or empty.
-                            const QList<QTime>& scheduledTimes,
-                            bool enabled,
-                            bool isSftpMode,
-                            const QString& sftpHost = QString(),
-                            int sftpPort = 22,
-                            const QString& sftpUsername = QString(),
-                            const QString& sftpRemotePath = QString(),
-                            bool isGcsMode = false, // New GCS parameter
-                            const QString& gcsBucketName = QString(), // New GCS parameter
-                            const QString& gcsObjectPrefix = QString()); // New GCS parameter (renamed from m_gcsPrefix)
+  // Configures the daily backup task
+  // Configures the daily backup task
+  void setDailyBackupTask(
+      const QString &sourcePath,
+      const QString
+          &destinationPathOrIdentifier, // For local, it's path. For SFTP, it
+                                        // might be a descriptive string or
+                                        // empty.
+      const QList<ScheduleEntry> &scheduleEntries, bool enabled,
+      bool isSftpMode, const QString &sftpHost = QString(), int sftpPort = 22,
+      const QString &sftpUsername = QString(),
+      const QString &sftpRemotePath = QString(),
+      bool isGcsMode = false,                   // New GCS parameter
+      const QString &gcsBucketName = QString(), // New GCS parameter
+      const QString &gcsObjectPrefix =
+          QString()); // New GCS parameter (renamed from m_gcsPrefix)
 
-    // Loads task from QSettings
-    void loadTask();
-    
-    QString sourcePath() const;
-    QString destinationPath() const; // For local mode, or descriptive identifier for SFTP
-    QList<QTime> scheduledTimes() const;
-    bool isEnabled() const;
-    bool isSftpMode() const; // Getter for SFTP mode
+  // Loads task from QSettings
+  void loadTask();
 
-    // Getters for SFTP configuration
-    QString sftpHost() const;
-    int sftpPort() const;
-    QString sftpUsername() const;
-    QString sftpRemotePath() const;
+  QString sourcePath() const;
+  QString
+  destinationPath() const; // For local mode, or descriptive identifier for SFTP
+  QList<QTime> scheduledTimes() const; // legacy helper
+  QList<ScheduleEntry> scheduleEntries() const { return m_scheduleEntries; }
+  bool isEnabled() const;
+  bool isSftpMode() const; // Getter for SFTP mode
 
-    // Getters for GCS configuration
-    bool isGcsMode() const;
-    QString gcsBucketName() const;
-    QString gcsObjectPrefix() const;
-    QString gcsAccountIdentifier() const;
+  // Getters for SFTP configuration
+  QString sftpHost() const;
+  int sftpPort() const;
+  QString sftpUsername() const;
+  QString sftpRemotePath() const;
+
+  // Getters for GCS configuration
+  bool isGcsMode() const;
+  QString gcsBucketName() const;
+  QString gcsObjectPrefix() const;
+  QString gcsAccountIdentifier() const;
 
 signals:
-    // Emitted when a scheduled backup is due
-    // The slot connected to this in MainWindow will use Scheduler's getters to fetch full config
-    void backupTaskTriggered(const QString& sourcePath, const QString& destinationOrIdentifier);
-    // Emitted when task details change, so UI can update
-    void taskChanged(); 
+  // Emitted when a scheduled backup is due
+  // The slot connected to this in MainWindow will use Scheduler's getters to
+  // fetch full config
+  void backupTaskTriggered(const QString &sourcePath,
+                           const QString &destinationOrIdentifier);
+  // Emitted when task details change, so UI can update
+  void taskChanged();
 
 private slots:
-    void checkScheduledTime(); // Slot for the QTimer to call
+  void checkScheduledTime(); // Slot for the QTimer to call
 
 private:
-    void saveTask(); // Saves current task to QSettings
-    void scheduleNextCheck(); // Helper to arm the timer for the next day or initial check
+  void saveTask();          // Saves current task to QSettings
+  void scheduleNextCheck(); // Helper to arm the timer for the next day or
+                            // initial check
 
-    QString m_currentSourcePath;
-    QString m_currentDestinationPath; // For local, this is the path. For SFTP, this might be a placeholder or unused if SFTP details are separate.
-    QList<QTime> m_scheduledTimes;
-    bool m_taskEnabled;
-    
-    // SFTP specific settings
-    bool m_isSftpMode;
-    QString m_sftpHost;
-    int m_sftpPort;
-    QString m_sftpUsername;
-    QString m_sftpRemotePath;
+  QString m_currentSourcePath;
+  QString m_currentDestinationPath; // For local, this is the path. For SFTP,
+                                    // this might be a placeholder or unused if
+                                    // SFTP details are separate.
+  QList<ScheduleEntry> m_scheduleEntries;
+  QList<QTime> m_scheduledTimes; // legacy support
+  bool m_taskEnabled;
 
-    // GCS specific settings
-    bool m_isGcsMode;
-    QString m_gcsBucketName;
-    QString m_gcsObjectPrefix; // Renamed from m_gcsPrefix
+  // SFTP specific settings
+  bool m_isSftpMode;
+  QString m_sftpHost;
+  int m_sftpPort;
+  QString m_sftpUsername;
+  QString m_sftpRemotePath;
 
-    QTimer* m_dailyTimer; // Timer to check if backup is due
-    QSettings* m_settings; // For persisting task details
+  // GCS specific settings
+  bool m_isGcsMode;
+  QString m_gcsBucketName;
+  QString m_gcsObjectPrefix; // Renamed from m_gcsPrefix
 
-    // QSettings keys
-    const QString SETTINGS_GROUP = "Scheduler";
-    const QString KEY_SOURCE_PATH = "sourcePath";
-    const QString KEY_DEST_PATH = "destinationPath"; // Or "destinationIdentifier"
-    const QString KEY_SCHEDULED_TIMES = "scheduledTimes";
-    const QString KEY_TASK_ENABLED = "taskEnabled";
-    const QString KEY_IS_SFTP_MODE = "isSftpMode";
-    const QString KEY_SFTP_HOST = "sftpHost";
-    const QString KEY_SFTP_PORT = "sftpPort";
-    const QString KEY_SFTP_USERNAME = "sftpUsername";
-    const QString KEY_SFTP_REMOTE_PATH = "sftpRemotePath";
-    const QString KEY_IS_GCS_MODE = "isGcsMode";
-    const QString KEY_GCS_BUCKET_NAME = "gcsBucketName";
-    const QString KEY_GCS_OBJECT_PREFIX = "gcsObjectPrefix";
+  QTimer *m_dailyTimer;  // Timer to check if backup is due
+  QSettings *m_settings; // For persisting task details
+
+  // QSettings keys
+  const QString SETTINGS_GROUP = "Scheduler";
+  const QString KEY_SOURCE_PATH = "sourcePath";
+  const QString KEY_DEST_PATH = "destinationPath"; // Or "destinationIdentifier"
+  const QString KEY_SCHEDULED_TIMES = "scheduledTimes";
+  const QString KEY_TASK_ENABLED = "taskEnabled";
+  const QString KEY_IS_SFTP_MODE = "isSftpMode";
+  const QString KEY_SFTP_HOST = "sftpHost";
+  const QString KEY_SFTP_PORT = "sftpPort";
+  const QString KEY_SFTP_USERNAME = "sftpUsername";
+  const QString KEY_SFTP_REMOTE_PATH = "sftpRemotePath";
+  const QString KEY_IS_GCS_MODE = "isGcsMode";
+  const QString KEY_GCS_BUCKET_NAME = "gcsBucketName";
+  const QString KEY_GCS_OBJECT_PREFIX = "gcsObjectPrefix";
 };
 
 #endif // SCHEDULER_H
