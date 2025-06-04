@@ -6,6 +6,7 @@
 #include <QString> // For source/destination paths
 #include <QTimer>
 #include <QSettings> // For persistence
+#include <QList>
 
 // Forward declaration if BackupTask struct becomes complex, for now just basic info
 // struct BackupTask {
@@ -25,14 +26,14 @@ public:
 
     // Configures the daily backup task
     // Configures the daily backup task
-    void setDailyBackupTask(const QString& sourcePath, 
+    void setDailyBackupTask(const QString& sourcePath,
                             const QString& destinationPathOrIdentifier, // For local, it's path. For SFTP, it might be a descriptive string or empty.
-                            const QTime& scheduledTime, 
-                            bool enabled, 
-                            bool isSftpMode, 
-                            const QString& sftpHost = QString(), 
-                            int sftpPort = 22, 
-                            const QString& sftpUsername = QString(), 
+                            const QList<QTime>& scheduledTimes,
+                            bool enabled,
+                            bool isSftpMode,
+                            const QString& sftpHost = QString(),
+                            int sftpPort = 22,
+                            const QString& sftpUsername = QString(),
                             const QString& sftpRemotePath = QString(),
                             bool isGcsMode = false, // New GCS parameter
                             const QString& gcsBucketName = QString(), // New GCS parameter
@@ -43,7 +44,7 @@ public:
     
     QString sourcePath() const;
     QString destinationPath() const; // For local mode, or descriptive identifier for SFTP
-    QTime scheduledTime() const;
+    QList<QTime> scheduledTimes() const;
     bool isEnabled() const;
     bool isSftpMode() const; // Getter for SFTP mode
 
@@ -75,7 +76,7 @@ private:
 
     QString m_currentSourcePath;
     QString m_currentDestinationPath; // For local, this is the path. For SFTP, this might be a placeholder or unused if SFTP details are separate.
-    QTime m_currentScheduledTime;
+    QList<QTime> m_scheduledTimes;
     bool m_taskEnabled;
     
     // SFTP specific settings
@@ -97,7 +98,7 @@ private:
     const QString SETTINGS_GROUP = "Scheduler";
     const QString KEY_SOURCE_PATH = "sourcePath";
     const QString KEY_DEST_PATH = "destinationPath"; // Or "destinationIdentifier"
-    const QString KEY_SCHEDULED_TIME = "scheduledTime";
+    const QString KEY_SCHEDULED_TIMES = "scheduledTimes";
     const QString KEY_TASK_ENABLED = "taskEnabled";
     const QString KEY_IS_SFTP_MODE = "isSftpMode";
     const QString KEY_SFTP_HOST = "sftpHost";

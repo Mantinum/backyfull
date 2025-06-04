@@ -5,13 +5,12 @@
 
 Scheduler::Scheduler(const QString& settingsFilePath, QObject *parent)
     : QObject(parent),
-      m_taskEnabled(false), // Renamed variables
-      m_isSftpMode(false),  // Initialize new SFTP flag
-      m_sftpPort(22),       // Default SFTP port
-      m_isGcsMode(false),   // Initialize GCS flag
-      // m_gcsBucketName and m_gcsObjectPrefix are QStrings, default constructor makes them empty
-      m_dailyTimer(new QTimer(this)), // Renamed
-      m_settings(nullptr)      // Renamed
+      m_taskEnabled(false),
+      m_isSftpMode(false),
+      m_sftpPort(22),
+      m_isGcsMode(false),
+      m_dailyTimer(new QTimer(this)),
+      m_settings(nullptr)
 {
     if (settingsFilePath.isEmpty()) {
         if (QCoreApplication::organizationName().isEmpty()) {
@@ -35,10 +34,10 @@ Scheduler::~Scheduler() {
     // m_dailyTimer and m_settings are children, Qt handles cleanup.
 }
 
-void Scheduler::setDailyBackupTask(const QString& sourcePath, 
-                                   const QString& destinationPathOrIdentifier, 
-                                   const QTime& scheduledTime, 
-                                   bool enabled, 
+void Scheduler::setDailyBackupTask(const QString& sourcePath,
+                                   const QString& destinationPathOrIdentifier,
+                                   const QList<QTime>& scheduledTimes,
+                                   bool enabled,
                                    bool isSftpMode,
                                    const QString& sftpHost,
                                    int sftpPort,
@@ -49,7 +48,7 @@ void Scheduler::setDailyBackupTask(const QString& sourcePath,
                                    const QString& gcsObjectPrefix) {
     m_currentSourcePath = sourcePath;
     m_currentDestinationPath = destinationPathOrIdentifier; // Store identifier or local path
-    m_currentScheduledTime = scheduledTime;
+    m_scheduledTimes = scheduledTimes;
     m_taskEnabled = enabled;
     m_isSftpMode = isSftpMode;
     m_isGcsMode = isGcsMode;
@@ -98,7 +97,12 @@ void Scheduler::loadTask() {
     m_settings->beginGroup(SETTINGS_GROUP);
     m_currentSourcePath = m_settings->value(KEY_SOURCE_PATH, "").toString();
     m_currentDestinationPath = m_settings->value(KEY_DEST_PATH, "").toString();
-    m_currentScheduledTime = m_settings->value(KEY_SCHEDULED_TIME, QTime(23, 0)).toTime();
+    QStringList timeStrings = m_settings->value(KEY_SCHEDULED_TIMES, QStringList({"23:00"})).toStringList();
+    m_scheduledTimes.clear();
+    for (const QString& ts : timeStrings) {
+        QTime t = QTime::fromString(ts, "HH:mm");
+        if (t.isValid()) m_scheduledTimes.append(t);
+    }
     m_taskEnabled = m_settings->value(KEY_TASK_ENABLED, false).toBool();
     m_isSftpMode = m_settings->value(KEY_IS_SFTP_MODE, false).toBool();
     m_isGcsMode = m_settings->value(KEY_IS_GCS_MODE, false).toBool();
@@ -119,7 +123,7 @@ void Scheduler::loadTask() {
     qDebug() << "Scheduler: Loaded task -"
              << "Source:" << m_currentSourcePath
              << "Dest/ID:" << m_currentDestinationPath
-             << "Time:" << m_currentScheduledTime.toString("HH:mm")
+             << "Times:" << m_scheduledTimes
              << "Enabled:" << m_taskEnabled
              << "SFTP Mode:" << m_isSftpMode
              << "GCS Mode:" << m_isGcsMode;
@@ -138,7 +142,11 @@ void Scheduler::saveTask() {
     m_settings->beginGroup(SETTINGS_GROUP);
     m_settings->setValue(KEY_SOURCE_PATH, m_currentSourcePath);
     m_settings->setValue(KEY_DEST_PATH, m_currentDestinationPath);
-    m_settings->setValue(KEY_SCHEDULED_TIME, m_currentScheduledTime);
+    QStringList timeStrings;
+    for (const QTime& t : m_scheduledTimes) {
+        timeStrings << t.toString("HH:mm");
+    }
+    m_settings->setValue(KEY_SCHEDULED_TIMES, timeStrings);
     m_settings->setValue(KEY_TASK_ENABLED, m_taskEnabled);
     m_settings->setValue(KEY_IS_SFTP_MODE, m_isSftpMode);
     m_settings->setValue(KEY_IS_GCS_MODE, m_isGcsMode);
@@ -186,7 +194,7 @@ void Scheduler::saveTask() {
     qDebug() << "Scheduler: Saved task -"
              << "Source:" << m_currentSourcePath
              << "Dest/ID:" << m_currentDestinationPath
-             << "Time:" << m_currentScheduledTime.toString("HH:mm")
+             << "Times:" << m_scheduledTimes
              << "Enabled:" << m_taskEnabled
              << "SFTP Mode:" << m_isSftpMode
              << "GCS Mode:" << m_isGcsMode;
@@ -204,33 +212,38 @@ void Scheduler::scheduleNextCheck() {
     bool gcsConfigOk = !m_isGcsMode || !m_gcsBucketName.isEmpty(); // Object prefix can be empty
     bool localConfigOk = (!m_isSftpMode && !m_isGcsMode) ? !m_currentDestinationPath.isEmpty() : true; // Only check if local mode
 
-    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
+    if (!m_taskEnabled || m_scheduledTimes.isEmpty() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
         qDebug() << "Scheduler: Task disabled or not fully configured for the current mode, not scheduling.";
         if (!m_taskEnabled) qDebug() << "Reason: Task not enabled.";
-        if (!m_currentScheduledTime.isValid()) qDebug() << "Reason: Scheduled time invalid.";
+        if (m_scheduledTimes.isEmpty()) qDebug() << "Reason: No scheduled times.";
         if (m_currentSourcePath.isEmpty()) qDebug() << "Reason: Source path empty.";
         if (m_isSftpMode && !sftpConfigOk) qDebug() << "Reason: SFTP mode active but not fully configured.";
         if (m_isGcsMode && !gcsConfigOk) qDebug() << "Reason: GCS mode active but bucket name empty.";
         if (!m_isSftpMode && !m_isGcsMode && !localConfigOk) qDebug() << "Reason: Local mode active but destination path empty.";
         return;
     }
-
     QDateTime currentDateTime = QDateTime::currentDateTime();
-    QDateTime scheduledDateTime(currentDateTime.date(), m_currentScheduledTime); // Renamed variable
-
-    if (scheduledDateTime < currentDateTime) {
-        scheduledDateTime = scheduledDateTime.addDays(1);
+    QDateTime nextDateTime;
+    bool found = false;
+    for (const QTime& t : m_scheduledTimes) {
+        if (!t.isValid()) continue;
+        QDateTime candidate(currentDateTime.date(), t);
+        if (candidate < currentDateTime)
+            candidate = candidate.addDays(1);
+        if (!found || candidate < nextDateTime) {
+            nextDateTime = candidate;
+            found = true;
+        }
     }
+    if (!found) return;
 
-    qint64 msecsUntilScheduled = currentDateTime.msecsTo(scheduledDateTime);
-    if (msecsUntilScheduled < 0) { 
-        msecsUntilScheduled = 0; 
-    }
-    
-    m_dailyTimer->setSingleShot(true); // Renamed variable
-    m_dailyTimer->start(msecsUntilScheduled); // Renamed variable
+    qint64 msecsUntilScheduled = currentDateTime.msecsTo(nextDateTime);
+    if (msecsUntilScheduled < 0) msecsUntilScheduled = 0;
 
-    qDebug() << "Scheduler: Next check scheduled for:" << scheduledDateTime.toString("yyyy-MM-dd HH:mm:ss")
+    m_dailyTimer->setSingleShot(true);
+    m_dailyTimer->start(msecsUntilScheduled);
+
+    qDebug() << "Scheduler: Next check scheduled for:" << nextDateTime.toString("yyyy-MM-dd HH:mm:ss")
              << "in" << msecsUntilScheduled / 1000.0 << "seconds.";
 }
 
@@ -239,15 +252,15 @@ void Scheduler::checkScheduledTime() {
     bool gcsConfigOk = !m_isGcsMode || !m_gcsBucketName.isEmpty(); // Object prefix can be empty
     bool localConfigOk = (!m_isSftpMode && !m_isGcsMode) ? !m_currentDestinationPath.isEmpty() : true;
 
-    if (!m_taskEnabled || !m_currentScheduledTime.isValid() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
+    if (!m_taskEnabled || m_scheduledTimes.isEmpty() || m_currentSourcePath.isEmpty() || !sftpConfigOk || !gcsConfigOk || !localConfigOk) {
         qDebug() << "Scheduler: Check time called, but task is not active or fully configured for the current mode.";
-        scheduleNextCheck(); 
+        scheduleNextCheck();
         return;
     }
 
     QTime currentTime = QTime::currentTime();
     qDebug() << "Scheduler: Timer fired! Current time:" << currentTime.toString("HH:mm:ss")
-             << "Scheduled:" << m_currentScheduledTime.toString("HH:mm"); // Renamed variable
+             << "Times:" << m_scheduledTimes;
 
     emit backupTaskTriggered(m_currentSourcePath, m_currentDestinationPath); // Renamed variables
     
@@ -263,8 +276,8 @@ QString Scheduler::destinationPath() const {
     return m_currentDestinationPath; // Renamed variable (this is dest path for local, or identifier for SFTP)
 }
 
-QTime Scheduler::scheduledTime() const {
-    return m_currentScheduledTime; // Renamed variable
+QList<QTime> Scheduler::scheduledTimes() const {
+    return m_scheduledTimes;
 }
 
 bool Scheduler::isEnabled() const {

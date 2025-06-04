@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QTimeEdit>
+#include <QListWidget>
 #include <QFileDialog>
 #include <QComboBox>
 #include <QGroupBox>
@@ -60,6 +61,8 @@ private slots:
     void onFileViewerDownloadClicked();
     void onFileViewerDeleteClicked();
     void onFileTableItemDoubleClicked(QTableWidgetItem *item);
+    void onAddBackupTimeClicked();
+    void onRemoveBackupTimeClicked();
 
 private:
     void setupUI();
@@ -72,6 +75,9 @@ private:
     QLineEdit *destinationDirEdit_;
     QPushButton *destinationDirButton_;
     QTimeEdit *backupTimeEdit_;
+    QPushButton *addTimeButton_;
+    QListWidget *timeListWidget_;
+    QPushButton *removeTimeButton_;
     QPushButton *applyScheduleButton_;
     QPushButton *runBackupButton_;
     QTextEdit *logDisplay_;

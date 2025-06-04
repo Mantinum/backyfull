@@ -39,6 +39,9 @@ MainWindow::MainWindow(QWidget *parent)
       destinationDirEdit_(nullptr),
       destinationDirButton_(nullptr),
       backupTimeEdit_(nullptr),
+      addTimeButton_(nullptr),
+      timeListWidget_(nullptr),
+      removeTimeButton_(nullptr),
       applyScheduleButton_(nullptr),
       runBackupButton_(nullptr),
       logDisplay_(nullptr),
@@ -200,16 +203,27 @@ void MainWindow::setupUI() {
 
     QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
     QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-    scheduleLayout->addWidget(new QLabel(tr("Daily Backup Time:")), 0, 0);
+    scheduleLayout->addWidget(new QLabel(tr("Backup Time:")), 0, 0);
     backupTimeEdit_ = new QTimeEdit();
     backupTimeEdit_->setDisplayFormat("HH:mm");
-    scheduleLayout->addWidget(backupTimeEdit_, 0, 1, 1, 2);
+    scheduleLayout->addWidget(backupTimeEdit_, 0, 1);
+    addTimeButton_ = new QPushButton(tr("Add"));
+    scheduleLayout->addWidget(addTimeButton_, 0, 2);
+    connect(addTimeButton_, &QPushButton::clicked, this, &MainWindow::onAddBackupTimeClicked);
+
+    scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 1, 0, 1, 3);
+    timeListWidget_ = new QListWidget();
+    scheduleLayout->addWidget(timeListWidget_, 2, 0, 1, 3);
+    removeTimeButton_ = new QPushButton(tr("Remove Selected"));
+    scheduleLayout->addWidget(removeTimeButton_, 3, 0, 1, 3);
+    connect(removeTimeButton_, &QPushButton::clicked, this, &MainWindow::onRemoveBackupTimeClicked);
+
     applyScheduleButton_ = new QPushButton(tr("Apply Schedule"));
     connect(applyScheduleButton_, &QPushButton::clicked, this, &MainWindow::applySchedule);
-    scheduleLayout->addWidget(applyScheduleButton_, 1, 0, 1, 3);
+    scheduleLayout->addWidget(applyScheduleButton_, 4, 0, 1, 3);
     runBackupButton_ = new QPushButton(tr("Run Backup Now"));
     connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
-    scheduleLayout->addWidget(runBackupButton_, 2, 0, 1, 3);
+    scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
     mainLayout->addWidget(scheduleGroupBox);
 
     mainLayout->addWidget(new QLabel(tr("Logs:")));
@@ -284,18 +298,35 @@ void MainWindow::selectDestinationDirectory() {
     }
 }
 
+void MainWindow::onAddBackupTimeClicked() {
+    QTime t = backupTimeEdit_->time();
+    if (!t.isValid()) return;
+    QString text = t.toString("HH:mm");
+    if (timeListWidget_->findItems(text, Qt::MatchExactly).isEmpty()) {
+        timeListWidget_->addItem(text);
+    }
+}
+
+void MainWindow::onRemoveBackupTimeClicked() {
+    qDeleteAll(timeListWidget_->selectedItems());
+}
+
 void MainWindow::applySchedule() {
     QString sourcePath = sourceDirEdit_->text();
-    QTime backupTime = backupTimeEdit_->time();
+    QList<QTime> times;
+    for (int i = 0; i < timeListWidget_->count(); ++i) {
+        QTime t = QTime::fromString(timeListWidget_->item(i)->text(), "HH:mm");
+        if (t.isValid()) times.append(t);
+    }
 
     if (sourcePath.isEmpty()) {
         QMessageBox::warning(this, tr("Configuration Error"), tr("Source path cannot be empty."));
         updateLog("Error: Failed to apply schedule. Source path empty.");
         return;
     }
-     if (!backupTime.isValid()) {
-        QMessageBox::warning(this, tr("Configuration Error"), tr("The selected backup time is invalid."));
-        updateLog("Error: Failed to apply schedule. Invalid time.");
+    if (times.isEmpty()) {
+        QMessageBox::warning(this, tr("Configuration Error"), tr("At least one backup time must be added."));
+        updateLog("Error: Failed to apply schedule. No times added.");
         return;
     }
 
@@ -312,12 +343,13 @@ void MainWindow::applySchedule() {
             updateLog("Error: Failed to apply schedule for Local Backup. Destination path empty.");
             return;
         }
-        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, times, true,
                                        false, QString(),      // sftpHost is QString
                                        0, QString(), QString(), false, // isGcsMode is bool
                                        QString(), QString());
-        updateLog(QString("Schedule applied for Local Backup: %1 to %2 at %3")
-                      .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
+        updateLog(QString("Schedule applied for Local Backup: %1 to %2 with %3 times")
+                      .arg(sourcePath, effectiveDestPathOrIdentifier)
+                      .arg(times.size()));
 
     } else if (sftpMode) {
         if (sftpHostLineEdit_->text().isEmpty() || sftpUsernameLineEdit_->text().isEmpty() || sftpRemotePathLineEdit_->text().isEmpty()) {
@@ -337,14 +369,15 @@ void MainWindow::applySchedule() {
                 m_credentialManager->deleteSecret(serviceName, qUsername);
             }
         }
-        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, times, true,
                                        true, sftpHostLineEdit_->text(), // sftpHost
-                                       sftpPortLineEdit_->text().toInt(), 
-                                       sftpUsernameLineEdit_->text(), 
+                                       sftpPortLineEdit_->text().toInt(),
+                                       sftpUsernameLineEdit_->text(),
                                        sftpRemotePathLineEdit_->text(),
                                        false, QString(), QString()); // isGcsMode, gcsBucketName, gcsObjectPrefix
-        updateLog(QString("Schedule applied for SFTP Backup: %1 to %2 at %3")
-                      .arg(sourcePath, effectiveDestPathOrIdentifier, backupTime.toString("HH:mm")));
+        updateLog(QString("Schedule applied for SFTP Backup: %1 to %2 with %3 times")
+                      .arg(sourcePath, effectiveDestPathOrIdentifier)
+                      .arg(times.size()));
 
     } else if (gcsMode) {
         QString bucketName = gcsBucketNameLineEdit_->text();
@@ -355,12 +388,13 @@ void MainWindow::applySchedule() {
             return;
         }
         effectiveDestPathOrIdentifier = QString("gcs://%1").arg(bucketName);
-        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, backupTime, true,
+        scheduler_->setDailyBackupTask(sourcePath, effectiveDestPathOrIdentifier, times, true,
                                        false, QString(),      // sftpHost is QString
                                        0, QString(), QString(), true, // isGcsMode is bool
                                        bucketName, accountId);
-        updateLog(QString("Schedule applied for GCS Backup: %1 to bucket '%2' (Account: %3) at %4")
-                      .arg(sourcePath, bucketName, accountId, backupTime.toString("HH:mm")));
+        updateLog(QString("Schedule applied for GCS Backup: %1 to bucket '%2' (Account: %3) with %4 times")
+                      .arg(sourcePath, bucketName, accountId)
+                      .arg(times.size()));
     } else {
         QMessageBox::critical(this, tr("Internal Error"), tr("Unknown backup mode selected."));
         updateLog("Error: Apply schedule failed. Unknown backup mode.");
@@ -937,10 +971,15 @@ void MainWindow::onTaskChanged() {
         destinationDirEdit_->setText(scheduler_->destinationPath());
     }
     
-    if (scheduler_->scheduledTime().isValid()) {
-        backupTimeEdit_->setTime(scheduler_->scheduledTime());
+    timeListWidget_->clear();
+    QList<QTime> stimes = scheduler_->scheduledTimes();
+    if (!stimes.isEmpty()) {
+        for (const QTime& t : stimes) {
+            timeListWidget_->addItem(t.toString("HH:mm"));
+        }
+        backupTimeEdit_->setTime(stimes.first());
     } else {
-        backupTimeEdit_->setTime(QTime(23, 0)); 
+        backupTimeEdit_->setTime(QTime(23, 0));
     }
     onBackupModeChanged(backupModeComboBox_->currentIndex());
     updateLog("Task details updated in UI from Scheduler state.");
