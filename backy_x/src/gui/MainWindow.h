@@ -14,6 +14,7 @@
 #include <QGroupBox>
 #include <QCheckBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
+#include <QDockWidget>
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
 class QTableWidget;
@@ -109,6 +110,8 @@ private:
     QPushButton *deleteButton_ = nullptr;
     QLabel *currentPathLabel_ = nullptr;
     QString currentRemotePath_ = "/";
+
+    QDockWidget *fileViewerDockWidget_ = nullptr;
 
     // Core components
     Scheduler *scheduler_;

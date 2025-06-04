@@ -22,6 +22,8 @@
 #include <QSettings>
 #include <QCoreApplication>
 #include <QCloseEvent>
+#include <QMenuBar>
+#include <QMenu>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -67,6 +69,7 @@ MainWindow::MainWindow(QWidget *parent)
       deleteButton_(nullptr),
       currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
+      fileViewerDockWidget_(nullptr),
       // Core components
       scheduler_(nullptr),
       localTarget_(nullptr),
@@ -94,6 +97,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     if (backupModeComboBox_) {
         onBackupModeChanged(backupModeComboBox_->currentIndex());
+    }
+
+    if (fileViewerDockWidget_) {
+        fileViewerDockWidget_->show();
     }
     onTaskChanged();
 
@@ -218,9 +225,9 @@ void MainWindow::setupUI() {
     mainLayout->addWidget(logDisplay_);
     mainLayout->setStretchFactor(logDisplay_, 1);
 
-    // File Viewer GroupBox
-    fileViewerGroupBox_ = new QGroupBox(tr("Remote File Viewer"), centralWidget); // Parented to centralWidget
-    QVBoxLayout *fileViewerLayout = new QVBoxLayout(); // No parent here, will be set on the group box
+    // File Viewer Dock
+    fileViewerGroupBox_ = new QGroupBox(tr("Remote File Viewer"));
+    QVBoxLayout *fileViewerLayout = new QVBoxLayout();
 
     currentPathLabel_ = new QLabel(tr("Path: /"), fileViewerGroupBox_); // Parented
     fileTableWidget_ = new QTableWidget(fileViewerGroupBox_); // Parented
@@ -248,8 +255,17 @@ void MainWindow::setupUI() {
     fileViewerLayout->addWidget(fileTableWidget_);
     fileViewerLayout->addLayout(buttonLayout);
     fileViewerGroupBox_->setLayout(fileViewerLayout);
-    mainLayout->addWidget(fileViewerGroupBox_);
-    fileViewerGroupBox_->setVisible(false); // Initially hidden
+
+    fileViewerDockWidget_ = new QDockWidget(tr("Remote File Viewer"), this);
+    fileViewerDockWidget_->setWidget(fileViewerGroupBox_);
+    fileViewerDockWidget_->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    fileViewerDockWidget_->setFeatures(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+    addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
+    fileViewerDockWidget_->setVisible(false);
+
+    // Add a View menu with toggle action for the dock
+    QMenu *viewMenu = menuBar()->addMenu(tr("View"));
+    viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
 
     // Connect file viewer signals
     connect(refreshButton_, &QPushButton::clicked, this, &MainWindow::onFileViewerRefreshClicked);
@@ -993,8 +1009,8 @@ void MainWindow::onBackupModeChanged(int index) {
 
     // Show/hide file viewer group box (only for remote modes)
     bool remoteModeSelected = (sftpSelected || gcsSelected);
-    if (fileViewerGroupBox_) {
-        fileViewerGroupBox_->setVisible(remoteModeSelected);
+    if (fileViewerDockWidget_) {
+        fileViewerDockWidget_->setVisible(remoteModeSelected);
     }
 
     // IMPORTANT: Automatic connection and browsing logic has been removed.
