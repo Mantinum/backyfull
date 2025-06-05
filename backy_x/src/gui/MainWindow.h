@@ -105,7 +105,7 @@ private:
   QPushButton *destinationDirButton_;
   QTimeEdit *backupTimeEdit_;
   QList<QAbstractButton *> dayButtons_;
-  QPushButton *addTimeButton_;
+  QToolButton *addTimeButton_;
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
