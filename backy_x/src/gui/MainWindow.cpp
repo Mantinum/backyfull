@@ -146,9 +146,9 @@ void MainWindow::setupUI() {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
-  QFrame *headerFrame = new QFrame();
-  headerFrame->setStyleSheet("background:#F5F5F5; border:1px solid #dcdcdc;");
-  QHBoxLayout *modeLayout = new QHBoxLayout(headerFrame);
+  QGroupBox *modeGroupBox = new QGroupBox(tr("Backup Mode Selector"));
+  QHBoxLayout *modeLayout = new QHBoxLayout(modeGroupBox);
+  modeGroupBox->setStyleSheet("QGroupBox{background:#F5F5F5;}");
   QLabel *modeIcon = new QLabel();
   modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
   modeLayout->addWidget(modeIcon);
@@ -163,7 +163,7 @@ void MainWindow::setupUI() {
       "QComboBox QAbstractItemView { color: black; background: white; }");
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
-  mainLayout->addWidget(headerFrame);
+  mainLayout->addWidget(modeGroupBox);
 
   createSourceConfigUI(mainLayout, buttonStyle);
 
@@ -321,6 +321,7 @@ void MainWindow::onAddBackupTimeClicked() {
   for (QAbstractButton *btn : dayButtons_)
     btn->setChecked(false);
   updateScheduleFromUI();
+  updateActionButtons();
 }
 
 void MainWindow::onRemoveBackupTimeClicked() {
@@ -342,6 +343,7 @@ void MainWindow::onRemoveBackupTimeClicked() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   updateScheduleFromUI();
+  updateActionButtons();
 }
 
 void MainWindow::onAddWatchEntry() {
@@ -418,6 +420,7 @@ void MainWindow::onAddWatchEntry() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
+  updateActionButtons();
   adjustHeightToScreen();
 }
 
@@ -568,6 +571,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
+  updateActionButtons();
 }
 
 void MainWindow::disableWatch() {
@@ -577,6 +581,7 @@ void MainWindow::disableWatch() {
   pendingWatchPaths_.clear();
   watchStatusLabel_->setText(tr("Monitoring off"));
   updateScheduleSummary();
+  updateActionButtons();
 }
 
 void MainWindow::enableWatch() {
@@ -587,6 +592,7 @@ void MainWindow::enableWatch() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
+  updateActionButtons();
 }
 
 
@@ -2212,7 +2218,6 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   QHBoxLayout *srcPathLayout = new QHBoxLayout();
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
-  sourceDirEdit_->setPlaceholderText(tr("Select the folder to back up"));
   srcPathLayout->addWidget(sourceDirEdit_);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
@@ -2222,20 +2227,28 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
 
+  QLabel *srcHint = new QLabel(tr("Select the folder to back up"));
+  srcHint->setStyleSheet("color: gray; font-style: italic;");
+  sourceLayout->addRow(srcHint);
+  mainLayout->addWidget(sourceGroupBox);
+
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
   watchLayout->setContentsMargins(4, 4, 4, 4);
   watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
   watchLayout->addWidget(watchToggleCheckBox_);
-  watchStatusLabel_ = new QLabel(tr("Monitoring off"));
+  watchStatusLabel_ = new QLabel(tr("0 dossier(s) surveill\xC3\xA9(s)"));
   watchStatusLabel_->setStyleSheet("color:#2680eb;");
   watchLayout->addWidget(watchStatusLabel_);
+  watchAddButton_ = new QPushButton(tr("Add Monitored Folder"));
+  watchAddButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+  watchLayout->addWidget(watchAddButton_);
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
           &MainWindow::onWatchToggleChanged);
+  connect(watchAddButton_, &QPushButton::clicked, this, &MainWindow::onAddWatchEntry);
   watchGroupBox_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  sourceLayout->addRow(watchGroupBox_);
-  mainLayout->addWidget(sourceGroupBox);
+  mainLayout->addWidget(watchGroupBox_);
 
   m_localDestinationGroupBox =
       new QGroupBox(tr("Local Destination Configuration"));
@@ -2317,6 +2330,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   mainLayout->addWidget(gcsSettingsGroupBox_);
 
   applyUnifiedStyle(sourceGroupBox);
+  applyUnifiedStyle(watchGroupBox_);
   applyUnifiedStyle(m_localDestinationGroupBox);
   applyUnifiedStyle(sftpSettingsGroupBox_);
   applyUnifiedStyle(gcsSettingsGroupBox_);
@@ -2324,7 +2338,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
 void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                             const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
+  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Monitoring Summary"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
   scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
   backupTimeEdit_ = new QTimeEdit();
@@ -2369,6 +2383,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   timesLayout->setContentsMargins(0, 0, 0, 0);
   timesLayout->addWidget(timeListWidget_);
   scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
+  connect(timeListWidget_, &QListWidget::itemSelectionChanged, this, &MainWindow::updateActionButtons);
 
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
   removeTimeButton_->setStyleSheet(buttonStyle);
@@ -2378,15 +2393,19 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
           &MainWindow::onRemoveBackupTimeClicked);
   connect(runBackupButton_, &QPushButton::clicked, this,
           &MainWindow::runBackupNow);
-  QHBoxLayout *buttonsLayout = new QHBoxLayout();
-  buttonsLayout->addWidget(removeTimeButton_);
-  buttonsLayout->addStretch();
-  buttonsLayout->addWidget(runBackupButton_);
-  scheduleLayout->addLayout(buttonsLayout, 4, 0, 1, 3);
 
   mainLayout->addWidget(scheduleGroupBox);
   applyUnifiedStyle(scheduleGroupBox);
   updateScheduleSummary();
+
+  actionsGroupBox_ = new QGroupBox(tr("Actions"));
+  QHBoxLayout *buttonsLayout = new QHBoxLayout(actionsGroupBox_);
+  buttonsLayout->addWidget(removeTimeButton_);
+  buttonsLayout->addStretch();
+  buttonsLayout->addWidget(runBackupButton_);
+  mainLayout->addWidget(actionsGroupBox_);
+  applyUnifiedStyle(actionsGroupBox_);
+  updateActionButtons();
 }
 
 void MainWindow::updateScheduleSummary() {
@@ -2413,4 +2432,15 @@ void MainWindow::updateScheduleSummary() {
           .arg(count)
           .arg(count == 1 ? "" : "s")
           .arg(nextText));
+}
+
+void MainWindow::updateActionButtons() {
+  bool hasSelection = timeListWidget_ && !timeListWidget_->selectedItems().isEmpty();
+  if (removeTimeButton_)
+    removeTimeButton_->setEnabled(hasSelection);
+  if (runBackupButton_) {
+    QString base = QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
+    QString style = hasSelection ? "background:#2680eb;color:white;" : "background:gray;color:white;";
+    runBackupButton_->setStyleSheet(base + style);
+  }
 }
