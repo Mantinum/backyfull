@@ -29,10 +29,12 @@ bool LocalTarget::beginSession() {
 }
 
 bool LocalTarget::sendFile(const std::string& localPath, const FileMetadata& metadata) {
-    // Treat 'localPath' (first param) as the absoluteSourcePath for this function's logic
+    // Treat 'localPath' (first param) as the absolute source path
     const std::filesystem::path absoluteSourceFsPath(localPath);
-    // Use 'metadata.name' as the targetRelativePath
-    const std::filesystem::path targetRelativeFsPath(metadata.name);
+    // If metadata.name is empty, fall back to the source filename
+    const std::filesystem::path targetRelativeFsPath =
+        metadata.name.empty() ? absoluteSourceFsPath.filename()
+                               : std::filesystem::path(metadata.name);
 
     // Construct the full destination path including any subdirectories from targetRelativeFsPath
     const std::filesystem::path destinationFile = std::filesystem::path(currentBasePath_) / targetRelativeFsPath;

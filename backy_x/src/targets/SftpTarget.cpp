@@ -15,6 +15,7 @@
 #include <QDateTime> // For SFTP date parsing
 #include <QLocale>   // For SFTP date parsing
 #include <QStringList> // For new parseSftpDate
+#include <QHostInfo>   // For host name resolution check
 #include "util/CredentialManager.h" // For createPlatformCredentialManager and CredentialManager class
 
 // For libcurl (SFTP operations)
@@ -329,6 +330,14 @@ bool SftpTarget::beginSession() {
     lastError_.clear(); // Clear any errors from previous operations/sessions.
     if (!m_properlyConfigured) {
         lastError_ = "SFTP Target not properly configured.";
+        std::cerr << "SftpTarget::beginSession: " << lastError_ << std::endl;
+        return false;
+    }
+
+    // Basic host resolution check so invalid hosts fail early
+    QHostInfo info = QHostInfo::fromName(QString::fromStdString(m_host));
+    if (info.error() != QHostInfo::NoError || info.addresses().isEmpty()) {
+        lastError_ = "Failed to resolve host: " + m_host;
         std::cerr << "SftpTarget::beginSession: " << lastError_ << std::endl;
         return false;
     }
