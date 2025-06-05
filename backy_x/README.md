@@ -16,6 +16,7 @@ BackyFull is a multi-platform backup software (macOS, Windows, Linux) designed f
 *   **Multiple Backup Targets:**
     *   **Local Storage Target:** Support for backing up to a local directory.
     *   **SFTP Target:** Support for backing up to a remote server via SFTP, with secure credential storage.
+    *   **Google Cloud Storage Target:** Backup to a GCS bucket using OAuth 2.0 credentials stored in `oauth_credentials.json`.
 
 ## Build Instructions
 
@@ -65,6 +66,9 @@ When "SFTP Backup" mode is selected, the following fields need to be configured:
     *   If checked, the entered SFTP password will be stored securely in the system's credential manager (e.g., macOS Keychain, Windows Credential Manager, libsecret on Linux).
     *   If unchecked, the password will be used for the current session only and for any immediate scheduled task setup, but will not be stored persistently by BackyFull's credential manager. If a previously stored password exists for the host/user combination, unchecking this box will cause it to be deleted from the system's credential manager when settings are saved.
     *   For subsequent sessions or scheduled backups (if saved), `SftpTarget` will attempt to retrieve the password from the credential manager if the password field is left empty.
+
+### GCS Backup Setup
+When "Google Cloud Storage Backup" mode is selected, BackyFull reads OAuth 2.0 credentials from a file named `oauth_credentials.json` located in the same directory as the application. This JSON file must provide at least `client_id` and `client_secret` fields as issued by Google. If the file is missing or malformed, GCS functionality will be disabled and an error will be logged.
 
 ### Scheduling Backups
 *   **Daily Backup Time:** Set the time for the automated daily backup.
