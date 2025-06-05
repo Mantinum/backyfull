@@ -21,6 +21,7 @@
 #include <QToolButton>
 #include <QLabel>
 #include <QIntValidator>
+#include <QSizePolicy>
 #include <QScreen>
 #include <QMessageBox>
 #include <QSettings>
@@ -156,6 +157,8 @@ void MainWindow::setupUI() {
   backupModeComboBox_->addItem(tr("Local Backup"));
   backupModeComboBox_->addItem(tr("SFTP Backup"));
   backupModeComboBox_->addItem(tr("Google Cloud Storage"));
+  backupModeComboBox_->setStyleSheet(
+      "QComboBox, QAbstractItemView { color: black; }");
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
   mainLayout->addWidget(headerFrame);
@@ -2172,14 +2175,15 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   }
   const auto buttons = widget->findChildren<QAbstractButton *>();
   for (QAbstractButton *b : buttons) {
-    b->setMinimumHeight(28);
+    b->setMinimumHeight(24);
   }
   const auto groups = widget->findChildren<QGroupBox *>();
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
         "QGroupBox{font-weight:bold;margin-top:10px;border:1px solid #ddd;"
-        "padding-top:10px;}QGroupBox::title{subcontrol-origin:margin;left:8px;"
-        "top:-7px;background:#fafafa;padding:0 3px;}");
+        "border-radius:4px;padding-top:15px;background:#fafafa;}"
+        "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-10px;"
+        "background:#fafafa;padding:0 3px;}");
   }
 }
 
@@ -2212,6 +2216,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
           &MainWindow::onWatchToggleChanged);
+  watchGroupBox_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   sourceLayout->addRow(watchGroupBox_);
   mainLayout->addWidget(sourceGroupBox);
 
@@ -2304,7 +2309,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                             const QString &buttonStyle) {
   QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-  scheduleLayout->addWidget(new QLabel(tr("Backup Time:")), 0, 0);
+  scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
   backupTimeEdit_ = new QTimeEdit();
   backupTimeEdit_->setDisplayFormat("HH:mm");
 
