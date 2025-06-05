@@ -44,7 +44,7 @@ MainWindow::MainWindow(QWidget *parent)
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
-      applyScheduleButton_(nullptr), runBackupButton_(nullptr),
+      runBackupButton_(nullptr),
       logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
@@ -62,7 +62,7 @@ MainWindow::MainWindow(QWidget *parent)
       downloadButton_(nullptr), deleteButton_(nullptr), currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
       watchGroupBox_(nullptr),
-      watchEnableCheckBox_(nullptr), watchStatusLabel_(nullptr),
+      addWatchButton_(nullptr), watchStatusLabel_(nullptr),
       dirWatcher_(nullptr), watchTriggerTimer_(nullptr),
       // Core components
       scheduler_(nullptr), localTarget_(nullptr), sftpTarget_(nullptr),
@@ -162,13 +162,12 @@ void MainWindow::setupUI() {
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
-  watchEnableCheckBox_ =
-      new QCheckBox(tr("Activer la surveillance automatique de ce dossier"));
-  watchLayout->addWidget(watchEnableCheckBox_, 0, 0, 1, 3);
-  watchStatusLabel_ = new QLabel(tr("Surveillance inactive"));
+  addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"));
+  watchLayout->addWidget(addWatchButton_, 0, 0, 1, 3);
+  watchStatusLabel_ = new QLabel(tr("Aucune surveillance"));
   watchLayout->addWidget(watchStatusLabel_, 1, 0, 1, 3);
-  connect(watchEnableCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onAutoWatchToggled);
+  connect(addWatchButton_, &QPushButton::clicked, this,
+          &MainWindow::onAddWatchEntry);
   sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
   mainLayout->addWidget(sourceGroupBox);
 
@@ -271,14 +270,10 @@ void MainWindow::setupUI() {
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
 
-  applyScheduleButton_ = new QPushButton(tr("Apply Schedule"));
-  connect(applyScheduleButton_, &QPushButton::clicked, this,
-          &MainWindow::applySchedule);
-  scheduleLayout->addWidget(applyScheduleButton_, 5, 0, 1, 3);
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
   connect(runBackupButton_, &QPushButton::clicked, this,
           &MainWindow::runBackupNow);
-  scheduleLayout->addWidget(runBackupButton_, 6, 0, 1, 3);
+  scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
   mainLayout->addWidget(scheduleGroupBox);
 
   mainLayout->addWidget(new QLabel(tr("Logs:")));
@@ -357,9 +352,6 @@ void MainWindow::selectSourceDirectory() {
   if (!directory.isEmpty()) {
     sourceDirEdit_->setText(QDir::toNativeSeparators(directory));
     updateLog(QString("Source directory selected: %1").arg(directory));
-    if (watchEnableCheckBox_->isChecked()) {
-      onAutoWatchToggled(true);
-    }
   }
 }
 
@@ -415,6 +407,7 @@ void MainWindow::onAddBackupTimeClicked() {
   timeListWidget_->addItem(item);
   for (QCheckBox *cb : dayCheckBoxes_)
     cb->setChecked(false);
+  updateScheduleFromUI();
 }
 
 void MainWindow::onRemoveBackupTimeClicked() {
@@ -422,76 +415,141 @@ void MainWindow::onRemoveBackupTimeClicked() {
   for (QListWidgetItem *item : items) {
     QString data = item->data(Qt::UserRole).toString();
     if (data.startsWith("WATCH|")) {
-      watchEnableCheckBox_->setChecked(false);
-    }
-    delete item;
-  }
-}
-
-void MainWindow::onAutoWatchToggled(bool checked) {
-  dirWatcher_->removePaths(dirWatcher_->directories());
-  if (checked) {
-    QString dir = sourceDirEdit_->text();
-    if (!dir.isEmpty()) {
-      dirWatcher_->addPath(dir);
-      watchStatusLabel_->setText(
-          QString::fromUtf8("\xF0\x9F\x93\x82 ") +
-          tr("Dossier surveill\u00e9 : %1")
-              .arg(shortenPathForDisplay(dir)));
-      QString data = QStringLiteral("WATCH|") + dir;
-      QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
-                        tr("Surveillance active | %1 \u2192 %2")
-                            .arg(shortenPathForDisplay(dir),
-                                 currentDestinationForDisplay());
-      bool found = false;
-      for (int i = 0; i < timeListWidget_->count(); ++i) {
-        QListWidgetItem *it = timeListWidget_->item(i);
-        QString d = it->data(Qt::UserRole).toString();
-        if (d.startsWith("WATCH|")) {
-          it->setText(display);
-          it->setData(Qt::UserRole, data);
-          found = true;
+      QString path = data.mid(QStringLiteral("WATCH|").length());
+      for (int i = 0; i < watchEntries_.size(); ++i) {
+        if (watchEntries_[i].source == path) {
+          dirWatcher_->removePath(path);
+          watchEntries_.removeAt(i);
           break;
         }
       }
-      if (!found) {
-        QListWidgetItem *item = new QListWidgetItem(display);
-        QFont f = item->font();
-        f.setItalic(true);
-        item->setFont(f);
-        item->setData(Qt::UserRole, data);
-        timeListWidget_->addItem(item);
-      }
-    } else {
-      watchStatusLabel_->setText(tr("No directory set"));
     }
-  } else {
-    watchStatusLabel_->setText(tr("Surveillance inactive"));
-    for (int i = 0; i < timeListWidget_->count(); ++i) {
-      QListWidgetItem *it = timeListWidget_->item(i);
-      QString d = it->data(Qt::UserRole).toString();
-      if (d.startsWith("WATCH|")) {
-        delete timeListWidget_->takeItem(i);
-        break;
-      }
+    delete item;
+  }
+  watchStatusLabel_->setText(
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+  updateScheduleFromUI();
+}
+
+void MainWindow::onAddWatchEntry() {
+  QString dir = sourceDirEdit_->text();
+  if (dir.isEmpty()) {
+    QMessageBox::warning(this, tr("Configuration Error"),
+                         tr("Source path cannot be empty."));
+    return;
+  }
+  QString modeText = backupModeComboBox_->currentText();
+  bool localMode = (modeText == tr("Local Backup"));
+  bool sftpMode = (modeText == tr("SFTP Backup"));
+  bool gcsMode = (modeText == tr("Google Cloud Storage"));
+
+  WatchEntry entry;
+  entry.source = dir;
+  if (localMode) {
+    entry.destination = destinationDirEdit_->text();
+    if (entry.destination.isEmpty()) {
+      QMessageBox::warning(this, tr("Configuration Error"),
+                           tr("Destination path cannot be empty for local "
+                              "backup."));
+      return;
+    }
+  } else if (sftpMode) {
+    if (sftpHostLineEdit_->text().isEmpty() ||
+        sftpUsernameLineEdit_->text().isEmpty() ||
+        sftpRemotePathLineEdit_->text().isEmpty()) {
+      QMessageBox::warning(this, tr("Configuration Error"),
+                           tr("SFTP Host, Username, and Remote Path cannot be "
+                              "empty."));
+      return;
+    }
+    entry.isSftpMode = true;
+    entry.sftpHost = sftpHostLineEdit_->text();
+    entry.sftpPort = sftpPortLineEdit_->text().toInt();
+    entry.sftpUsername = sftpUsernameLineEdit_->text();
+    entry.sftpRemotePath = sftpRemotePathLineEdit_->text();
+  } else if (gcsMode) {
+    if (gcsBucketNameLineEdit_->text().isEmpty() ||
+        gcsAccountIdentifierLineEdit_->text().isEmpty()) {
+      QMessageBox::warning(this, tr("Configuration Error"),
+                           tr("GCS Bucket Name and Account Identifier cannot "
+                              "be empty."));
+      return;
+    }
+    entry.isGcsMode = true;
+    entry.gcsBucketName = gcsBucketNameLineEdit_->text();
+    entry.gcsAccountId = gcsAccountIdentifierLineEdit_->text();
+  }
+
+  for (const WatchEntry &e : watchEntries_) {
+    if (e.source == dir) {
+      QMessageBox::information(this, tr("Already Watching"),
+                               tr("This directory is already being watched."));
+      return;
     }
   }
+
+  watchEntries_.append(entry);
+  dirWatcher_->addPath(dir);
+
+  QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
+                    tr("Surveillance : %1 \u2192 %2")
+                        .arg(shortenPathForDisplay(dir),
+                             currentDestinationForDisplay());
+  QListWidgetItem *item = new QListWidgetItem(display);
+  QFont f = item->font();
+  f.setItalic(true);
+  item->setFont(f);
+  item->setData(Qt::UserRole, QStringLiteral("WATCH|") + dir);
+  timeListWidget_->addItem(item);
+
+  watchStatusLabel_->setText(
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   adjustHeightToScreen();
 }
 
 void MainWindow::onDirectoryChanged(const QString &path) {
-  Q_UNUSED(path);
+  pendingWatchPaths_.insert(path);
   watchStatusLabel_->setText(tr("Dernier changement: %1")
                                  .arg(QDateTime::currentDateTime().toString()));
-  watchTriggerTimer_->start(3000);
+  if (!watchTriggerTimer_->isActive())
+    watchTriggerTimer_->start(3000);
 }
 
 void MainWindow::onWatchTimerTimeout() {
-  updateLog(tr("Modification détectée, lancement de la sauvegarde."));
-  runBackupNow();
+  for (const QString &p : pendingWatchPaths_) {
+    for (const WatchEntry &e : watchEntries_) {
+      if (e.source == p) {
+        updateLog(tr("Modification détectée dans %1, lancement de la sauvegarde.")
+                      .arg(e.source));
+        if (e.isGcsMode) {
+          std::map<std::string, std::string> cfg;
+          cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
+          cfg["gcs_account_identifier"] = e.gcsAccountId.toStdString();
+          cfg["gcs_object_prefix"] = "";
+          GcsTarget *t = new GcsTarget(cfg, m_credentialManager.get());
+          performBackupInternal(e.source, t);
+          delete t;
+        } else if (e.isSftpMode) {
+          std::map<std::string, std::string> cfg;
+          cfg["host"] = e.sftpHost.toStdString();
+          cfg["port"] = QString::number(e.sftpPort).toStdString();
+          cfg["username"] = e.sftpUsername.toStdString();
+          cfg["remoteBasePath"] = e.sftpRemotePath.toStdString();
+          SftpTarget *t = new SftpTarget(cfg);
+          performBackupInternal(e.source, t);
+          delete t;
+        } else {
+          LocalTarget *t = new LocalTarget(e.destination.toStdString());
+          performBackupInternal(e.source, t);
+          delete t;
+        }
+      }
+    }
+  }
+  pendingWatchPaths_.clear();
 }
 
-void MainWindow::applySchedule() {
+void MainWindow::updateScheduleFromUI() {
   QString sourcePath = sourceDirEdit_->text();
   QList<ScheduleEntry> entries;
   for (int i = 0; i < timeListWidget_->count(); ++i) {
@@ -516,115 +574,77 @@ void MainWindow::applySchedule() {
     entries.append(se);
   }
 
-  if (sourcePath.isEmpty()) {
-    QMessageBox::warning(this, tr("Configuration Error"),
-                         tr("Source path cannot be empty."));
-    updateLog("Error: Failed to apply schedule. Source path empty.");
-    return;
-  }
-  if (entries.isEmpty()) {
-    QMessageBox::warning(this, tr("Configuration Error"),
-                         tr("At least one backup time must be added."));
-    updateLog("Error: Failed to apply schedule. No times added.");
+  if (sourcePath.isEmpty() || entries.isEmpty()) {
+    scheduler_->setDailyBackupTask("", "", {}, false, false, QString(), 0,
+                                  QString(), QString(), false, QString(),
+                                  QString());
     return;
   }
 
-  QString effectiveDestPathOrIdentifier;
-  QString currentModeText = backupModeComboBox_->currentText();
-  bool localMode = (currentModeText == tr("Local Backup"));
-  bool sftpMode = (currentModeText == tr("SFTP Backup"));
-  bool gcsMode = (currentModeText == tr("Google Cloud Storage"));
+  QString destIdentifier;
+  QString modeText = backupModeComboBox_->currentText();
+  bool localMode = (modeText == tr("Local Backup"));
+  bool sftpMode = (modeText == tr("SFTP Backup"));
+  bool gcsMode = (modeText == tr("Google Cloud Storage"));
 
   if (localMode) {
-    effectiveDestPathOrIdentifier = destinationDirEdit_->text();
-    if (effectiveDestPathOrIdentifier.isEmpty()) {
-      QMessageBox::warning(
-          this, tr("Configuration Error"),
-          tr("Destination path cannot be empty for local backup."));
-      updateLog("Error: Failed to apply schedule for Local Backup. Destination "
-                "path empty.");
+    destIdentifier = destinationDirEdit_->text();
+    if (destIdentifier.isEmpty())
       return;
-    }
-    scheduler_->setDailyBackupTask(
-        sourcePath, effectiveDestPathOrIdentifier, entries, true, false,
-        QString(),                      // sftpHost is QString
-        0, QString(), QString(), false, // isGcsMode is bool
-        QString(), QString());
-    updateLog(
-        QString("Schedule applied for Local Backup: %1 to %2 with %3 times")
-            .arg(sourcePath, effectiveDestPathOrIdentifier)
-            .arg(entries.size()));
-
+    scheduler_->setDailyBackupTask(sourcePath, destIdentifier, entries, true,
+                                   false, QString(), 0, QString(), QString(),
+                                   false, QString(), QString());
   } else if (sftpMode) {
     if (sftpHostLineEdit_->text().isEmpty() ||
         sftpUsernameLineEdit_->text().isEmpty() ||
-        sftpRemotePathLineEdit_->text().isEmpty()) {
-      QMessageBox::warning(this, tr("Configuration Error"),
-                           tr("SFTP Host, Username, and Remote Path cannot be "
-                              "empty for SFTP mode."));
-      updateLog(
-          "Error: Failed to apply schedule for SFTP. Required fields missing.");
+        sftpRemotePathLineEdit_->text().isEmpty())
       return;
-    }
-    effectiveDestPathOrIdentifier =
+    scheduler_->setDailyBackupTask(
+        sourcePath,
         QString("sftp://%1%2")
-            .arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());
-
-    if (m_credentialManager) {
-      QString serviceName = QString("sftp_%1_%2")
-                                .arg(sftpHostLineEdit_->text())
-                                .arg(sftpPortLineEdit_->text().toInt());
-      QString qUsername = sftpUsernameLineEdit_->text();
-      QString qPassword = sftpPasswordLineEdit_->text();
-      if (sftpSavePasswordCheckBox_->isChecked()) {
-        if (!qPassword.isEmpty())
-          m_credentialManager->storeSecret(serviceName, qUsername, qPassword);
-      } else {
-        m_credentialManager->deleteSecret(serviceName, qUsername);
-      }
-    }
-    scheduler_->setDailyBackupTask(
-        sourcePath, effectiveDestPathOrIdentifier, entries, true, true,
-        sftpHostLineEdit_->text(), // sftpHost
+            .arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text()),
+        entries, true, true, sftpHostLineEdit_->text(),
         sftpPortLineEdit_->text().toInt(), sftpUsernameLineEdit_->text(),
-        sftpRemotePathLineEdit_->text(), false, QString(),
-        QString()); // isGcsMode, gcsBucketName, gcsObjectPrefix
-    updateLog(
-        QString("Schedule applied for SFTP Backup: %1 to %2 with %3 times")
-            .arg(sourcePath, effectiveDestPathOrIdentifier)
-            .arg(entries.size()));
-
+        sftpRemotePathLineEdit_->text(), false, QString(), QString());
   } else if (gcsMode) {
-    QString bucketName = gcsBucketNameLineEdit_->text();
-    QString accountId = gcsAccountIdentifierLineEdit_->text();
-    if (bucketName.isEmpty() || accountId.isEmpty()) {
-      QMessageBox::warning(this, tr("Configuration Error"),
-                           tr("GCS Bucket Name and Account Identifier cannot "
-                              "be empty for GCS mode."));
-      updateLog("Error: Failed to apply schedule for GCS. Bucket Name or "
-                "Account ID missing.");
+    if (gcsBucketNameLineEdit_->text().isEmpty() ||
+        gcsAccountIdentifierLineEdit_->text().isEmpty())
       return;
-    }
-    effectiveDestPathOrIdentifier = QString("gcs://%1").arg(bucketName);
     scheduler_->setDailyBackupTask(
-        sourcePath, effectiveDestPathOrIdentifier, entries, true, false,
-        QString(),                     // sftpHost is QString
-        0, QString(), QString(), true, // isGcsMode is bool
-        bucketName, accountId);
-    updateLog(QString("Schedule applied for GCS Backup: %1 to bucket '%2' "
-                      "(Account: %3) with %4 times")
-                  .arg(sourcePath, bucketName, accountId)
-                  .arg(entries.size()));
-  } else {
-    QMessageBox::critical(this, tr("Internal Error"),
-                          tr("Unknown backup mode selected."));
-    updateLog("Error: Apply schedule failed. Unknown backup mode.");
-    return;
+        sourcePath, QString("gcs://%1").arg(gcsBucketNameLineEdit_->text()),
+        entries, true, false, QString(), 0, QString(), QString(), true,
+        gcsBucketNameLineEdit_->text(),
+        gcsAccountIdentifierLineEdit_->text());
   }
-
-  QMessageBox::information(this, tr("Schedule Updated"),
-                           tr("Backup schedule has been updated and saved."));
 }
+
+void MainWindow::refreshWatchEntriesDisplay() {
+  if (!timeListWidget_)
+    return;
+  for (const WatchEntry &e : watchEntries_) {
+    QString destDisp;
+    if (e.isSftpMode) {
+      destDisp = QString("%1:%2").arg(e.sftpHost, e.sftpRemotePath);
+    } else if (e.isGcsMode) {
+      destDisp = QString("gcs://%1").arg(e.gcsBucketName);
+    } else {
+      destDisp = e.destination;
+    }
+    destDisp = shortenPathForDisplay(destDisp);
+    QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
+                      tr("Surveillance : %1 \u2192 %2")
+                          .arg(shortenPathForDisplay(e.source), destDisp);
+    QListWidgetItem *item = new QListWidgetItem(display);
+    QFont f = item->font();
+    f.setItalic(true);
+    item->setFont(f);
+    item->setData(Qt::UserRole, QStringLiteral("WATCH|") + e.source);
+    timeListWidget_->addItem(item);
+  }
+  watchStatusLabel_->setText(
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+}
+
 
 void MainWindow::runBackupNow() {
   QString sourcePath = sourceDirEdit_->text();
@@ -1373,9 +1393,7 @@ void MainWindow::onTaskChanged() {
   } else {
     backupTimeEdit_->setTime(QTime(23, 0));
   }
-  if (watchEnableCheckBox_->isChecked()) {
-    onAutoWatchToggled(true);
-  }
+  refreshWatchEntriesDisplay();
   onBackupModeChanged(backupModeComboBox_->currentIndex());
   updateLog("Task details updated in UI from Scheduler state.");
 }
@@ -1464,15 +1482,29 @@ void MainWindow::loadSettings() {
       settings.value("backupModeIndex", 0).toInt());
   settings.endGroup();
 
-  settings.beginGroup("AutoWatch");
-  watchEnableCheckBox_->setChecked(settings.value("enabled", false).toBool());
-  settings.endGroup();
-
-  if (watchEnableCheckBox_->isChecked()) {
-    onAutoWatchToggled(true);
-  } else {
-    watchStatusLabel_->setText(tr("Surveillance inactive"));
+  settings.beginGroup("WatchEntries");
+  int watchCount = settings.beginReadArray("entries");
+  for (int i = 0; i < watchCount; ++i) {
+    settings.setArrayIndex(i);
+    WatchEntry e;
+    e.source = settings.value("source").toString();
+    e.destination = settings.value("destination").toString();
+    e.isSftpMode = settings.value("isSftp", false).toBool();
+    e.isGcsMode = settings.value("isGcs", false).toBool();
+    e.sftpHost = settings.value("sftpHost").toString();
+    e.sftpPort = settings.value("sftpPort", 22).toInt();
+    e.sftpUsername = settings.value("sftpUser").toString();
+    e.sftpRemotePath = settings.value("sftpPath").toString();
+    e.gcsBucketName = settings.value("gcsBucket").toString();
+    e.gcsAccountId = settings.value("gcsAccount").toString();
+    if (!e.source.isEmpty()) {
+      watchEntries_.append(e);
+      dirWatcher_->addPath(e.source);
+    }
   }
+  settings.endArray();
+  settings.endGroup();
+  refreshWatchEntriesDisplay();
 
   settings.beginGroup("SFTP");
   sftpHostLineEdit_->setText(settings.value("host", "").toString());
@@ -1526,8 +1558,23 @@ void MainWindow::saveSettings() {
   // gcs_last_authenticated_account is saved only on successful connect
   settings.endGroup();
 
-  settings.beginGroup("AutoWatch");
-  settings.setValue("enabled", watchEnableCheckBox_->isChecked());
+  settings.beginGroup("WatchEntries");
+  settings.beginWriteArray("entries");
+  for (int i = 0; i < watchEntries_.size(); ++i) {
+    settings.setArrayIndex(i);
+    const WatchEntry &e = watchEntries_[i];
+    settings.setValue("source", e.source);
+    settings.setValue("destination", e.destination);
+    settings.setValue("isSftp", e.isSftpMode);
+    settings.setValue("isGcs", e.isGcsMode);
+    settings.setValue("sftpHost", e.sftpHost);
+    settings.setValue("sftpPort", e.sftpPort);
+    settings.setValue("sftpUser", e.sftpUsername);
+    settings.setValue("sftpPath", e.sftpRemotePath);
+    settings.setValue("gcsBucket", e.gcsBucketName);
+    settings.setValue("gcsAccount", e.gcsAccountId);
+  }
+  settings.endArray();
   settings.endGroup();
 
   if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {
