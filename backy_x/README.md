@@ -68,7 +68,7 @@ When "SFTP Backup" mode is selected, the following fields need to be configured:
     *   For subsequent sessions or scheduled backups (if saved), `SftpTarget` will attempt to retrieve the password from the credential manager if the password field is left empty.
 
 ### GCS Backup Setup
-When "Google Cloud Storage Backup" mode is selected, BackyFull reads OAuth 2.0 credentials from a file named `oauth_credentials.json` located in the same directory as the application. This JSON file must provide at least `client_id` and `client_secret` fields as issued by Google. If the file is missing or malformed, GCS functionality will be disabled and an error will be logged.
+When "Google Cloud Storage Backup" mode is selected, BackyFull reads OAuth 2.0 credentials from a file named `oauth_credentials.json` located in the same directory as the application. The file should contain an `installed` object with fields `client_id`, `client_secret`, and a `redirect_uris` array (the first URI is used). If the file is missing or malformed, GCS functionality will be disabled and an error will be logged.
 
 ### Scheduling Backups
 *   **Daily Backup Time:** Set the time for the automated daily backup.

@@ -90,13 +90,22 @@ GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, Credentia
         credFile.close();
         QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
         if (jsonDoc.isObject()) {
-            QJsonObject obj = jsonDoc.object();
-            if (obj.contains("client_id"))
-                m_clientId = obj["client_id"].toString().toStdString();
-            if (obj.contains("client_secret"))
-                m_clientSecret = obj["client_secret"].toString().toStdString();
-            if (obj.contains("redirect_uri"))
-                m_redirectUri = obj["redirect_uri"].toString().toStdString();
+            QJsonObject rootObj = jsonDoc.object();
+            if (rootObj.contains("installed") && rootObj["installed"].isObject()) {
+                QJsonObject installed = rootObj["installed"].toObject();
+                if (installed.contains("client_id"))
+                    m_clientId = installed["client_id"].toString().toStdString();
+                if (installed.contains("client_secret"))
+                    m_clientSecret = installed["client_secret"].toString().toStdString();
+                if (installed.contains("redirect_uris") && installed["redirect_uris"].isArray()) {
+                    QJsonArray uris = installed["redirect_uris"].toArray();
+                    if (!uris.isEmpty() && uris[0].isString())
+                        m_redirectUri = uris[0].toString().toStdString();
+                }
+            } else {
+                m_lastError = "oauth_credentials.json missing 'installed' object.";
+                std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
+            }
         } else {
             m_lastError = "oauth_credentials.json is malformed.";
             std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
