@@ -17,6 +17,7 @@
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QJsonArray>
+#include <QFile>
 #include <QDesktopServices>
 #include <QCoreApplication>
 #include <QTimer>
@@ -80,13 +81,42 @@ GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, Credentia
     if (!m_credentialManager) {
         m_credentialManager = createPlatformCredentialManager();
     }
-    // IMPORTANT: These must be replaced by actual values from Google Cloud Console
-    m_clientId = "YOUR_CLIENT_ID_GOES_HERE.apps.googleusercontent.com";
-    m_clientSecret = "YOUR_CLIENT_SECRET_GOES_HERE";
     m_redirectUri = "http://127.0.0.1:8085";
 
-    if (m_clientId.rfind("YOUR_CLIENT_ID", 0) == 0 || m_clientSecret.rfind("YOUR_CLIENT_SECRET", 0) == 0) {
-        m_lastError = "OAuth Client ID or Secret are placeholders. Configure them in GcsTarget.cpp.";
+    // --- Read OAuth credentials from local file -------------------------
+    QFile credFile("./oauth_credentials.json");
+    if (credFile.exists() && credFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QByteArray data = credFile.readAll();
+        credFile.close();
+        QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
+        if (jsonDoc.isObject()) {
+            QJsonObject rootObj = jsonDoc.object();
+            if (rootObj.contains("installed") && rootObj["installed"].isObject()) {
+                QJsonObject installed = rootObj["installed"].toObject();
+                if (installed.contains("client_id"))
+                    m_clientId = installed["client_id"].toString().toStdString();
+                if (installed.contains("client_secret"))
+                    m_clientSecret = installed["client_secret"].toString().toStdString();
+                if (installed.contains("redirect_uris") && installed["redirect_uris"].isArray()) {
+                    QJsonArray uris = installed["redirect_uris"].toArray();
+                    if (!uris.isEmpty() && uris[0].isString())
+                        m_redirectUri = uris[0].toString().toStdString();
+                }
+            } else {
+                m_lastError = "oauth_credentials.json missing 'installed' object.";
+                std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
+            }
+        } else {
+            m_lastError = "oauth_credentials.json is malformed.";
+            std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
+        }
+    } else {
+        m_lastError = "oauth_credentials.json not found or unreadable.";
+        std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
+    }
+
+    if (m_clientId.empty() || m_clientSecret.empty()) {
+        m_lastError = "OAuth client_id or client_secret missing in oauth_credentials.json.";
         std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
     }
 
@@ -325,8 +355,10 @@ bool GcsTarget::testConnection(std::string& errorMsg) {
 
 bool GcsTarget::initiateOAuthAndStoreToken() {
     m_lastError.clear();
-    if (m_clientId.rfind("YOUR_CLIENT_ID", 0) == 0 || m_clientSecret.rfind("YOUR_CLIENT_SECRET", 0) == 0) {
-        m_lastError = "OAuth Client ID or Secret are placeholders."; std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl; return false;
+    if (m_clientId.empty() || m_clientSecret.empty()) {
+        m_lastError = "OAuth client_id or client_secret not available.";
+        std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
+        return false;
     }
     if (m_accountIdentifier.empty()) { m_lastError = "Account Identifier not set."; std::cerr << "GcsTarget: " << m_lastError << std::endl; return false; }
 
@@ -340,8 +372,9 @@ bool GcsTarget::initiateOAuthAndStoreToken() {
 std::string GcsTarget::getLastError() const { return m_lastError; }
 
 std::string GcsTarget::getAccessToken() {
-    if (m_clientId.rfind("YOUR_CLIENT_ID", 0) == 0 || m_clientSecret.rfind("YOUR_CLIENT_SECRET", 0) == 0) {
-        m_lastError = "OAuth Client ID or Secret are placeholders."; return "";
+    if (m_clientId.empty() || m_clientSecret.empty()) {
+        m_lastError = "OAuth client_id or client_secret not available.";
+        return "";
     }
     auto now = std::chrono::steady_clock::now();
     if (!m_currentAccessToken.empty() && std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count() < m_accessTokenExpiryTime) {
