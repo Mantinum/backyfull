@@ -137,10 +137,12 @@ void MainWindow::setupUI() {
   scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-  mainLayout->setSpacing(12);
+  mainLayout->setSpacing(15);
 
-  const QString buttonStyle =
-      QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
+  const QString buttonStyle = QStringLiteral(
+      "QPushButton{padding:4px 12px;border-radius:4px;background:#3A3A3A;"
+      "color:white;}"
+      "QPushButton:disabled{background:#555;color:#bbb;}");
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
     setMaximumHeight(scr->availableGeometry().height());
@@ -2194,8 +2196,8 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   if (!widget)
     return;
   if (auto layout = widget->layout()) {
-    layout->setContentsMargins(8, 8, 8, 8);
-    layout->setSpacing(8);
+    layout->setContentsMargins(10, 10, 10, 10);
+    layout->setSpacing(10);
   }
   const auto buttons = widget->findChildren<QAbstractButton *>();
   for (QAbstractButton *b : buttons) {
@@ -2204,10 +2206,10 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   const auto groups = widget->findChildren<QGroupBox *>();
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
-        "QGroupBox{font-weight:bold;margin-top:10px;border:1px solid #ddd;"
-        "border-radius:4px;padding-top:20px;background:#fafafa;}"
+        "QGroupBox{font-weight:bold;margin-top:10px;border:1px solid #444;"
+        "border-radius:4px;padding-top:20px;background:#2d2d2d;color:#f0f0f0;}"
         "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-12px;"
-        "background:#fafafa;padding:0 3px;}");
+        "background:#2d2d2d;padding:0 3px;}");
   }
 }
 
@@ -2227,9 +2229,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
 
-  QLabel *srcHint = new QLabel(tr("Select the folder to back up"));
-  srcHint->setStyleSheet("color: gray; font-style: italic;");
-  sourceLayout->addRow(srcHint);
+  sourceDirEdit_->setPlaceholderText(tr("Select the folder to back up"));
   mainLayout->addWidget(sourceGroupBox);
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
@@ -2242,6 +2242,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   watchLayout->addWidget(watchStatusLabel_);
   watchAddButton_ = new QPushButton(tr("Add Monitored Folder"));
   watchAddButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+  watchAddButton_->setStyleSheet(buttonStyle);
   watchLayout->addWidget(watchAddButton_);
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
@@ -2378,9 +2379,11 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 2, 0, 1, 3);
   timeListWidget_ = new QListWidget();
   QFrame *timesFrame = new QFrame();
-  timesFrame->setStyleSheet("background:#f0f0f0;border:1px solid #ccc;");
+  timesFrame->setStyleSheet(
+      "background:#2E2E2E;border:1px solid #444;color:#F0F0F0;");
   QVBoxLayout *timesLayout = new QVBoxLayout(timesFrame);
   timesLayout->setContentsMargins(0, 0, 0, 0);
+  timeListWidget_->setStyleSheet("background-color:#2E2E2E;color:#F0F0F0;");
   timesLayout->addWidget(timeListWidget_);
   scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
   connect(timeListWidget_, &QListWidget::itemSelectionChanged, this, &MainWindow::updateActionButtons);
@@ -2439,8 +2442,9 @@ void MainWindow::updateActionButtons() {
   if (removeTimeButton_)
     removeTimeButton_->setEnabled(hasSelection);
   if (runBackupButton_) {
-    QString base = QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
-    QString style = hasSelection ? "background:#2680eb;color:white;" : "background:gray;color:white;";
+    QString base =
+        QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;color:white;}");
+    QString style = hasSelection ? "background:#2680eb;" : "background:#555;";
     runBackupButton_->setStyleSheet(base + style);
   }
 }
