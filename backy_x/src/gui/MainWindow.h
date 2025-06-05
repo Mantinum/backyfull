@@ -17,6 +17,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
@@ -180,6 +181,11 @@ private:
   QString currentDestinationForDisplay() const;
 
   void adjustHeightToScreen();
+  void createSourceConfigUI(QVBoxLayout *mainLayout,
+                            const QString &buttonStyle);
+  void createSchedulingControlsUI(QVBoxLayout *mainLayout,
+                                  const QString &buttonStyle);
+  void applyUnifiedStyle(QWidget *widget);
 };
 
 #endif // MAINWINDOW_H
