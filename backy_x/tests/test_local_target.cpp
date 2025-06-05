@@ -68,6 +68,7 @@ TEST_F(LocalTargetTest, CopySingleFileToRoot) {
 
     // Call sendFile with absolute source path and relative target path (just filename for root)
     FileMetadata dummy{};
+    dummy.name = fileName; // destination path relative to target root
     ASSERT_TRUE(target.sendFile(sourceFile.string(), dummy)) << "LocalTarget sendFile failed for " << sourceFile;
     ASSERT_TRUE(target.endSession()) << "LocalTarget endSession failed.";
 
@@ -99,7 +100,8 @@ TEST_F(LocalTargetTest, CopyFileToSubDirectory) {
     ASSERT_TRUE(target.beginSession()) << "LocalTarget beginSession failed.";
     
     // Call sendFile with absolute source path and relative target path including subdirectory
-    FileMetadata dummy_subdir{}; // Use a different name or ensure scope is limited if concerned
+    FileMetadata dummy_subdir{}; // specify target path including subdirectory
+    dummy_subdir.name = relativeTargetPath;
     ASSERT_TRUE(target.sendFile(sourceFile.string(), dummy_subdir)) << "LocalTarget sendFile failed for " << sourceFile << " to " << relativeTargetPath;
     ASSERT_TRUE(target.endSession()) << "LocalTarget endSession failed.";
 

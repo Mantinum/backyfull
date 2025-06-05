@@ -17,6 +17,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
@@ -96,6 +97,7 @@ private:
   void saveSettings();
   void updateScheduleFromUI();
   void refreshWatchEntriesDisplay();
+  void enableWatch();
   void disableWatch();
 
   // UI Elements
@@ -109,6 +111,7 @@ private:
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
+  QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
   QScrollArea *scrollArea_ = nullptr;
@@ -180,6 +183,12 @@ private:
   QString currentDestinationForDisplay() const;
 
   void adjustHeightToScreen();
+  void createSourceConfigUI(QVBoxLayout *mainLayout,
+                            const QString &buttonStyle);
+  void createSchedulingControlsUI(QVBoxLayout *mainLayout,
+                                  const QString &buttonStyle);
+  void applyUnifiedStyle(QWidget *widget);
+  void updateScheduleSummary();
 };
 
 #endif // MAINWINDOW_H
