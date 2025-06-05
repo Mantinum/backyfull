@@ -18,6 +18,7 @@
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
+#include <QSet>
 #include <QScrollArea>
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
@@ -36,6 +37,19 @@ class IStorageTarget;
 class LocalTarget;
 class SftpTarget;
 class GcsTarget; // Forward declare GcsTarget
+
+struct WatchEntry {
+  QString source;
+  QString destination;
+  bool isSftpMode = false;
+  bool isGcsMode = false;
+  QString sftpHost;
+  int sftpPort = 22;
+  QString sftpUsername;
+  QString sftpRemotePath;
+  QString gcsBucketName;
+  QString gcsAccountId;
+};
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -70,7 +84,7 @@ private slots:
   void onRemoveBackupTimeClicked();
 
   // Auto watch slots
-  void onAutoWatchToggled(bool checked);
+  void onAddWatchEntry();
   void onDirectoryChanged(const QString &path);
   void onWatchTimerTimeout();
 
@@ -132,11 +146,13 @@ private:
 
   // Auto Watch UI
   QGroupBox *watchGroupBox_ = nullptr;
-  QCheckBox *watchEnableCheckBox_ = nullptr;
+  QPushButton *addWatchButton_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
   QTimer *watchTriggerTimer_ = nullptr;
+  QList<WatchEntry> watchEntries_;
+  QSet<QString> pendingWatchPaths_;
 
   // Core components
   Scheduler *scheduler_;
