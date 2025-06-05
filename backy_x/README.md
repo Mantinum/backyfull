@@ -63,12 +63,11 @@ When "SFTP Backup" mode is selected, the following fields need to be configured:
 *   **SFTP Remote Path:** The absolute path on the remote server where the backup (within a subfolder named after your source directory) will be stored (e.g., `/home/user/backups/` or `/backups/`).
 *   **Save password securely:**
     *   If checked, the entered SFTP password will be stored securely in the system's credential manager (e.g., macOS Keychain, Windows Credential Manager, libsecret on Linux).
-    *   If unchecked, the password will be used for the current session only and for any immediate scheduled task setup, but will not be stored persistently by BackyFull's credential manager. If a previously stored password exists for the host/user combination, unchecking this box will cause it to be deleted from the system's credential manager upon saving settings or applying the schedule.
+    *   If unchecked, the password will be used for the current session only and for any immediate scheduled task setup, but will not be stored persistently by BackyFull's credential manager. If a previously stored password exists for the host/user combination, unchecking this box will cause it to be deleted from the system's credential manager when settings are saved.
     *   For subsequent sessions or scheduled backups (if saved), `SftpTarget` will attempt to retrieve the password from the credential manager if the password field is left empty.
 
 ### Scheduling Backups
 *   **Daily Backup Time:** Set the time for the automated daily backup.
-*   **Apply Schedule:** Click this button to save the current configuration (source, destination/SFTP settings, time) and activate the schedule. Scheduled SFTP backups will use securely stored credentials if saved.
 
 ### Running Backups
 *   **Run Backup Now:** Click this button to perform an immediate backup with the currently configured settings (source, and active destination/SFTP target).

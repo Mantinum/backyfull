@@ -64,7 +64,6 @@ protected:
 private slots:
   void selectSourceDirectory();
   void selectDestinationDirectory();
-  void applySchedule();
   void runBackupNow();
   void updateLog(const QString &message);
   void onTaskChanged();
@@ -92,6 +91,8 @@ private:
   void setupUI();
   void loadSettings();
   void saveSettings();
+  void updateScheduleFromUI();
+  void refreshWatchEntriesDisplay();
 
   // UI Elements
   QLineEdit *sourceDirEdit_;
@@ -103,7 +104,6 @@ private:
   QPushButton *addTimeButton_;
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
-  QPushButton *applyScheduleButton_;
   QPushButton *runBackupButton_;
   QTextEdit *logDisplay_;
 
