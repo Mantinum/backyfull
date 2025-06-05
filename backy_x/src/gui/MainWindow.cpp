@@ -6,7 +6,6 @@
 #include "util/CredentialManager.h"
 
 #include <QApplication>
-#include <QGuiApplication>
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -17,17 +16,19 @@
 #include <QFileSystemWatcher>
 #include <QFormLayout>
 #include <QGridLayout>
+#include <QGuiApplication>
 #include <QHBoxLayout>
-#include <QToolButton>
-#include <QLabel>
 #include <QIntValidator>
-#include <QSizePolicy>
-#include <QScreen>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
+#include <QScreen>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QStandardPaths>
 #include <QTime>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <filesystem>
@@ -62,11 +63,12 @@ MainWindow::MainWindow(QWidget *parent)
       // File Viewer UI Elements
       fileViewerGroupBox_(nullptr), fileViewerDockWidget_(nullptr),
       fileTableWidget_(nullptr), refreshButton_(nullptr),
-      downloadButton_(nullptr), deleteButton_(nullptr), currentPathLabel_(nullptr),
+      downloadButton_(nullptr), deleteButton_(nullptr),
+      currentPathLabel_(nullptr),
       currentRemotePath_("/"), // Initialize currentRemotePath_
-      watchGroupBox_(nullptr),
-      watchToggleCheckBox_(nullptr), watchStatusLabel_(nullptr),
-      dirWatcher_(nullptr), watchTriggerTimer_(nullptr),
+      watchGroupBox_(nullptr), watchToggleCheckBox_(nullptr),
+      watchStatusLabel_(nullptr), dirWatcher_(nullptr),
+      watchTriggerTimer_(nullptr),
       // Core components
       scheduler_(nullptr), localTarget_(nullptr), sftpTarget_(nullptr),
       gcsTarget_(nullptr), // Initialize GCS target member
@@ -137,7 +139,7 @@ void MainWindow::setupUI() {
   scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-  mainLayout->setSpacing(15);
+  mainLayout->setSpacing(20);
 
   const QString buttonStyle = QStringLiteral(
       "QPushButton{padding:4px 12px;border-radius:4px;background:#3A3A3A;"
@@ -152,7 +154,8 @@ void MainWindow::setupUI() {
   QHBoxLayout *modeLayout = new QHBoxLayout(modeGroupBox);
   modeGroupBox->setStyleSheet("QGroupBox{background:#F5F5F5;}");
   QLabel *modeIcon = new QLabel();
-  modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
+  modeIcon->setPixmap(
+      style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
   modeLayout->addWidget(modeIcon);
   QLabel *modeLabel = new QLabel(tr("<b>Backup Mode</b>"));
   modeLayout->addWidget(modeLabel);
@@ -175,7 +178,6 @@ void MainWindow::setupUI() {
 
   createSchedulingControlsUI(mainLayout, buttonStyle);
 
-
   QToolButton *logToggleButton = new QToolButton();
   logToggleButton->setText(tr("Logs"));
   logToggleButton->setCheckable(true);
@@ -183,14 +185,17 @@ void MainWindow::setupUI() {
   mainLayout->addWidget(logToggleButton);
   logDisplay_ = new QTextEdit();
   logDisplay_->setReadOnly(true);
-  logDisplay_->setStyleSheet("background:#1e1e1e;color:#e8e8e8;font-family:monospace;");
+  logDisplay_->setStyleSheet(
+      "background:#1e1e1e;color:#e8e8e8;font-family:monospace;");
   logDisplay_->setVisible(false);
   logDisplay_->setMaximumHeight(150);
   mainLayout->addWidget(logDisplay_);
-  connect(logToggleButton, &QToolButton::toggled, [this, logToggleButton](bool checked) {
-    logDisplay_->setVisible(checked);
-    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-  });
+  connect(logToggleButton, &QToolButton::toggled,
+          [this, logToggleButton](bool checked) {
+            logDisplay_->setVisible(checked);
+            logToggleButton->setArrowType(checked ? Qt::DownArrow
+                                                  : Qt::RightArrow);
+          });
   mainLayout->setStretchFactor(logDisplay_, 1);
 
   // File Viewer GroupBox within a DockWidget
@@ -349,12 +354,11 @@ void MainWindow::onRemoveBackupTimeClicked() {
 }
 
 void MainWindow::onAddWatchEntry() {
-  QString dir = sourceDirEdit_->text();
-  if (dir.isEmpty()) {
-    QMessageBox::warning(this, tr("Configuration Error"),
-                         tr("Source path cannot be empty."));
+  QString initial = sourceDirEdit_->text();
+  QString dir = QFileDialog::getExistingDirectory(
+      this, tr("Select Folder to Monitor"), initial);
+  if (dir.isEmpty())
     return;
-  }
   QString modeText = backupModeComboBox_->currentText();
   bool localMode = (modeText == tr("Local Backup"));
   bool sftpMode = (modeText == tr("SFTP Backup"));
@@ -408,10 +412,10 @@ void MainWindow::onAddWatchEntry() {
   watchEntries_.append(entry);
   dirWatcher_->addPath(dir);
 
-  QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
-                    tr(" Monitoring | %1 \u2192 %2")
-                        .arg(shortenPathForDisplay(dir),
-                             currentDestinationForDisplay());
+  QString display =
+      QString::fromUtf8("\xF0\x9F\x91\x81 ") +
+      tr(" Monitoring | %1 \u2192 %2")
+          .arg(shortenPathForDisplay(dir), currentDestinationForDisplay());
   QListWidgetItem *item = new QListWidgetItem(display);
   QFont f = item->font();
   f.setItalic(true);
@@ -427,12 +431,10 @@ void MainWindow::onAddWatchEntry() {
 }
 
 void MainWindow::onWatchToggleChanged(bool checked) {
-  if (checked) {
+  if (checked)
     enableWatch();
-    onAddWatchEntry();
-  } else {
+  else
     disableWatch();
-  }
 }
 
 void MainWindow::onDirectoryChanged(const QString &path) {
@@ -447,8 +449,9 @@ void MainWindow::onWatchTimerTimeout() {
   for (const QString &p : pendingWatchPaths_) {
     for (const WatchEntry &e : watchEntries_) {
       if (e.source == p) {
-        updateLog(tr("Modification détectée dans %1, lancement de la sauvegarde.")
-                      .arg(e.source));
+        updateLog(
+            tr("Modification détectée dans %1, lancement de la sauvegarde.")
+                .arg(e.source));
         if (e.isGcsMode) {
           std::map<std::string, std::string> cfg;
           cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
@@ -504,8 +507,8 @@ void MainWindow::updateScheduleFromUI() {
 
   if (sourcePath.isEmpty() || entries.isEmpty()) {
     scheduler_->setDailyBackupTask("", "", {}, false, false, QString(), 0,
-                                  QString(), QString(), false, QString(),
-                                  QString());
+                                   QString(), QString(), false, QString(),
+                                   QString());
     return;
   }
 
@@ -541,8 +544,7 @@ void MainWindow::updateScheduleFromUI() {
     scheduler_->setDailyBackupTask(
         sourcePath, QString("gcs://%1").arg(gcsBucketNameLineEdit_->text()),
         entries, true, false, QString(), 0, QString(), QString(), true,
-        gcsBucketNameLineEdit_->text(),
-        gcsAccountIdentifierLineEdit_->text());
+        gcsBucketNameLineEdit_->text(), gcsAccountIdentifierLineEdit_->text());
   }
   updateScheduleSummary();
 }
@@ -596,7 +598,6 @@ void MainWindow::enableWatch() {
   updateScheduleSummary();
   updateActionButtons();
 }
-
 
 void MainWindow::runBackupNow() {
   QString sourcePath = sourceDirEdit_->text();
@@ -724,8 +725,7 @@ void MainWindow::runBackupNow() {
 }
 
 void MainWindow::onGcsConnectButtonClicked() {
-  updateLog(
-      tr("GCS 'Log in to Google Drive' button clicked (OAuth process)."));
+  updateLog(tr("GCS 'Log in to Google Drive' button clicked (OAuth process)."));
   QString bucketName = gcsBucketNameLineEdit_->text();
   QString accountId = gcsAccountIdentifierLineEdit_->text();
 
@@ -1326,8 +1326,8 @@ void MainWindow::onTaskChanged() {
       QString srcDisp = shortenPathForDisplay(scheduler_->sourcePath());
       QString destDisp;
       if (scheduler_->isSftpMode()) {
-        destDisp = QString("%1:%2")
-                       .arg(scheduler_->sftpHost(), scheduler_->sftpRemotePath());
+        destDisp = QString("%1:%2").arg(scheduler_->sftpHost(),
+                                        scheduler_->sftpRemotePath());
       } else if (scheduler_->isGcsMode()) {
         destDisp = QString("gcs://%1").arg(scheduler_->gcsBucketName());
       } else {
@@ -2173,8 +2173,8 @@ QString MainWindow::shortenPathForDisplay(const QString &path) const {
 QString MainWindow::currentDestinationForDisplay() const {
   QString currentModeText = backupModeComboBox_->currentText();
   if (currentModeText == tr("SFTP Backup")) {
-    return QString("%1:%2")
-        .arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());
+    return QString("%1:%2").arg(sftpHostLineEdit_->text(),
+                                sftpRemotePathLineEdit_->text());
   } else if (currentModeText == tr("Google Cloud Storage")) {
     return QString("gcs://%1").arg(gcsBucketNameLineEdit_->text());
   }
@@ -2203,10 +2203,15 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   for (QAbstractButton *b : buttons) {
     b->setMinimumHeight(24);
   }
+  const auto edits = widget->findChildren<QLineEdit *>();
+  for (QLineEdit *e : edits) {
+    e->setStyleSheet("QLineEdit{background:#444;color:#f0f0f0;}"
+                     "QLineEdit::placeholder{color:#bbb;}");
+  }
   const auto groups = widget->findChildren<QGroupBox *>();
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
-        "QGroupBox{font-weight:bold;margin-top:10px;border:1px solid #444;"
+        "QGroupBox{font-weight:bold;margin-top:15px;border:1px solid #444;"
         "border-radius:4px;padding-top:20px;background:#2d2d2d;color:#f0f0f0;}"
         "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-12px;"
         "background:#2d2d2d;padding:0 3px;}");
@@ -2220,6 +2225,8 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   QHBoxLayout *srcPathLayout = new QHBoxLayout();
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
+  sourceDirEdit_->setMinimumWidth(400);
+  sourceDirEdit_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   srcPathLayout->addWidget(sourceDirEdit_);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
@@ -2247,7 +2254,8 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
           &MainWindow::onWatchToggleChanged);
-  connect(watchAddButton_, &QPushButton::clicked, this, &MainWindow::onAddWatchEntry);
+  connect(watchAddButton_, &QPushButton::clicked, this,
+          &MainWindow::onAddWatchEntry);
   watchGroupBox_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   mainLayout->addWidget(watchGroupBox_);
 
@@ -2257,6 +2265,9 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   QHBoxLayout *destPathLayout = new QHBoxLayout();
   destinationDirEdit_ = new QLineEdit();
   destinationDirEdit_->setReadOnly(true);
+  destinationDirEdit_->setMinimumWidth(400);
+  destinationDirEdit_->setSizePolicy(QSizePolicy::Expanding,
+                                     QSizePolicy::Preferred);
   destPathLayout->addWidget(destinationDirEdit_);
   destinationDirButton_ = new QPushButton(tr("Browse..."));
   destinationDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
@@ -2265,8 +2276,8 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
   localDestLayout->addRow(tr("Destination Directory (Local):"), destPathLayout);
-  QLabel *destHint = new QLabel(
-      tr("Select destination folder (local or remote)"));
+  QLabel *destHint =
+      new QLabel(tr("Select destination folder (local or remote)"));
   destHint->setStyleSheet("color: gray; font-style: italic;");
   localDestLayout->addRow(destHint);
   mainLayout->addWidget(m_localDestinationGroupBox);
@@ -2339,7 +2350,8 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
 void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                             const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Monitoring Summary"));
+  QGroupBox *scheduleGroupBox =
+      new QGroupBox(tr("Scheduling & Monitoring Summary"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
   scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
   backupTimeEdit_ = new QTimeEdit();
@@ -2356,7 +2368,8 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
     btn->setCheckable(true);
     btn->setFixedSize(26, 26);
     btn->setStyleSheet(
-        "QToolButton{border-radius:13px;border:1px solid gray;background:#f0f0f0;}"
+        "QToolButton{border-radius:13px;border:1px solid "
+        "gray;background:#f0f0f0;}"
         "QToolButton:checked{background:#dbeafe;border-color:#2680eb;}");
     dayButtons_.append(btn);
     scheduleRow->addWidget(btn);
@@ -2365,8 +2378,8 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   addTimeButton_ = new QToolButton();
   addTimeButton_->setText("+");
   addTimeButton_->setFixedSize(26, 26);
-  addTimeButton_->setStyleSheet(
-      "QToolButton{border-radius:13px;border:1px solid gray;background:#e0e0e0;}");
+  addTimeButton_->setStyleSheet("QToolButton{border-radius:13px;border:1px "
+                                "solid gray;background:#e0e0e0;}");
   scheduleRow->addWidget(addTimeButton_);
   scheduleLayout->addLayout(scheduleRow, 0, 0, 1, 3);
   connect(addTimeButton_, &QToolButton::clicked, this,
@@ -2386,7 +2399,8 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   timeListWidget_->setStyleSheet("background-color:#2E2E2E;color:#F0F0F0;");
   timesLayout->addWidget(timeListWidget_);
   scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
-  connect(timeListWidget_, &QListWidget::itemSelectionChanged, this, &MainWindow::updateActionButtons);
+  connect(timeListWidget_, &QListWidget::itemSelectionChanged, this,
+          &MainWindow::updateActionButtons);
 
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
   removeTimeButton_->setStyleSheet(buttonStyle);
@@ -2431,20 +2445,24 @@ void MainWindow::updateScheduleSummary() {
   }
   QString nextText = earliest.isValid() ? earliest.toString("HH:mm") : "--:--";
   scheduleSummaryLabel_->setText(
-      QString::fromUtf8("\xF0\x9F\x93\x85 %1 scheduled backup%2 | \xF0\x9F\x95\x92 Next: %3")
+      QString::fromUtf8(
+          "\xF0\x9F\x93\x85 %1 scheduled backup%2 | \xF0\x9F\x95\x92 Next: %3")
           .arg(count)
           .arg(count == 1 ? "" : "s")
           .arg(nextText));
 }
 
 void MainWindow::updateActionButtons() {
-  bool hasSelection = timeListWidget_ && !timeListWidget_->selectedItems().isEmpty();
+  bool hasEntries = timeListWidget_ && timeListWidget_->count() > 0;
+  bool hasSelection =
+      timeListWidget_ && !timeListWidget_->selectedItems().isEmpty();
   if (removeTimeButton_)
     removeTimeButton_->setEnabled(hasSelection);
   if (runBackupButton_) {
-    QString base =
-        QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;color:white;}");
-    QString style = hasSelection ? "background:#2680eb;" : "background:#555;";
+    runBackupButton_->setEnabled(hasEntries);
+    QString base = QStringLiteral(
+        "QPushButton{padding:4px 12px;border-radius:4px;color:white;}");
+    QString style = hasEntries ? "background:#2680eb;" : "background:#555;";
     runBackupButton_->setStyleSheet(base + style);
   }
 }
