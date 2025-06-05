@@ -2202,6 +2202,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   QHBoxLayout *srcPathLayout = new QHBoxLayout();
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
+  sourceDirEdit_->setPlaceholderText(tr("Select the folder to back up"));
   srcPathLayout->addWidget(sourceDirEdit_);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
@@ -2210,9 +2211,6 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
-  QLabel *sourceHint = new QLabel(tr("Select the folder to back up"));
-  sourceHint->setStyleSheet("color: gray; font-style: italic;");
-  sourceLayout->addRow(sourceHint);
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
