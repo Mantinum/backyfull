@@ -6,6 +6,8 @@
 
 // Qt class includes
 #include <QCheckBox>
+#include <QToolButton>
+#include <QAbstractButton>
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFileDialog>
@@ -84,6 +86,7 @@ private slots:
 
   // Auto watch slots
   void onAddWatchEntry();
+  void onWatchToggleChanged(bool checked);
   void onDirectoryChanged(const QString &path);
   void onWatchTimerTimeout();
 
@@ -93,6 +96,7 @@ private:
   void saveSettings();
   void updateScheduleFromUI();
   void refreshWatchEntriesDisplay();
+  void disableWatch();
 
   // UI Elements
   QLineEdit *sourceDirEdit_;
@@ -100,8 +104,8 @@ private:
   QLineEdit *destinationDirEdit_;
   QPushButton *destinationDirButton_;
   QTimeEdit *backupTimeEdit_;
-  QList<QCheckBox *> dayCheckBoxes_;
-  QPushButton *addTimeButton_;
+  QList<QAbstractButton *> dayButtons_;
+  QToolButton *addTimeButton_;
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
@@ -146,7 +150,7 @@ private:
 
   // Auto Watch UI
   QGroupBox *watchGroupBox_ = nullptr;
-  QPushButton *addWatchButton_ = nullptr;
+  QCheckBox *watchToggleCheckBox_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
