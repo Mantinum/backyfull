@@ -404,8 +404,8 @@ void MainWindow::onAddWatchEntry() {
   watchEntries_.append(entry);
   dirWatcher_->addPath(dir);
 
-  QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
-                    tr("Surveillance : %1 \u2192 %2")
+  QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
+                    tr(" Monitoring | %1 \u2192 %2")
                         .arg(shortenPathForDisplay(dir),
                              currentDestinationForDisplay());
   QListWidgetItem *item = new QListWidgetItem(display);
@@ -417,11 +417,13 @@ void MainWindow::onAddWatchEntry() {
 
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+  updateScheduleSummary();
   adjustHeightToScreen();
 }
 
 void MainWindow::onWatchToggleChanged(bool checked) {
   if (checked) {
+    enableWatch();
     onAddWatchEntry();
   } else {
     disableWatch();
@@ -553,8 +555,8 @@ void MainWindow::refreshWatchEntriesDisplay() {
       destDisp = e.destination;
     }
     destDisp = shortenPathForDisplay(destDisp);
-    QString display = QString::fromUtf8("\xF0\x9F\x93\x81 ") +
-                      tr("Surveillance : %1 \u2192 %2")
+    QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
+                      tr(" Monitoring | %1 \u2192 %2")
                           .arg(shortenPathForDisplay(e.source), destDisp);
     QListWidgetItem *item = new QListWidgetItem(display);
     QFont f = item->font();
@@ -572,15 +574,18 @@ void MainWindow::disableWatch() {
   for (const WatchEntry &e : watchEntries_) {
     dirWatcher_->removePath(e.source);
   }
-  watchEntries_.clear();
-  for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
-    QListWidgetItem *item = timeListWidget_->item(i);
-    if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
-      delete item;
-    }
-  }
   pendingWatchPaths_.clear();
   watchStatusLabel_->setText(tr("Monitoring off"));
+  updateScheduleSummary();
+}
+
+void MainWindow::enableWatch() {
+  for (const WatchEntry &e : watchEntries_) {
+    if (!dirWatcher_->directories().contains(e.source))
+      dirWatcher_->addPath(e.source);
+  }
+  watchStatusLabel_->setText(
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
 }
 
@@ -1447,8 +1452,13 @@ void MainWindow::loadSettings() {
   settings.endArray();
   settings.endGroup();
   refreshWatchEntriesDisplay();
-  if (watchToggleCheckBox_)
+  if (watchToggleCheckBox_) {
+    bool blocked = watchToggleCheckBox_->blockSignals(true);
     watchToggleCheckBox_->setChecked(!watchEntries_.isEmpty());
+    watchToggleCheckBox_->blockSignals(blocked);
+    if (!watchEntries_.isEmpty())
+      enableWatch();
+  }
 
   settings.beginGroup("SFTP");
   sftpHostLineEdit_->setText(settings.value("host", "").toString());

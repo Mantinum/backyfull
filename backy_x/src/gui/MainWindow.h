@@ -97,6 +97,7 @@ private:
   void saveSettings();
   void updateScheduleFromUI();
   void refreshWatchEntriesDisplay();
+  void enableWatch();
   void disableWatch();
 
   // UI Elements
