@@ -110,6 +110,7 @@ private:
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
+  QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
   QScrollArea *scrollArea_ = nullptr;
@@ -186,6 +187,7 @@ private:
   void createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                   const QString &buttonStyle);
   void applyUnifiedStyle(QWidget *widget);
+  void updateScheduleSummary();
 };
 
 #endif // MAINWINDOW_H

@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget *parent)
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
-      runBackupButton_(nullptr),
+      runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
       logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
@@ -537,6 +537,7 @@ void MainWindow::updateScheduleFromUI() {
         gcsBucketNameLineEdit_->text(),
         gcsAccountIdentifierLineEdit_->text());
   }
+  updateScheduleSummary();
 }
 
 void MainWindow::refreshWatchEntriesDisplay() {
@@ -564,6 +565,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
   }
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+  updateScheduleSummary();
 }
 
 void MainWindow::disableWatch() {
@@ -579,6 +581,7 @@ void MainWindow::disableWatch() {
   }
   pendingWatchPaths_.clear();
   watchStatusLabel_->setText(tr("Monitoring off"));
+  updateScheduleSummary();
 }
 
 
@@ -1332,6 +1335,7 @@ void MainWindow::onTaskChanged() {
   refreshWatchEntriesDisplay();
   onBackupModeChanged(backupModeComboBox_->currentIndex());
   updateLog("Task details updated in UI from Scheduler state.");
+  updateScheduleSummary();
 }
 
 void MainWindow::onBackupModeChanged(int index) {
@@ -2330,7 +2334,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
     btn->setFixedSize(26, 26);
     btn->setStyleSheet(
         "QToolButton{border-radius:13px;border:1px solid gray;background:#f0f0f0;}"
-        "QToolButton:checked{background:#2680eb;color:white;}");
+        "QToolButton:checked{background:#dbeafe;border-color:#2680eb;}");
     dayButtons_.append(btn);
     scheduleRow->addWidget(btn);
   }
@@ -2345,26 +2349,60 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   connect(addTimeButton_, &QToolButton::clicked, this,
           &MainWindow::onAddBackupTimeClicked);
 
-  scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 1, 0, 1, 3);
+  scheduleSummaryLabel_ = new QLabel();
+  scheduleSummaryLabel_->setStyleSheet("font-weight:bold");
+  scheduleLayout->addWidget(scheduleSummaryLabel_, 1, 0, 1, 3);
+
+  scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 2, 0, 1, 3);
   timeListWidget_ = new QListWidget();
   QFrame *timesFrame = new QFrame();
   timesFrame->setStyleSheet("background:#f0f0f0;border:1px solid #ccc;");
   QVBoxLayout *timesLayout = new QVBoxLayout(timesFrame);
   timesLayout->setContentsMargins(0, 0, 0, 0);
   timesLayout->addWidget(timeListWidget_);
-  scheduleLayout->addWidget(timesFrame, 2, 0, 1, 3);
+  scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
 
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
   removeTimeButton_->setStyleSheet(buttonStyle);
-  scheduleLayout->addWidget(removeTimeButton_, 3, 0, 1, 3);
-  connect(removeTimeButton_, &QPushButton::clicked, this,
-          &MainWindow::onRemoveBackupTimeClicked);
-
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
   runBackupButton_->setStyleSheet(buttonStyle);
-  connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
-  scheduleLayout->addWidget(runBackupButton_, 4, 0, 1, 3, Qt::AlignCenter);
+  connect(removeTimeButton_, &QPushButton::clicked, this,
+          &MainWindow::onRemoveBackupTimeClicked);
+  connect(runBackupButton_, &QPushButton::clicked, this,
+          &MainWindow::runBackupNow);
+  QHBoxLayout *buttonsLayout = new QHBoxLayout();
+  buttonsLayout->addWidget(removeTimeButton_);
+  buttonsLayout->addStretch();
+  buttonsLayout->addWidget(runBackupButton_);
+  scheduleLayout->addLayout(buttonsLayout, 4, 0, 1, 3);
 
   mainLayout->addWidget(scheduleGroupBox);
   applyUnifiedStyle(scheduleGroupBox);
+  updateScheduleSummary();
+}
+
+void MainWindow::updateScheduleSummary() {
+  if (!scheduleSummaryLabel_ || !timeListWidget_)
+    return;
+  int count = 0;
+  QTime earliest;
+  bool first = true;
+  for (int i = 0; i < timeListWidget_->count(); ++i) {
+    QString data = timeListWidget_->item(i)->data(Qt::UserRole).toString();
+    if (data.startsWith("WATCH|"))
+      continue;
+    QString timeStr = data.split('|').value(0);
+    QTime t = QTime::fromString(timeStr, "HH:mm");
+    if (t.isValid() && (first || t < earliest)) {
+      earliest = t;
+      first = false;
+    }
+    ++count;
+  }
+  QString nextText = earliest.isValid() ? earliest.toString("HH:mm") : "--:--";
+  scheduleSummaryLabel_->setText(
+      QString::fromUtf8("\xF0\x9F\x93\x85 %1 scheduled backup%2 | \xF0\x9F\x95\x92 Next: %3")
+          .arg(count)
+          .arg(count == 1 ? "" : "s")
+          .arg(nextText));
 }
