@@ -137,6 +137,7 @@ void MainWindow::setupUI() {
   scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+  mainLayout->setSpacing(12);
 
   const QString buttonStyle =
       QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
@@ -158,7 +159,8 @@ void MainWindow::setupUI() {
   backupModeComboBox_->addItem(tr("SFTP Backup"));
   backupModeComboBox_->addItem(tr("Google Cloud Storage"));
   backupModeComboBox_->setStyleSheet(
-      "QComboBox, QAbstractItemView { color: black; }");
+      "QComboBox { color: black; }"
+      "QComboBox QAbstractItemView { color: black; background: white; }");
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
   mainLayout->addWidget(headerFrame);
@@ -1396,6 +1398,8 @@ void MainWindow::onBackupModeChanged(int index) {
           "Backup mode changed to: %1. UI adjusted. File viewer visible: %2.")
           .arg(currentModeText)
           .arg(remoteModeSelected ? "Yes" : "No"));
+  if (centralWidget() && centralWidget()->layout())
+    centralWidget()->layout()->invalidate();
   adjustHeightToScreen();
 }
 
@@ -2181,8 +2185,8 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
         "QGroupBox{font-weight:bold;margin-top:10px;border:1px solid #ddd;"
-        "border-radius:4px;padding-top:15px;background:#fafafa;}"
-        "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-10px;"
+        "border-radius:4px;padding-top:20px;background:#fafafa;}"
+        "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-12px;"
         "background:#fafafa;padding:0 3px;}");
   }
 }
@@ -2208,6 +2212,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
+  watchLayout->setContentsMargins(4, 4, 4, 4);
   watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
   watchLayout->addWidget(watchToggleCheckBox_);
   watchStatusLabel_ = new QLabel(tr("Monitoring off"));
@@ -2314,7 +2319,9 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   backupTimeEdit_->setDisplayFormat("HH:mm");
 
   QHBoxLayout *scheduleRow = new QHBoxLayout();
+  scheduleRow->setContentsMargins(0, 0, 0, 0);
   scheduleRow->setSpacing(6);
+  scheduleRow->setAlignment(Qt::AlignCenter);
   const QStringList dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
   for (int i = 0; i < 7; ++i) {
     QToolButton *btn = new QToolButton();
