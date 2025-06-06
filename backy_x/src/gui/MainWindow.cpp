@@ -141,10 +141,7 @@ void MainWindow::setupUI() {
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
   mainLayout->setSpacing(20);
 
-  const QString buttonStyle = QStringLiteral(
-      "QPushButton{padding:4px 12px;border-radius:4px;background:#3A3A3A;"
-      "color:white;}"
-      "QPushButton:disabled{background:#555;color:#bbb;}");
+  const QString buttonStyle = QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}" "QPushButton:enabled{background:palette(button);color:palette(button-text);}" "QPushButton:disabled{background:palette(mid);color:palette(midlight);}");
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
     setMaximumHeight(scr->availableGeometry().height());
@@ -152,7 +149,6 @@ void MainWindow::setupUI() {
 
   QGroupBox *modeGroupBox = new QGroupBox(tr("Backup Mode Selector"));
   QHBoxLayout *modeLayout = new QHBoxLayout(modeGroupBox);
-  modeGroupBox->setStyleSheet("QGroupBox{background:#F5F5F5;}");
   QLabel *modeIcon = new QLabel();
   modeIcon->setPixmap(
       style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
@@ -169,6 +165,7 @@ void MainWindow::setupUI() {
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
   mainLayout->addWidget(modeGroupBox);
+  applyUnifiedStyle(modeGroupBox);
 
   createSourceConfigUI(mainLayout, buttonStyle);
 
@@ -2205,16 +2202,18 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   }
   const auto edits = widget->findChildren<QLineEdit *>();
   for (QLineEdit *e : edits) {
-    e->setStyleSheet("QLineEdit{background:#444;color:#f0f0f0;}"
-                     "QLineEdit::placeholder{color:#bbb;}");
+    e->setStyleSheet(
+        "QLineEdit{background:palette(base);color:palette(text);}"
+        "QLineEdit::placeholder{color:palette(mid);}");
   }
   const auto groups = widget->findChildren<QGroupBox *>();
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
-        "QGroupBox{font-weight:bold;margin-top:15px;border:1px solid #444;"
-        "border-radius:4px;padding-top:20px;background:#2d2d2d;color:#f0f0f0;}"
-        "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-12px;"
-        "background:#2d2d2d;padding:0 3px;}");
+        "QGroupBox{font-weight:bold;margin-top:15px;border:1px solid palette(mid);"
+        "border-radius:4px;padding-top:20px;background:palette(window);"
+        "color:palette(window-text);}"
+        "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-8px;"
+        "background:palette(window);padding:0 3px;}");
   }
 }
 
@@ -2222,6 +2221,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
                                       const QString &buttonStyle) {
   QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
   QFormLayout *sourceLayout = new QFormLayout(sourceGroupBox);
+  sourceLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   QHBoxLayout *srcPathLayout = new QHBoxLayout();
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
@@ -2250,7 +2250,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   watchAddButton_ = new QPushButton(tr("Add Monitored Folder"));
   watchAddButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
   watchAddButton_->setStyleSheet(buttonStyle);
-  watchLayout->addWidget(watchAddButton_);
+  watchLayout->addWidget(watchAddButton_, 0, Qt::AlignVCenter);
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
           &MainWindow::onWatchToggleChanged);
@@ -2262,6 +2262,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   m_localDestinationGroupBox =
       new QGroupBox(tr("Local Destination Configuration"));
   QFormLayout *localDestLayout = new QFormLayout(m_localDestinationGroupBox);
+  localDestLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   QHBoxLayout *destPathLayout = new QHBoxLayout();
   destinationDirEdit_ = new QLineEdit();
   destinationDirEdit_->setReadOnly(true);
@@ -2284,6 +2285,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
   sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
   QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
+  sftpFormLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   sftpHostLineEdit_ = new QLineEdit();
   sftpFormLayout->addRow(new QLabel(tr("SFTP Host:")), sftpHostLineEdit_);
   sftpPortLineEdit_ = new QLineEdit();
@@ -2312,6 +2314,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   gcsSettingsGroupBox_ =
       new QGroupBox(tr("Google Cloud Storage Configuration"));
   QFormLayout *gcsFormLayout = new QFormLayout(gcsSettingsGroupBox_);
+  gcsFormLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   gcsBucketNameLineEdit_ = new QLineEdit();
   gcsBucketNameLineEdit_->setToolTip(
       tr("Name of your GCS bucket (must exist)"));
@@ -2353,7 +2356,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   QGroupBox *scheduleGroupBox =
       new QGroupBox(tr("Scheduling & Monitoring Summary"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-  scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
+  scheduleLayout->setVerticalSpacing(8);
   backupTimeEdit_ = new QTimeEdit();
   backupTimeEdit_->setDisplayFormat("HH:mm");
 
@@ -2393,10 +2396,12 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   timeListWidget_ = new QListWidget();
   QFrame *timesFrame = new QFrame();
   timesFrame->setStyleSheet(
-      "background:#2E2E2E;border:1px solid #444;color:#F0F0F0;");
+      "background:palette(base);border:1px solid palette(mid);"
+      "color:palette(text);");
   QVBoxLayout *timesLayout = new QVBoxLayout(timesFrame);
   timesLayout->setContentsMargins(0, 0, 0, 0);
-  timeListWidget_->setStyleSheet("background-color:#2E2E2E;color:#F0F0F0;");
+  timeListWidget_->setStyleSheet(
+      "background:palette(base);color:palette(text);");
   timesLayout->addWidget(timeListWidget_);
   scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
   connect(timeListWidget_, &QListWidget::itemSelectionChanged, this,
