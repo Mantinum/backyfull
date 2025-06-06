@@ -181,7 +181,6 @@ void MainWindow::setupUI() {
   mainLayout->addWidget(logToggleButton);
   logDisplay_ = new QTextEdit();
   logDisplay_->setReadOnly(true);
-  logDisplay_->setStyleSheet("background:#1e1e1e;color:#e8e8e8;font-family:monospace;");
   logDisplay_->setVisible(false);
   logDisplay_->setMaximumHeight(150);
   mainLayout->addWidget(logDisplay_);
