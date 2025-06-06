@@ -116,6 +116,11 @@ if(WIN32)
     set_target_properties(backy_full_gui PROPERTIES WIN32_EXECUTABLE ON)
 endif()
 
+# Copy stylesheet to build directory and install alongside the executable
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/theme.qss
+               ${CMAKE_CURRENT_BINARY_DIR}/theme.qss COPYONLY)
+install(FILES theme.qss DESTINATION bin)
+
 # --------------------------------------------------------------------
 # ============== tests unitaire GoogleTest ===========================
 enable_testing()

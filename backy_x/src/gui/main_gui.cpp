@@ -1,6 +1,8 @@
 #include "gui/MainWindow.h" // Adjust path if necessary
 #include <QApplication>
 #include <QCoreApplication> // For setting Org/App name
+#include <QFile>
+#include <QString>
 #include <curl/curl.h>      // For libcurl global init/cleanup
 #include <iostream>         // For std::cout
 
@@ -19,6 +21,13 @@ int main(int argc, char *argv[]) {
     // This is important for Scheduler and MainWindow settings.
     QCoreApplication::setOrganizationName("BackyFullOrg"); // Replace with your actual org name
     QCoreApplication::setApplicationName("BackyFull");    // Replace with your actual app name
+
+    // Load global style sheet
+    QFile styleFile(QCoreApplication::applicationDirPath() + "/theme.qss");
+    if (styleFile.open(QFile::ReadOnly | QFile::Text)) {
+        QString style = QString::fromUtf8(styleFile.readAll());
+        app.setStyleSheet(style);
+    }
 
     MainWindow mainWindow;
     mainWindow.show();
