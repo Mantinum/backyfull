@@ -23,6 +23,8 @@ class FileViewerWidget : public QWidget
 public:
     explicit FileViewerWidget(QWidget *parent = nullptr);
 
+    QTableWidget *tableWidget() const { return fileTableWidget_; }
+
     void setSftpTarget(SftpTarget *target) { sftpTarget_ = target; }
     void setGcsTarget(GcsTarget *target) { gcsTarget_ = target; }
     QString currentPath() const { return currentRemotePath_; }

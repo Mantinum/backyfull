@@ -34,13 +34,10 @@
 #include <functional>
 #include <map>
 // Added for File Viewer
-#include "CustomTableWidgetItems.h" // For custom sorting items
 #include <QDockWidget>
 #include <QHeaderView>
 #include <QMenu>
 #include <QMenuBar>
-#include <QTableWidget>
-#include <QTableWidgetItem>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
@@ -60,8 +57,7 @@ MainWindow::MainWindow(QWidget *parent)
           nullptr), // Initialize new GCS Test Connection button
       gcsAuthStatusLabel_(nullptr), gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
-      fileViewerGroupBox_(nullptr), fileViewerDockWidget_(nullptr),
-      fileViewerWidget_(nullptr), watchGroupBox_(nullptr),
+      fileViewerDockWidget_(nullptr), fileViewerWidget_(nullptr), watchGroupBox_(nullptr),
       watchToggleCheckBox_(nullptr), watchStatusLabel_(nullptr),
       watchManager_(nullptr),
       // Core components
@@ -182,61 +178,18 @@ void MainWindow::setupUI() {
   mainLayout->setStretchFactor(logDisplay_, 1);
 
   // File Viewer GroupBox within a DockWidget
-  fileViewerGroupBox_ = new QGroupBox();
-  QVBoxLayout *fileViewerLayout =
-      new QVBoxLayout(); // No parent here, will be set on the group box
-
-  currentPathLabel_ =
-      new QLabel(tr("Path: /"), fileViewerGroupBox_);       // Parented
-  fileTableWidget_ = new QTableWidget(fileViewerGroupBox_); // Parented
-  fileTableWidget_->setColumnCount(4);
-  QStringList headers = {tr("Name"), tr("Size"), tr("Date Modified"),
-                         tr("Type")};
-  fileTableWidget_->setHorizontalHeaderLabels(headers);
-  fileTableWidget_->setSelectionBehavior(QAbstractItemView::SelectRows);
-  fileTableWidget_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-  fileTableWidget_->setSelectionMode(QAbstractItemView::SingleSelection);
-  fileTableWidget_->verticalHeader()->setVisible(false);
-  fileTableWidget_->horizontalHeader()->setStretchLastSection(true);
-  fileTableWidget_->setSortingEnabled(true); // Enable sorting
-
-  refreshButton_ =
-      new QPushButton(tr("Refresh"), fileViewerGroupBox_); // Parented
-  refreshButton_->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
-  downloadButton_ =
-      new QPushButton(tr("Download"), fileViewerGroupBox_); // Parented
-  downloadButton_->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
-  deleteButton_ =
-      new QPushButton(tr("Delete"), fileViewerGroupBox_); // Parented
-  deleteButton_->setIcon(style()->standardIcon(QStyle::SP_TrashIcon));
-
-  QHBoxLayout *buttonLayout = new QHBoxLayout(); // No parent here
-  buttonLayout->addWidget(refreshButton_);
-  buttonLayout->addWidget(downloadButton_);
-  buttonLayout->addWidget(deleteButton_);
-  buttonLayout->addStretch();
-
-  fileViewerLayout->addWidget(currentPathLabel_);
-  fileViewerLayout->addWidget(fileTableWidget_);
-  fileViewerLayout->addLayout(buttonLayout);
-  fileViewerGroupBox_->setLayout(fileViewerLayout);
+  fileViewerWidget_ = new FileViewerWidget();
 
   fileViewerDockWidget_ = new QDockWidget(tr("Remote File Browser"), this);
-  fileViewerDockWidget_->setWidget(fileViewerGroupBox_);
+  fileViewerDockWidget_->setWidget(fileViewerWidget_);
   fileViewerDockWidget_->setMinimumSize(250, 300);
   addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
   fileViewerDockWidget_->hide();
   viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
 
-  // Connect file viewer signals
-  connect(refreshButton_, &QPushButton::clicked, this,
-          &MainWindow::onFileViewerRefreshClicked);
-  connect(downloadButton_, &QPushButton::clicked, this,
-          &MainWindow::onFileViewerDownloadClicked);
-  connect(deleteButton_, &QPushButton::clicked, this,
-          &MainWindow::onFileViewerDeleteClicked);
-  connect(fileTableWidget_, &QTableWidget::itemDoubleClicked, this,
-          &MainWindow::onFileTableItemDoubleClicked);
+  // Relay log messages from the viewer
+  connect(fileViewerWidget_, &FileViewerWidget::logMessage, this,
+          &MainWindow::updateLog);
 
   fileDialog_ = new QFileDialog(this);
   adjustHeightToScreen();
@@ -725,12 +678,9 @@ void MainWindow::onGcsConnectButtonClicked() {
     if (gcsConnectToggleButton_) { // Ensure button exists
       gcsConnectToggleButton_->setText(tr("Connect"));
     }
-    if (fileTableWidget_) { // Ensure table exists
-      fileTableWidget_->setRowCount(0);
-    }
     currentRemotePath_ = "/";
-    if (currentPathLabel_) { // Ensure label exists
-      currentPathLabel_->setText(tr("Path: /"));
+    if (fileViewerWidget_) {
+      fileViewerWidget_->browsePath(currentRemotePath_);
     }
     // QSettings settings(QCoreApplication::organizationName(),
     // QCoreApplication::applicationName());
@@ -741,118 +691,77 @@ void MainWindow::onGcsConnectButtonClicked() {
 }
 
 void MainWindow::onSftpConnectToggleClicked() {
-  if (sftpTarget_) { // Connected for listing -> Disconnect
-    updateLog(tr(
-        "SFTP 'Disconnect' (viewer) button clicked. Closing viewer session."));
+  if (sftpTarget_) {
+    updateLog(tr("SFTP 'Disconnect' (viewer) button clicked. Closing viewer session."));
     sftpTarget_->endSession();
     delete sftpTarget_;
     sftpTarget_ = nullptr;
-    if (fileTableWidget_) { // Check if table exists
-      fileTableWidget_->setRowCount(0);
-    }
+    fileViewerWidget_->setSftpTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
-    if (sftpConnectToggleButton_) { // Check if button exists
+    fileViewerWidget_->browsePath(currentRemotePath_);
+    if (sftpConnectToggleButton_)
       sftpConnectToggleButton_->setText(tr("Connect"));
-    }
-    updateLog(tr("SFTP viewer session closed.")); // Specific log message
+    updateLog(tr("SFTP viewer session closed."));
     return;
   }
 
-  // Not connected for listing -> Connect
-  updateLog(tr("SFTP 'Connect' (viewer) button clicked. Attempting to open "
-               "viewer session."));
+  updateLog(tr("SFTP 'Connect' (viewer) button clicked. Attempting to open viewer session."));
   std::map<std::string, std::string> cfg{
       {"host", sftpHostLineEdit_->text().toStdString()},
       {"port", sftpPortLineEdit_->text().toStdString()},
       {"username", sftpUsernameLineEdit_->text().toStdString()},
       {"remoteBasePath", sftpRemotePathLineEdit_->text().toStdString()}
-      // Password handling relies on SftpTarget's constructor/CredentialManager
   };
 
   if (cfg["host"].empty() || cfg["username"].empty()) {
-    QMessageBox::warning(
-        this, tr("SFTP Configuration"),
-        tr("SFTP Host and Username are required to connect for listing."));
-    updateLog(tr("SFTP viewer connection failed: Host or Username empty."));
-    // Ensure UI is in a consistent disconnected state (button text might
-    // already be "Connect")
-    if (sftpConnectToggleButton_) {
+    QMessageBox::warning(this, tr("SFTP Configuration"),
+                         tr("SFTP Host and Username are required to connect for listing."));
+    if (sftpConnectToggleButton_)
       sftpConnectToggleButton_->setText(tr("Connect"));
-    }
-    if (fileTableWidget_) {
-      fileTableWidget_->setRowCount(0);
-    }
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->setSftpTarget(nullptr);
+    fileViewerWidget_->browsePath(currentRemotePath_);
+    updateLog(tr("SFTP viewer connection failed: Host or Username empty."));
     return;
   }
 
-  // Ensure this sftpTarget_ is exclusively for the viewer.
-  // If any old instance exists (should not happen if logic is correct), delete
-  // it. delete sftpTarget_; // Not strictly needed here if logic elsewhere is
-  // perfect, but safe. sftpTarget_ = nullptr; //
-
-  sftpTarget_ =
-      new SftpTarget(cfg); // MainWindow::sftpTarget_ is for the viewer
+  sftpTarget_ = new SftpTarget(cfg);
   if (!sftpTarget_->beginSession()) {
-    QString err_msg = QString::fromStdString(
-        sftpTarget_->getLastError()); // Get error before deleting target
-    QMessageBox::critical(
-        this, tr("SFTP Error"),
-        tr("SFTP viewer connection failed: %1")
-            .arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
+    QString err_msg = QString::fromStdString(sftpTarget_->getLastError());
+    QMessageBox::critical(this, tr("SFTP Error"),
+                          tr("SFTP viewer connection failed: %1")
+                              .arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
     updateLog(tr("SFTP viewer connection failed: %1")
                   .arg(err_msg.isEmpty() ? tr("Unknown error") : err_msg));
     delete sftpTarget_;
     sftpTarget_ = nullptr;
-    // Ensure UI is in a consistent disconnected state
-    if (sftpConnectToggleButton_) {
+    if (sftpConnectToggleButton_)
       sftpConnectToggleButton_->setText(tr("Connect"));
-    }
-    if (fileTableWidget_) {
-      fileTableWidget_->setRowCount(0);
-    }
+    fileViewerWidget_->setSftpTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->browsePath(currentRemotePath_);
     return;
   }
 
-  if (sftpConnectToggleButton_) {
+  if (sftpConnectToggleButton_)
     sftpConnectToggleButton_->setText(tr("Disconnect"));
-  }
+  fileViewerWidget_->setSftpTarget(sftpTarget_);
   currentRemotePath_ = "/";
-  // browseRemotePath will update currentPathLabel_
-  browseRemotePath(currentRemotePath_);
-  updateLog(tr("SFTP viewer session opened.")); // Specific log message
+  fileViewerWidget_->browsePath(currentRemotePath_);
+  updateLog(tr("SFTP viewer session opened."));
 }
 
 void MainWindow::onGcsConnectToggleClicked() {
   if (gcsTarget_) { // Connected for listing -> Disconnect
-    updateLog(
-        tr("GCS 'Disconnect' button clicked. Closing session for listing."));
-    // We don't call endSession() if GCS target is used for active backup,
-    // but for listing, it's okay. However, GcsTarget::endSession might not do
-    // much if it's just a flag. The main thing is to delete the target for
-    // listing. Let's assume GcsTarget destructor or endSession handles any
-    // necessary cleanup.
-    gcsTarget_->endSession(); // Call directly
+    updateLog(tr("GCS 'Disconnect' button clicked. Closing session for listing."));
+    gcsTarget_->endSession();
     delete gcsTarget_;
     gcsTarget_ = nullptr;
-    fileTableWidget_->setRowCount(0);
+    fileViewerWidget_->setGcsTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->browsePath(currentRemotePath_);
     gcsConnectToggleButton_->setText(tr("Connect"));
     updateLog(tr("GCS session closed for listing. OAuth status is separate."));
-    // gcsAuthStatusLabel_ should NOT be changed here.
     return;
   }
 
@@ -871,11 +780,9 @@ void MainWindow::onGcsConnectToggleClicked() {
         "GCS connection for listing failed: Account ID or Bucket Name empty."));
     // Ensure UI is consistent
     gcsConnectToggleButton_->setText(tr("Connect"));
-    fileTableWidget_->setRowCount(0);
+    fileViewerWidget_->setGcsTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->browsePath(currentRemotePath_);
     return;
   }
 
@@ -899,11 +806,9 @@ void MainWindow::onGcsConnectToggleClicked() {
                   .arg(accountIdFromUI, lastAuthAccount));
     // Ensure UI is consistent
     gcsConnectToggleButton_->setText(tr("Connect"));
-    fileTableWidget_->setRowCount(0);
+    fileViewerWidget_->setGcsTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->browsePath(currentRemotePath_);
     return;
   }
 
@@ -936,11 +841,9 @@ void MainWindow::onGcsConnectToggleClicked() {
     gcsTarget_ = nullptr;
     // Ensure UI is consistent
     gcsConnectToggleButton_->setText(tr("Connect"));
-    fileTableWidget_->setRowCount(0);
+    fileViewerWidget_->setGcsTarget(nullptr);
     currentRemotePath_ = "/";
-    if (currentPathLabel_) {
-      currentPathLabel_->setText(tr("Path: /"));
-    }
+    fileViewerWidget_->browsePath(currentRemotePath_);
     // Potentially update gcsAuthStatusLabel_ if error indicates auth failure,
     // but the plan says this button doesn't directly change it.
     // However, if beginSession fails due to auth, the user should know.
@@ -950,11 +853,9 @@ void MainWindow::onGcsConnectToggleClicked() {
   }
 
   gcsConnectToggleButton_->setText(tr("Disconnect"));
-  currentRemotePath_ = "/"; // Set before browse
-  if (currentPathLabel_) {
-    currentPathLabel_->setText(tr("Path: /"));
-  }
-  browseRemotePath(currentRemotePath_);
+  fileViewerWidget_->setGcsTarget(gcsTarget_);
+  currentRemotePath_ = "/";
+  fileViewerWidget_->browsePath(currentRemotePath_);
   updateLog(tr("GCS session opened successfully for listing. Root directory "
                "displayed for bucket '%1'.")
                 .arg(bucketNameFromUI));
@@ -1324,13 +1225,12 @@ void MainWindow::onBackupModeChanged(int index) {
   }
 
   // Always reset file viewer UI elements on any mode change
-  if (fileTableWidget_) {
-    fileTableWidget_->setRowCount(0);
+  if (fileViewerWidget_) {
+    fileViewerWidget_->setSftpTarget(nullptr);
+    fileViewerWidget_->setGcsTarget(nullptr);
+    fileViewerWidget_->browsePath("/");
   }
   currentRemotePath_ = "/";
-  if (currentPathLabel_) {
-    currentPathLabel_->setText(tr("Path: /"));
-  }
 
   // Show/hide relevant group boxes
   if (m_localDestinationGroupBox)
@@ -1591,514 +1491,28 @@ void MainWindow::handleScheduledBackup(const QString &sourcePath,
   currentTarget = nullptr;
 }
 
-// New slots implementation & Remote file viewer methods
-void MainWindow::displayRemoteFiles(const std::vector<FileMetadata> &files) {
-  fileTableWidget_->setRowCount(0); // Clear existing items
-
-  // Add ".." navigation entry if not at root
-  if (currentRemotePath_ != "/") {
-    int row = fileTableWidget_->rowCount();
-    fileTableWidget_->insertRow(row);
-
-    QIcon dirIcon = QApplication::style()->standardIcon(
-        QStyle::SP_ArrowUp); // Or SP_DirIcon, SP_ArrowUp is more explicit for
-                             // "up"
-    QTableWidgetItem *nameItem = new QTableWidgetItem(dirIcon, "..");
-    nameItem->setData(Qt::UserRole, true);     // isDirectory = true
-    nameItem->setData(Qt::UserRole, true);     // isDirectory = true
-    nameItem->setData(Qt::UserRole + 1, ".."); // Actual name for navigation
-    fileTableWidget_->setItem(row, 0, nameItem);
-
-    SizeTableWidgetItem *sizeItem = new SizeTableWidgetItem("-");
-    sizeItem->setData(Qt::UserRole, QVariant::fromValue(qlonglong(
-                                        -2))); // Special value for ".." sorting
-    sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    fileTableWidget_->setItem(row, 1, sizeItem);
-
-    DateTimeTableWidgetItem *dateItem = new DateTimeTableWidgetItem("");
-    dateItem->setData(
-        Qt::UserRole,
-        QVariant::fromValue(
-            qlonglong(0))); // Special value for ".." sorting (very old date)
-    fileTableWidget_->setItem(row, 2, dateItem);
-
-    fileTableWidget_->setItem(row, 3,
-                              new QTableWidgetItem(tr("Parent Directory")));
-  }
-
-  for (const auto &file : files) {
-    int row = fileTableWidget_->rowCount();
-    fileTableWidget_->insertRow(row);
-
-    QIcon icon = QApplication::style()->standardIcon(
-        file.isDirectory ? QStyle::SP_DirIcon : QStyle::SP_FileIcon);
-    QTableWidgetItem *nameItem =
-        new QTableWidgetItem(icon, QString::fromStdString(file.name));
-    nameItem->setData(Qt::UserRole, file.isDirectory);
-    nameItem->setData(Qt::UserRole + 1,
-                      QString::fromStdString(file.name)); // Store actual name
-    fileTableWidget_->setItem(row, 0, nameItem);
-
-    SizeTableWidgetItem *sizeItem;
-    if (file.isDirectory) {
-      sizeItem = new SizeTableWidgetItem("-");
-      // Store a value that helps sort directories together, e.g., -1, if ".."
-      // uses -2
-      sizeItem->setData(Qt::UserRole, QVariant::fromValue(qlonglong(-1)));
-    } else {
-      // Basic size formatting (could be enhanced to KB/MB/GB)
-      QString formattedSize =
-          QString::number(file.size) + " B"; // Placeholder, can be improved
-      sizeItem = new SizeTableWidgetItem(formattedSize,
-                                         static_cast<qlonglong>(file.size));
-    }
-    sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    fileTableWidget_->setItem(row, 1, sizeItem);
-
-    qint64 secs =
-        static_cast<qint64>(std::chrono::duration_cast<std::chrono::seconds>(
-                                file.modificationTime.time_since_epoch())
-                                .count());
-
-    QDateTime modDateTime = QDateTime::fromSecsSinceEpoch(secs);
-    QString formattedDate = modDateTime.toString(Qt::TextDate);
-
-    DateTimeTableWidgetItem *dateItem = new DateTimeTableWidgetItem(
-        formattedDate, secs); // New line using qint64 secs
-    fileTableWidget_->setItem(row, 2, dateItem);
-
-    fileTableWidget_->setItem(
-        row, 3,
-        new QTableWidgetItem(file.isDirectory ? tr("Folder") : tr("File")));
-  }
-}
-
+// Remote file viewer wrappers
 void MainWindow::browseRemotePath(const QString &path) {
   currentRemotePath_ = path;
-  // Update the path label immediately. If listing fails or not connected, path
-  // still shows intent.
-  if (currentPathLabel_) {
-    currentPathLabel_->setText(tr("Path: ") + currentRemotePath_);
-  }
-  updateLog(tr("Attempting to browse remote path: %1").arg(path));
-
-  std::vector<FileMetadata> files;
-  QString currentModeText = backupModeComboBox_->currentText();
-
-  if (currentModeText == tr("Google Cloud Storage")) {
-    if (!gcsTarget_) { // Check if GCS target for listing exists (i.e.,
-                       // "Connect" was clicked)
-      updateLog(tr("GCS browse attempted but not connected for listing. Please "
-                   "use the 'Connect' button first."));
-      // Display empty list, user sees "Connect" button.
-      displayRemoteFiles({}); // Ensure view is empty
-      // Optionally, could show a QMessageBox::information here, but an empty
-      // table + visible Connect button is also clear.
-      return;
-    }
-    // If gcsTarget_ exists, assume it's connected (beginSession was successful
-    // in onGcsConnectToggleClicked)
-    files = gcsTarget_->listFiles(path.toStdString());
-    if (!gcsTarget_->getLastError().empty()) {
-      QMessageBox::critical(
-          this, tr("GCS Error"),
-          tr("Failed to list files: %1")
-              .arg(QString::fromStdString(gcsTarget_->getLastError())));
-      updateLog(
-          tr("GCS listFiles failed for path '%1': %2")
-              .arg(path, QString::fromStdString(gcsTarget_->getLastError())));
-      // files will be empty or partially filled, displayRemoteFiles will show
-      // what was returned.
-    }
-  } else if (currentModeText == tr("SFTP Backup")) {
-    if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
-      updateLog(tr("SFTP viewer not connected or session invalid. Please use "
-                   "the 'Connect' button."));
-      if (fileTableWidget_) {   // Ensure table exists before modifying
-        displayRemoteFiles({}); // Clear view by displaying an empty list
-      }
-      // Optional: Consider if sftpConnectToggleButton_ text should be reset to
-      // "Connect" here. If sftpTarget_ exists but session is not open, it
-      // implies an inconsistent state. For now, the primary goal is to prevent
-      // listFiles on an invalid session and clear the view. if
-      // (sftpConnectToggleButton_ && sftpTarget_ &&
-      // !sftpTarget_->isSessionOpen()) {
-      //     sftpConnectToggleButton_->setText(tr("Connect"));
-      // }
-      return;
-    }
-    // If sftpTarget_ exists AND session is open...
-    files = sftpTarget_->listFiles(path.toStdString());
-    // Temporary diagnostic log for SFTP
-    updateLog(QString("SFTP listFiles returned %1 items").arg(files.size()));
-
-    if (!sftpTarget_->getLastError()
-             .empty()) { // Assuming SftpTarget gets a getLastError()
-      QMessageBox::critical(
-          this, tr("SFTP Error"),
-          tr("Failed to list files: %1")
-              .arg(QString::fromStdString(sftpTarget_->getLastError())));
-      updateLog(
-          tr("SFTP listFiles failed for path '%1': %2")
-              .arg(path, QString::fromStdString(sftpTarget_->getLastError())));
-    }
-  } else {
-    // This case should ideally not be reached if fileViewerGroupBox is only
-    // visible in remote modes
-    updateLog(
-        tr("BrowseRemotePath called in non-remote mode: %1. Clearing view.")
-            .arg(currentModeText));
-    displayRemoteFiles({}); // Display empty list
-    return;
-  }
-  displayRemoteFiles(files);
-  updateLog(tr("Displayed %1 files/folders for path: %2")
-                .arg(files.size())
-                .arg(path));
+  if (fileViewerWidget_)
+    fileViewerWidget_->browsePath(path);
 }
 
 void MainWindow::onFileViewerRefreshClicked() {
-  updateLog("File viewer refresh clicked. Current path: " + currentRemotePath_);
-  browseRemotePath(currentRemotePath_);
+  if (fileViewerWidget_)
+    fileViewerWidget_->refresh();
 }
 
 void MainWindow::onFileViewerDownloadClicked() {
-  // Session Checks
-  QString currentModeText =
-      backupModeComboBox_->currentText(); // Get current mode
-
-  if (currentModeText == tr("SFTP Backup")) {
-    if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
-      updateLog(tr("SFTP Download: Not connected or session invalid. Please "
-                   "connect viewer session."));
-      QMessageBox::warning(this, tr("SFTP Download Error"),
-                           tr("SFTP session is not active. Please use the "
-                              "'Connect' button for the SFTP viewer first."));
-      return;
-    }
-  } else if (currentModeText == tr("Google Cloud Storage")) {
-    if (!gcsTarget_) { // For GCS, gcsTarget_ existing implies an attempt to
-                       // connect for listing was made. Actual token validity is
-                       // handled by GCS operations.
-      updateLog(tr("GCS Download: Not connected for listing. Please use the "
-                   "GCS 'Connect' button for listing first."));
-      QMessageBox::warning(this, tr("GCS Download Error"),
-                           tr("GCS session for listing is not active. Please "
-                              "use the 'Connect' (for listing) button first."));
-      return;
-    }
-  } else {
-    // Should not happen if download button is only enabled for remote modes,
-    // but good to have.
-    updateLog(tr("Download Error: Download is not available for the current "
-                 "backup mode."));
-    QMessageBox::warning(
-        this, tr("Download Error"),
-        tr("Download is not available for the current backup mode."));
-    return;
-  }
-
-  QList<QTableWidgetItem *> selectedItems = fileTableWidget_->selectedItems();
-  if (selectedItems.isEmpty() || selectedItems.first()->row() < 0) {
-    QMessageBox::information(this, tr("Download"),
-                             tr("No file selected or invalid selection."));
-    return;
-  }
-  // Ensure the first item (column 0) of the selected row is used for name data
-  QTableWidgetItem *nameItem =
-      fileTableWidget_->item(selectedItems.first()->row(), 0);
-  if (!nameItem) {
-    QMessageBox::warning(this, tr("Download Error"),
-                         tr("Could not retrieve item data."));
-    return;
-  }
-
-  bool isDir = nameItem->data(Qt::UserRole).toBool();
-  QString actualFileName =
-      nameItem->data(Qt::UserRole + 1).toString(); // Actual name from metadata
-
-  if (isDir) {
-    QMessageBox::information(
-        this, tr("Download"),
-        tr("Folder download is not implemented for this item type."));
-    return;
-  }
-  if (actualFileName ==
-      "..") { // Should not happen if selection is managed, but good check
-    QMessageBox::information(this, tr("Download"), tr("Cannot download '..'."));
-    return;
-  }
-
-  QString remoteFilePath = currentRemotePath_;
-  if (remoteFilePath.endsWith("/")) {
-    remoteFilePath += actualFileName;
-  } else {
-    remoteFilePath += "/" + actualFileName;
-  }
-  remoteFilePath = QDir::cleanPath(remoteFilePath);
-
-  QString localPath =
-      QFileDialog::getSaveFileName(this, tr("Save File"), actualFileName);
-  if (localPath.isEmpty()) {
-    return; // User cancelled
-  }
-
-  updateLog(tr("Attempting to download remote file '%1' to '%2'")
-                .arg(remoteFilePath, localPath));
-
-  bool success = false;
-  QString errorMsg;
-  // currentModeText is already defined and checked at the top of the function.
-
-  if (currentModeText == tr("Google Cloud Storage")) {
-    // Redundant check removed: if (!gcsTarget_)
-    if (gcsTarget_->downloadFile(remoteFilePath.toStdString(),
-                                 localPath.toStdString())) {
-      success = true;
-    } else {
-      errorMsg = QString::fromStdString(gcsTarget_->getLastError());
-    }
-  } else if (currentModeText == tr("SFTP Backup")) {
-    // Redundant check removed: if (!sftpTarget_)
-    // SFTP downloadFile expects path relative to its base.
-    // Our currentRemotePath_ is already relative to SFTP base if m_objectPrefix
-    // is used correctly by SftpTarget. Or, if currentRemotePath_ is absolute
-    // from SFTP root, then SftpTarget's remotePath needs that. For now, assume
-    // remoteFilePath as constructed is what SftpTarget expects.
-    if (sftpTarget_->downloadFile(remoteFilePath.toStdString(),
-                                  localPath.toStdString())) {
-      success = true;
-    } else {
-      errorMsg = QString::fromStdString(sftpTarget_->getLastError());
-      if (errorMsg.isEmpty()) { // Fallback if getLastError was empty but
-                                // download still failed
-        errorMsg = tr("SFTP download failed. Please check logs or ensure the "
-                      "file path is correct and accessible.");
-      }
-    }
-  }
-  // The 'else' case for unsupported modes is handled by the checks at the top
-  // of the function.
-
-  if (success) {
-    QMessageBox::information(this, tr("Download Complete"),
-                             tr("File '%1' downloaded successfully to '%2'.")
-                                 .arg(actualFileName, localPath));
-    updateLog(tr("Successfully downloaded '%1' to '%2'.")
-                  .arg(remoteFilePath, localPath));
-  } else {
-    QMessageBox::critical(
-        this, tr("Download Failed"),
-        tr("Failed to download '%1'. Error: %2").arg(actualFileName, errorMsg));
-    updateLog(
-        tr("Failed to download '%1'. Error: %2").arg(remoteFilePath, errorMsg));
-  }
+  if (fileViewerWidget_)
+    fileViewerWidget_->downloadSelected();
 }
 
 void MainWindow::onFileViewerDeleteClicked() {
-  QList<QTableWidgetItem *> selectedItems = fileTableWidget_->selectedItems();
-  if (selectedItems.isEmpty() || selectedItems.first()->row() < 0) {
-    QMessageBox::information(this, tr("Delete"),
-                             tr("No file selected or invalid selection."));
-    return;
-  }
-  int selectedRow = selectedItems.first()->row();
-
-  QTableWidgetItem *nameItemWidget =
-      fileTableWidget_->item(selectedRow, 0); // Name is in column 0
-  if (!nameItemWidget) {
-    QMessageBox::warning(this, tr("Delete Error"),
-                         tr("Could not retrieve item data for selected row %1.")
-                             .arg(selectedRow));
-    return;
-  }
-
-  QString actualFileName = nameItemWidget->data(Qt::UserRole + 1).toString();
-  bool isDirectory = nameItemWidget->data(Qt::UserRole).toBool();
-
-  if (actualFileName.isEmpty()) {
-    QMessageBox::warning(this, tr("Delete Error"),
-                         tr("Invalid or empty file name selected."));
-    updateLog(
-        tr("SFTP Delete: Attempted to delete an item with an empty name."));
-    return;
-  }
-  if (actualFileName == "..") {
-    QMessageBox::information(
-        this, tr("Delete Error"),
-        tr("Cannot delete the parent directory navigation entry."));
-    return;
-  }
-
-  QString fullRemotePath = currentRemotePath_;
-  if (fullRemotePath.endsWith('/')) {
-    fullRemotePath += actualFileName;
-  } else {
-    fullRemotePath += "/" + actualFileName;
-  }
-  fullRemotePath = QDir::cleanPath(fullRemotePath);
-
-  QMessageBox::StandardButton reply;
-  QString itemTypeForMessage = isDirectory ? tr(" (Directory)") : "";
-  reply = QMessageBox::warning(this, tr("Confirm Delete"),
-                               tr("Are you sure you want to delete '%1'%2?")
-                                   .arg(actualFileName, itemTypeForMessage),
-                               QMessageBox::Yes | QMessageBox::No);
-
-  if (reply == QMessageBox::No) {
-    return;
-  }
-
-  updateLog(tr("User confirmed deletion of: %1 (isDirectory: %2)")
-                .arg(fullRemotePath, isDirectory ? "true" : "false"));
-
-  bool success = false;
-  QString errorMsg;
-  QString currentModeText = backupModeComboBox_->currentText();
-
-  if (currentModeText == tr("Google Cloud Storage")) {
-    if (!gcsTarget_) {
-      QMessageBox::critical(this, tr("GCS Error"),
-                            tr("GCS target not initialized. Cannot delete."));
-      return;
-    }
-    if (isDirectory) {
-      // GCS: Deleting "folders" (prefixes) is complex.
-      // It requires listing all objects under the prefix and deleting them
-      // individually. This is a non-trivial operation and typically not done
-      // with a single "delete" call.
-      errorMsg =
-          tr("Deleting folders/prefixes in GCS requires deleting all contained "
-             "objects and is not implemented as a single operation.");
-      QMessageBox::information(this, tr("GCS Delete Info"), errorMsg);
-      updateLog("GCS delete directory attempted: " + errorMsg);
-      return; // Don't proceed with gcsTarget->deleteFile for directories
-    }
-    // Proceed with file deletion for GCS
-    if (gcsTarget_->deleteFile(fullRemotePath.toStdString())) {
-      success = true;
-    } else {
-      errorMsg = QString::fromStdString(gcsTarget_->getLastError());
-    }
-  } else if (currentModeText == tr("SFTP Backup")) {
-    // Add this new, more comprehensive check:
-    if (!sftpTarget_ || !sftpTarget_->isSessionOpen()) {
-      QMessageBox::warning(
-          this, tr("SFTP Delete Error"),
-          tr("SFTP session is not active or invalid. Please connect first."));
-      updateLog(tr("SFTP Delete: Attempted to delete when session was not "
-                   "active for file '%1'.")
-                    .arg(actualFileName));
-      return;
-    }
-    if (isDirectory) {
-      // SFTP: Standard SFTP 'rm' typically doesn't remove directories unless
-      // empty. 'rmdir' is for empty directories. Recursive delete usually needs
-      // server-side support or client-side recursion. The current
-      // SftpTarget::deleteFile uses "rm", so it will likely fail for non-empty
-      // dirs. We can inform the user or attempt it and let the server decide.
-      updateLog(tr("Attempting to delete SFTP directory '%1' using 'rm'. This "
-                   "may only work for empty directories or if server allows "
-                   "'rm' on dirs.")
-                    .arg(fullRemotePath));
-      // Proceed to call deleteFile, server error will be reported if it fails.
-    }
-    if (sftpTarget_->deleteFile(fullRemotePath.toStdString())) {
-      success = true;
-    } else {
-      errorMsg =
-          tr("SFTP delete failed. Check logs. The server might not allow 'rm' "
-             "on directories or the directory was not empty.");
-      // TODO: SftpTarget should ideally provide specific error via
-      // getLastError()
-    }
-  } else {
-    QMessageBox::warning(
-        this, tr("Delete Error"),
-        tr("Delete is not supported for the current backup mode."));
-    return;
-  }
-
-  if (success) {
-    QMessageBox::information(
-        this, tr("Delete Successful"),
-        tr("'%1' deleted successfully.").arg(actualFileName));
-    updateLog(tr("Successfully deleted '%1'.").arg(fullRemotePath));
-    if (selectedRow >= 0 && selectedRow < fileTableWidget_->rowCount()) {
-      fileTableWidget_->removeRow(selectedRow);
-      updateLog(tr("Removed item from view at row %1.").arg(selectedRow));
-    } else {
-      updateLog(tr("Could not remove item from view, row %1 invalid or table "
-                   "changed. Forcing refresh.")
-                    .arg(selectedRow));
-      onFileViewerRefreshClicked(); // Fallback to refresh
-    }
-  } else {
-    QMessageBox::critical(
-        this, tr("Delete Failed"),
-        tr("Failed to delete '%1'. Error: %2").arg(actualFileName, errorMsg));
-    updateLog(
-        tr("Failed to delete '%1'. Error: %2").arg(fullRemotePath, errorMsg));
-  }
+  if (fileViewerWidget_)
+    fileViewerWidget_->deleteSelected();
 }
 
-void MainWindow::onFileTableItemDoubleClicked(QTableWidgetItem *item) {
-  if (!item)
-    return;
-
-  // Ensure we are using the data from column 0 (Name column) for path
-  // construction
-  QTableWidgetItem *nameColItem = fileTableWidget_->item(item->row(), 0);
-  if (!nameColItem)
-    return; // Should not happen if item itself is valid
-
-  bool isDir = nameColItem->data(Qt::UserRole).toBool();
-  QString itemName = nameColItem->data(Qt::UserRole + 1)
-                         .toString(); // Get actual name from metadata
-
-  if (isDir) {
-    if (itemName == "..") {
-      QDir dir(currentRemotePath_);
-      if (dir.cdUp()) {
-        QString parentPath = dir.path();
-        // Ensure root path is just "/"
-        if (parentPath.isEmpty() || parentPath == "." || parentPath == "//") {
-          parentPath = "/";
-        }
-        // QDir might return "/." for parent of "/foo", clean it.
-        if (parentPath.endsWith("/.")) {
-          parentPath = parentPath.left(parentPath.length() - 2);
-          if (parentPath.isEmpty())
-            parentPath = "/";
-        }
-        updateLog("Navigating up to: " + parentPath);
-        browseRemotePath(parentPath);
-      } else {
-        updateLog("Could not navigate up from: " + currentRemotePath_);
-        browseRemotePath("/"); // Go to root if cdUp fails strangely
-      }
-    } else {
-      QString newPath;
-      if (currentRemotePath_ == "/") {
-        newPath = "/" + itemName;
-      } else {
-        newPath = currentRemotePath_ + "/" + itemName;
-      }
-      // Clean path to remove any potential double slashes, though
-      // QDir::filePath or manual construction should be careful
-      newPath = QDir::cleanPath(newPath);
-      updateLog(QString("Navigating into directory: %1 (New path: %2)")
-                    .arg(itemName, newPath));
-      browseRemotePath(newPath);
-    }
-  } else {
-    // Double-clicking a file could trigger download, view, etc.
-    // For now, let's call the download action.
-    updateLog(
-        QString("Double-clicked file: %1. Triggering download.").arg(itemName));
-    onFileViewerDownloadClicked();
-  }
-}
 
 QString MainWindow::shortenPathForDisplay(const QString &path) const {
   QDir home = QDir::home();

@@ -5,6 +5,7 @@
 
 #include <QTableWidget>
 #include <QPushButton>
+#include <QLabel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>

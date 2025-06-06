@@ -117,7 +117,6 @@ private:
   QPushButton *gcsConnectToggleButton_{nullptr};
 
   // File Viewer UI Elements
-  QGroupBox *fileViewerGroupBox_ = nullptr;
   QDockWidget *fileViewerDockWidget_ = nullptr;
   FileViewerWidget *fileViewerWidget_ = nullptr;
   QString currentRemotePath_ = "/";
@@ -144,7 +143,6 @@ private:
   void performBackupInternal(const QString &sourcePath, IStorageTarget *target);
 
   // Remote File Viewer methods
-  void displayRemoteFiles(const std::vector<FileMetadata> &files);
   void browseRemotePath(const QString &path);
 
   QString shortenPathForDisplay(const QString &path) const;
