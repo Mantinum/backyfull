@@ -113,6 +113,7 @@ private:
   QPushButton *runBackupButton_;
   QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
+  QGroupBox *actionsGroupBox_ = nullptr;
 
   QScrollArea *scrollArea_ = nullptr;
 
@@ -155,6 +156,7 @@ private:
   QGroupBox *watchGroupBox_ = nullptr;
   QCheckBox *watchToggleCheckBox_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
+  QPushButton *watchAddButton_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
   QTimer *watchTriggerTimer_ = nullptr;
@@ -189,6 +191,7 @@ private:
                                   const QString &buttonStyle);
   void applyUnifiedStyle(QWidget *widget);
   void updateScheduleSummary();
+  void updateActionButtons();
 };
 
 #endif // MAINWINDOW_H

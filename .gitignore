@@ -1,5 +1,6 @@
 # Ignore CMake build directory
 backy_x/build/
+build2/
 backy_x/build_new/
 
 # Ignore other common build artifacts and OS-specific files
