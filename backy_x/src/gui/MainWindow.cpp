@@ -121,110 +121,14 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
-  // Menu
-  QMenu *viewMenu = ui->menuView;
-  if (!viewMenu)
-    viewMenu = menuBar()->addMenu(tr("&View"));
-  if (ui->actionToggleFileViewer && viewMenu)
-    viewMenu->removeAction(ui->actionToggleFileViewer);
-
-  const QString buttonStyle =
-      QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
-
-  // Store pointers to widgets from UI
-  scrollArea_ = ui->scrollArea;
-  sourceDirEdit_ = ui->sourceDirEdit;
-  sourceDirButton_ = ui->sourceDirButton;
-  destinationDirEdit_ = ui->destinationDirEdit;
-  destinationDirButton_ = ui->destinationDirButton;
-  backupTimeEdit_ = ui->backupTimeEdit;
-  addTimeButton_ = ui->addTimeButton;
-  timeListWidget_ = ui->timeListWidget;
-  removeTimeButton_ = ui->removeTimeButton;
-  runBackupButton_ = ui->runBackupButton;
-  scheduleSummaryLabel_ = ui->scheduleSummaryLabel;
-  logDisplay_ = ui->logDisplay;
-  backupProgressBar_ = ui->backupProgressBar;
-  QToolButton *logToggleButton = ui->logToggleButton;
-  m_localDestinationGroupBox = ui->localDestinationGroupBox;
-  sftpSettingsGroupBox_ = ui->sftpSettingsGroupBox;
-  sftpHostLineEdit_ = ui->sftpHostLineEdit;
-  sftpPortLineEdit_ = ui->sftpPortLineEdit;
-  sftpUsernameLineEdit_ = ui->sftpUsernameLineEdit;
-  sftpPasswordLineEdit_ = ui->sftpPasswordLineEdit;
-  sftpRemotePathLineEdit_ = ui->sftpRemotePathLineEdit;
-  sftpSavePasswordCheckBox_ = ui->sftpSavePasswordCheckBox;
-  sftpConnectToggleButton_ = ui->sftpConnectToggleButton;
-  gcsSettingsGroupBox_ = ui->gcsSettingsGroupBox;
-  gcsBucketNameLineEdit_ = ui->gcsBucketNameLineEdit;
-  gcsAccountIdentifierLineEdit_ = ui->gcsAccountIdentifierLineEdit;
-  gcsConnectButton_ = ui->gcsConnectButton;
-  gcsTestConnectionButton_ = ui->gcsTestConnectionButton;
-  gcsAuthStatusLabel_ = ui->gcsAuthStatusLabel;
-  gcsConnectToggleButton_ = ui->gcsConnectToggleButton;
-  watchToggleCheckBox_ = ui->watchToggleCheckBox;
-  watchStatusLabel_ = ui->watchStatusLabel;
-  fileViewerDockWidget_ = ui->fileViewerDockWidget;
-  backupModeComboBox_ = ui->backupModeComboBox;
-  backupModeStackedWidget_ = ui->backupModeStackedWidget;
-
-  // Collect day buttons
-  dayButtons_.clear();
-  dayButtons_ << ui->dayButton1 << ui->dayButton2 << ui->dayButton3
-              << ui->dayButton4 << ui->dayButton5 << ui->dayButton6
-              << ui->dayButton7;
-
-  applyUnifiedStyle(ui->sourceGroupBox);
-  applyUnifiedStyle(ui->localDestinationGroupBox);
-  applyUnifiedStyle(ui->sftpSettingsGroupBox);
-  applyUnifiedStyle(ui->gcsSettingsGroupBox);
-  applyUnifiedStyle(ui->scheduleGroupBox);
-
-  setMinimumSize(800, 600);
-  if (QScreen *scr = QApplication::primaryScreen()) {
-    setMaximumHeight(scr->availableGeometry().height());
+  QListWidget *navList = findChild<QListWidget *>("navList");
+  QStackedWidget *pages = findChild<QStackedWidget *>("pages");
+  if (navList && pages) {
+    connect(navList, &QListWidget::currentRowChanged, pages,
+            &QStackedWidget::setCurrentIndex);
   }
 
-
-  // Setup File Viewer dock widget
-  fileViewerWidget_ = new FileViewerWidget();
-  fileViewerDockWidget_->setWidget(fileViewerWidget_);
-  fileViewerDockWidget_->setMinimumSize(250, 300);
-  addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
-  fileViewerDockWidget_->hide();
-  viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
-
-  // Connections
-  connect(sourceDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectSourceDirectory);
-  connect(destinationDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectDestinationDirectory);
-  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, &MainWindow::onBackupModeChanged);
-  connect(addTimeButton_, &QToolButton::clicked, this,
-          &MainWindow::onAddBackupTimeClicked);
-  connect(removeTimeButton_, &QPushButton::clicked, this,
-          &MainWindow::onRemoveBackupTimeClicked);
-  connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
-  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onWatchToggleChanged);
-  connect(gcsConnectButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectButtonClicked);
-  connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsTestConnectionClicked);
-  connect(gcsConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectToggleClicked);
-  connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onSftpConnectToggleClicked);
-  connect(logToggleButton, &QToolButton::toggled, this, [this, logToggleButton](bool checked) {
-    logDisplay_->setVisible(checked);
-    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-  });
-  connect(fileViewerWidget_, &FileViewerWidget::logMessage, this,
-          &MainWindow::updateLog);
-
   fileDialog_ = new QFileDialog(this);
-  adjustHeightToScreen();
 }
 
 void MainWindow::selectSourceDirectory() {
