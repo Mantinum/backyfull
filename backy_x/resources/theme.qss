@@ -5,21 +5,45 @@ QWidget {
     font-size: 13px;
 }
 
-QLineEdit, QTextEdit {
+QLineEdit,
+QTextEdit,
+QComboBox {
     background-color: #3c3c3c;
     border: 1px solid #555;
-    padding: 4px;
-    color: white;
+    border-radius: 5px;
+    padding: 4px 8px;
+    color: #f0f0f0;
+}
+
+QLineEdit:hover,
+QTextEdit:hover,
+QComboBox:hover {
+    border-color: #00bcd4;
+}
+
+QLineEdit:focus,
+QTextEdit:focus,
+QComboBox:focus {
+    border-color: #00bcd4;
+    outline: none;
 }
 
 QPushButton {
     background-color: #444;
     border: 1px solid #666;
-    padding: 5px 10px;
+    border-radius: 5px;
+    padding: 5px 12px;
+    color: #f0f0f0;
 }
 
 QPushButton:hover {
     background-color: #555;
+    border-color: #00bcd4;
+}
+
+QPushButton:focus {
+    border-color: #00bcd4;
+    outline: none;
 }
 
 QPushButton:disabled {
@@ -29,5 +53,14 @@ QPushButton:disabled {
 
 QGroupBox {
     border: 1px solid #666;
-    margin-top: 10px;
+    border-radius: 5px;
+    margin-top: 15px;
+    padding-top: 10px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    top: -8px;
+    padding: 0 4px;
 }

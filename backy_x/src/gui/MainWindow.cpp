@@ -142,13 +142,15 @@ void MainWindow::setupUI() {
   mainLayout->setSpacing(20);
 
   const QString buttonStyle = QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}" "QPushButton:enabled{background:palette(button);color:palette(button-text);}" "QPushButton:disabled{background:palette(mid);color:palette(midlight);}");
+  const int uniformButtonWidth = 140;
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
-  QGroupBox *modeGroupBox = new QGroupBox(tr("Backup Mode Selector"));
+  QGroupBox *modeGroupBox = new QGroupBox(tr("Backup Mode"));
   QHBoxLayout *modeLayout = new QHBoxLayout(modeGroupBox);
+  modeLayout->setContentsMargins(10, 10, 10, 10);
   QLabel *modeIcon = new QLabel();
   modeIcon->setPixmap(
       style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
@@ -162,6 +164,10 @@ void MainWindow::setupUI() {
   backupModeComboBox_->setStyleSheet(
       "QComboBox { color: black; }"
       "QComboBox QAbstractItemView { color: black; background: white; }");
+  backupModeComboBox_->setSizePolicy(QSizePolicy::Expanding,
+                                     QSizePolicy::Preferred);
+  backupModeComboBox_->setToolTip(
+      tr("Select the type of destination for backups"));
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
   mainLayout->addWidget(modeGroupBox);
@@ -345,7 +351,7 @@ void MainWindow::onRemoveBackupTimeClicked() {
     delete item;
   }
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 monitored folder(s)").arg(watchEntries_.size()));
   updateScheduleFromUI();
   updateActionButtons();
 }
@@ -421,7 +427,7 @@ void MainWindow::onAddWatchEntry() {
   timeListWidget_->addItem(item);
 
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 monitored folder(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
   updateActionButtons();
   adjustHeightToScreen();
@@ -436,8 +442,8 @@ void MainWindow::onWatchToggleChanged(bool checked) {
 
 void MainWindow::onDirectoryChanged(const QString &path) {
   pendingWatchPaths_.insert(path);
-  watchStatusLabel_->setText(tr("Dernier changement: %1")
-                                 .arg(QDateTime::currentDateTime().toString()));
+  watchStatusLabel_->setText(tr("Last change: %1")
+                               .arg(QDateTime::currentDateTime().toString()));
   if (!watchTriggerTimer_->isActive())
     watchTriggerTimer_->start(3000);
 }
@@ -447,8 +453,7 @@ void MainWindow::onWatchTimerTimeout() {
     for (const WatchEntry &e : watchEntries_) {
       if (e.source == p) {
         updateLog(
-            tr("Modification détectée dans %1, lancement de la sauvegarde.")
-                .arg(e.source));
+            tr("Change detected in %1, launching backup.").arg(e.source));
         if (e.isGcsMode) {
           std::map<std::string, std::string> cfg;
           cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
@@ -570,7 +575,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
     timeListWidget_->addItem(item);
   }
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 monitored folder(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
   updateActionButtons();
 }
@@ -591,7 +596,7 @@ void MainWindow::enableWatch() {
       dirWatcher_->addPath(e.source);
   }
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 monitored folder(s)").arg(watchEntries_.size()));
   updateScheduleSummary();
   updateActionButtons();
 }
@@ -712,6 +717,9 @@ void MainWindow::runBackupNow() {
     updateLog("Error: Manual backup failed. Target initialization failed.");
     return;
   }
+
+  QMessageBox::information(this, tr("Backup Started"),
+                           tr("Manual backup has started."));
 
   performBackupInternal(sourcePath, backupOperationTarget);
 
@@ -2231,25 +2239,31 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
   sourceDirButton_->setStyleSheet(buttonStyle);
+  sourceDirButton_->setToolTip(tr("Select source directory"));
+  sourceDirButton_->setMinimumWidth(uniformButtonWidth);
   srcPathLayout->addWidget(sourceDirButton_);
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
 
   sourceDirEdit_->setPlaceholderText(tr("Select the folder to back up"));
+  sourceDirEdit_->setToolTip(tr("Folder to back up"));
   mainLayout->addWidget(sourceGroupBox);
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
   watchLayout->setContentsMargins(4, 4, 4, 4);
   watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
+  watchToggleCheckBox_->setToolTip(tr("Toggle automatic folder monitoring"));
   watchLayout->addWidget(watchToggleCheckBox_);
-  watchStatusLabel_ = new QLabel(tr("0 dossier(s) surveill\xC3\xA9(s)"));
+  watchStatusLabel_ = new QLabel(tr("0 monitored folder(s)"));
   watchStatusLabel_->setStyleSheet("color:#2680eb;");
   watchLayout->addWidget(watchStatusLabel_);
   watchAddButton_ = new QPushButton(tr("Add Monitored Folder"));
   watchAddButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
   watchAddButton_->setStyleSheet(buttonStyle);
+  watchAddButton_->setToolTip(tr("Add a folder to be watched for changes"));
+  watchAddButton_->setMinimumWidth(uniformButtonWidth);
   watchLayout->addWidget(watchAddButton_, 0, Qt::AlignVCenter);
   watchLayout->addStretch();
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
@@ -2269,10 +2283,13 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   destinationDirEdit_->setMinimumWidth(400);
   destinationDirEdit_->setSizePolicy(QSizePolicy::Expanding,
                                      QSizePolicy::Preferred);
+  destinationDirEdit_->setToolTip(tr("Local destination folder"));
   destPathLayout->addWidget(destinationDirEdit_);
   destinationDirButton_ = new QPushButton(tr("Browse..."));
   destinationDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
   destinationDirButton_->setStyleSheet(buttonStyle);
+  destinationDirButton_->setToolTip(tr("Select destination directory"));
+  destinationDirButton_->setMinimumWidth(uniformButtonWidth);
   destPathLayout->addWidget(destinationDirButton_);
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
@@ -2411,6 +2428,8 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   removeTimeButton_->setStyleSheet(buttonStyle);
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
   runBackupButton_->setStyleSheet(buttonStyle);
+  runBackupButton_->setToolTip(tr("Start an immediate backup"));
+  runBackupButton_->setMinimumWidth(uniformButtonWidth);
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
   connect(runBackupButton_, &QPushButton::clicked, this,
