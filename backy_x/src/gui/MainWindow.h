@@ -185,8 +185,8 @@ private:
   void adjustHeightToScreen();
   void createSourceConfigUI(QVBoxLayout *mainLayout,
                             const QString &buttonStyle);
-  void createSchedulingControlsUI(QVBoxLayout *mainLayout,
-                                  const QString &buttonStyle);
+  void createBackupSettingsUI(QVBoxLayout *mainLayout,
+                              const QString &buttonStyle);
   void applyUnifiedStyle(QWidget *widget);
   void updateScheduleSummary();
 };
