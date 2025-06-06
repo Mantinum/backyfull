@@ -1,70 +1,18 @@
 QWidget {
-    background-color: #2e2e2e;
-    color: #f0f0f0;
-    font-family: "Segoe UI", sans-serif;
-    font-size: 13px;
-}
-
-QLineEdit,
-QTextEdit,
-QComboBox {
-    background-color: #3c3c3c;
-    border: 1px solid #555;
-    border-radius: 5px;
-    padding: 4px 8px;
-    color: #f0f0f0;
-    margin: 6px;
-}
-
-QLineEdit:hover,
-QTextEdit:hover,
-QComboBox:hover {
-    border-color: #00bcd4;
-}
-
-QLineEdit:focus,
-QTextEdit:focus,
-QComboBox:focus {
-    border-color: #00bcd4;
-    outline: none;
+    background-color: #fefefe; /* temporary to confirm stylesheet loading */
 }
 
 QPushButton {
-    background-color: #444;
-    border: 1px solid #666;
-    border-radius: 5px;
-    padding: 5px 12px;
-    color: #f0f0f0;
     min-height: 28px;
     min-width: 100px;
     margin: 6px;
 }
 
-QPushButton:hover {
-    background-color: #555;
-    border-color: #00bcd4;
-}
-
-QPushButton:focus {
-    border-color: #00bcd4;
-    outline: none;
-}
-
-QPushButton:disabled {
-    background-color: #2a2a2a;
-    color: #888;
+QLineEdit, QComboBox, QTextEdit {
+    margin: 6px;
 }
 
 QGroupBox {
-    border: 1px solid #666;
-    border-radius: 5px;
     margin-top: 12px;
     padding: 12px;
-}
-
-QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 8px;
-    top: -8px;
-    padding: 0 4px;
 }

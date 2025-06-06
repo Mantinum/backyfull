@@ -185,10 +185,8 @@ private:
   QString currentDestinationForDisplay() const;
 
   void adjustHeightToScreen();
-  void createSourceConfigUI(QVBoxLayout *mainLayout,
-                            const QString &buttonStyle);
-  void createSchedulingControlsUI(QVBoxLayout *mainLayout,
-                                  const QString &buttonStyle);
+  void createSourceConfigUI(QVBoxLayout *mainLayout);
+  void createSchedulingControlsUI(QVBoxLayout *mainLayout);
   void applyUnifiedStyle(QWidget *widget);
   void updateScheduleSummary();
   void updateActionButtons();
