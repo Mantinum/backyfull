@@ -8,7 +8,8 @@
 #include <QCheckBox>
 #include <QToolButton>
 #include <QAbstractButton>
-#include <QComboBox>
+#include <QTabWidget>
+#include <QProgressBar>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QGroupBox>
@@ -97,7 +98,9 @@ private:
   QScrollArea *scrollArea_ = nullptr;
 
   // Backup Mode Selection
-  QComboBox *backupModeComboBox_;
+  QTabWidget *backupModeTabWidget_;
+
+  QProgressBar *backupProgressBar_{nullptr};
 
   // Local Backup Settings
   QGroupBox *m_localDestinationGroupBox;

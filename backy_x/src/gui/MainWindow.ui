@@ -105,7 +105,7 @@
              <item>
               <widget class="QPushButton" name="sourceDirButton">
                <property name="text">
-                <string>Browse...</string>
+                <string>📂 Browse</string>
                </property>
               </widget>
              </item>
@@ -150,7 +150,7 @@
              <item>
               <widget class="QPushButton" name="destinationDirButton">
                <property name="text">
-                <string>Browse...</string>
+                <string>📂 Browse</string>
                </property>
               </widget>
              </item>
@@ -574,8 +574,21 @@
                </property>
               </widget>
              </item>
-            </layout>
-           </item>
+           </layout>
+          </item>
+          <item row="6" column="0" colspan="3">
+           <widget class="QProgressBar" name="backupProgressBar">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
           </layout>
          </widget>
         </item>
@@ -646,8 +659,9 @@
     </property>
     <addaction name="actionToggleFileViewer"/>
    </widget>
-   <addaction name="menuView"/>
-  </widget>
+  <addaction name="menuView"/>
+ </widget>
+  <widget class="QStatusBar" name="statusBar"/>
 </widget>
  <resources/>
  <connections/>
