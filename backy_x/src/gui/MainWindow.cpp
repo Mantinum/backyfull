@@ -142,22 +142,19 @@ void MainWindow::setupUI() {
   mainLayout->setSpacing(20);
 
   const QString buttonStyle = QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}" "QPushButton:enabled{background:palette(button);color:palette(button-text);}" "QPushButton:disabled{background:palette(mid);color:palette(midlight);}");
-  const int uniformButtonWidth = 140;
+  const int uniformButtonWidth = 100;
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
   QGroupBox *modeGroupBox = new QGroupBox(tr("Backup Mode"));
-  QHBoxLayout *modeLayout = new QHBoxLayout(modeGroupBox);
+  QFormLayout *modeLayout = new QFormLayout(modeGroupBox);
   modeLayout->setContentsMargins(10, 10, 10, 10);
-  QLabel *modeIcon = new QLabel();
-  modeIcon->setPixmap(
-      style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
-  modeLayout->addWidget(modeIcon);
-  QLabel *modeLabel = new QLabel(tr("<b>Backup Mode</b>"));
-  modeLayout->addWidget(modeLabel);
+  QLabel *modeLabel = new QLabel(tr("Mode:"));
+  modeLabel->setMinimumWidth(modeLabel->sizeHint().width());
   backupModeComboBox_ = new QComboBox();
+  backupModeComboBox_->setMinimumHeight(28);
   backupModeComboBox_->addItem(tr("Local Backup"));
   backupModeComboBox_->addItem(tr("SFTP Backup"));
   backupModeComboBox_->addItem(tr("Google Cloud Storage"));
@@ -168,8 +165,7 @@ void MainWindow::setupUI() {
                                      QSizePolicy::Preferred);
   backupModeComboBox_->setToolTip(
       tr("Select the type of destination for backups"));
-  modeLayout->addWidget(backupModeComboBox_);
-  modeLayout->addStretch();
+  modeLayout->addRow(modeLabel, backupModeComboBox_);
   mainLayout->addWidget(modeGroupBox);
   applyUnifiedStyle(modeGroupBox);
 
@@ -2206,10 +2202,16 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   }
   const auto buttons = widget->findChildren<QAbstractButton *>();
   for (QAbstractButton *b : buttons) {
-    b->setMinimumHeight(24);
+    b->setMinimumHeight(28);
+    b->setMinimumWidth(100);
+  }
+  const auto combos = widget->findChildren<QComboBox *>();
+  for (QComboBox *c : combos) {
+    c->setMinimumHeight(28);
   }
   const auto edits = widget->findChildren<QLineEdit *>();
   for (QLineEdit *e : edits) {
+    e->setMinimumHeight(28);
     e->setStyleSheet(
         "QLineEdit{background:palette(base);color:palette(text);}"
         "QLineEdit::placeholder{color:palette(mid);}");
@@ -2217,8 +2219,8 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   const auto groups = widget->findChildren<QGroupBox *>();
   for (QGroupBox *g : groups) {
     g->setStyleSheet(
-        "QGroupBox{font-weight:bold;margin-top:15px;border:1px solid palette(mid);"
-        "border-radius:4px;padding-top:20px;background:palette(window);"
+        "QGroupBox{font-weight:bold;margin-top:12px;border:1px solid palette(mid);"
+        "border-radius:4px;padding:12px;background:palette(window);"
         "color:palette(window-text);}"
         "QGroupBox::title{subcontrol-origin:margin;left:8px;top:-8px;"
         "background:palette(window);padding:0 3px;}");
@@ -2273,8 +2275,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   watchGroupBox_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   mainLayout->addWidget(watchGroupBox_);
 
-  m_localDestinationGroupBox =
-      new QGroupBox(tr("Local Destination Configuration"));
+  m_localDestinationGroupBox = new QGroupBox(tr("Destination"));
   QFormLayout *localDestLayout = new QFormLayout(m_localDestinationGroupBox);
   localDestLayout->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
   QHBoxLayout *destPathLayout = new QHBoxLayout();
@@ -2370,8 +2371,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
 void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                             const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox =
-      new QGroupBox(tr("Scheduling & Monitoring Summary"));
+  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Schedule"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
   scheduleLayout->setVerticalSpacing(8);
   backupTimeEdit_ = new QTimeEdit();
