@@ -639,13 +639,13 @@
     <string>Remote File Browser</string>
    </property>
   </action>
-  <widget class="QMenu" name="menuView">
-   <property name="title">
-    <string>&amp;View</string>
-   </property>
-   <addaction name="actionToggleFileViewer"/>
-  </widget>
   <widget class="QMenuBar" name="menubar">
+   <widget class="QMenu" name="menuView">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <addaction name="actionToggleFileViewer"/>
+   </widget>
    <addaction name="menuView"/>
   </widget>
 </widget>

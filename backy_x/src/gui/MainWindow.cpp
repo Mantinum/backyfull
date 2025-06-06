@@ -122,8 +122,8 @@ void MainWindow::setupUI() {
   QMenu *viewMenu = ui->menuView;
   if (!viewMenu)
     viewMenu = menuBar()->addMenu(tr("&View"));
-  if (ui->actionToggleFileViewer)
-    ui->menuView->removeAction(ui->actionToggleFileViewer);
+  if (ui->actionToggleFileViewer && viewMenu)
+    viewMenu->removeAction(ui->actionToggleFileViewer);
 
   const QString buttonStyle =
       QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
