@@ -106,6 +106,7 @@ target_compile_options(backy_x_cli PRIVATE -Wall -Wextra -pedantic)
 add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
+    src/gui/MainWindow.ui
     src/gui/FileViewerWidget.cpp
     src/gui/WatchManager.cpp
 )

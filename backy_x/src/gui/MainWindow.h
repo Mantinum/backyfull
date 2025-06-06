@@ -36,6 +36,10 @@ class GcsTarget; // Forward declare GcsTarget
 class FileViewerWidget;
 class WatchManager;
 
+namespace Ui {
+class MainWindow;
+}
+
 class MainWindow : public QMainWindow {
   Q_OBJECT
 
@@ -69,6 +73,7 @@ private slots:
   void handleWatchTriggered(const WatchEntry &entry);
 
 private:
+  Ui::MainWindow *ui{nullptr};
   void setupUI();
   void loadSettings();
   void saveSettings();
@@ -148,10 +153,6 @@ private:
   QString currentDestinationForDisplay() const;
 
   void adjustHeightToScreen();
-  void createSourceConfigUI(QVBoxLayout *mainLayout,
-                            const QString &buttonStyle);
-  void createSchedulingControlsUI(QVBoxLayout *mainLayout,
-                                  const QString &buttonStyle);
   void applyUnifiedStyle(QWidget *widget);
   void updateScheduleSummary();
 };
