@@ -6,6 +6,7 @@
 #include "util/CredentialManager.h"
 #include "gui/FileViewerWidget.h"
 #include "gui/WatchManager.h"
+#include "ui_MainWindow.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -40,7 +41,7 @@
 #include <QMenuBar>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
+    : QMainWindow(parent), ui(new Ui::MainWindow), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
@@ -100,6 +101,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() {
+  delete ui;
   delete localTarget_;
   localTarget_ = nullptr;
   delete sftpTarget_;
@@ -114,80 +116,109 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::setupUI() {
-  setWindowTitle(tr("BackyFull - Backup Configuration"));
+  ui->setupUi(this);
 
-  // Menu bar
-  QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
-
-  scrollArea_ = new QScrollArea(this);
-  setCentralWidget(scrollArea_);
-  scrollArea_->setWidgetResizable(true);
-  QWidget *centralWidget = new QWidget(scrollArea_);
-  scrollArea_->setWidget(centralWidget);
-
-  QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-  mainLayout->setSpacing(12);
+  // Menu
+  QMenu *viewMenu = ui->menuView;
+  if (!viewMenu)
+    viewMenu = menuBar()->addMenu(tr("&View"));
+  if (ui->actionToggleFileViewer && viewMenu)
+    viewMenu->removeAction(ui->actionToggleFileViewer);
 
   const QString buttonStyle =
       QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
+
+  // Store pointers to widgets from UI
+  scrollArea_ = ui->scrollArea;
+  sourceDirEdit_ = ui->sourceDirEdit;
+  sourceDirButton_ = ui->sourceDirButton;
+  destinationDirEdit_ = ui->destinationDirEdit;
+  destinationDirButton_ = ui->destinationDirButton;
+  backupModeComboBox_ = ui->backupModeComboBox;
+  backupTimeEdit_ = ui->backupTimeEdit;
+  addTimeButton_ = ui->addTimeButton;
+  timeListWidget_ = ui->timeListWidget;
+  removeTimeButton_ = ui->removeTimeButton;
+  runBackupButton_ = ui->runBackupButton;
+  scheduleSummaryLabel_ = ui->scheduleSummaryLabel;
+  logDisplay_ = ui->logDisplay;
+  QToolButton *logToggleButton = ui->logToggleButton;
+  m_localDestinationGroupBox = ui->localDestinationGroupBox;
+  sftpSettingsGroupBox_ = ui->sftpSettingsGroupBox;
+  sftpHostLineEdit_ = ui->sftpHostLineEdit;
+  sftpPortLineEdit_ = ui->sftpPortLineEdit;
+  sftpUsernameLineEdit_ = ui->sftpUsernameLineEdit;
+  sftpPasswordLineEdit_ = ui->sftpPasswordLineEdit;
+  sftpRemotePathLineEdit_ = ui->sftpRemotePathLineEdit;
+  sftpSavePasswordCheckBox_ = ui->sftpSavePasswordCheckBox;
+  sftpConnectToggleButton_ = ui->sftpConnectToggleButton;
+  gcsSettingsGroupBox_ = ui->gcsSettingsGroupBox;
+  gcsBucketNameLineEdit_ = ui->gcsBucketNameLineEdit;
+  gcsAccountIdentifierLineEdit_ = ui->gcsAccountIdentifierLineEdit;
+  gcsConnectButton_ = ui->gcsConnectButton;
+  gcsTestConnectionButton_ = ui->gcsTestConnectionButton;
+  gcsAuthStatusLabel_ = ui->gcsAuthStatusLabel;
+  gcsConnectToggleButton_ = ui->gcsConnectToggleButton;
+  watchToggleCheckBox_ = ui->watchToggleCheckBox;
+  watchStatusLabel_ = ui->watchStatusLabel;
+  fileViewerDockWidget_ = ui->fileViewerDockWidget;
+
+  // Collect day buttons
+  dayButtons_.clear();
+  dayButtons_ << ui->dayButton1 << ui->dayButton2 << ui->dayButton3
+              << ui->dayButton4 << ui->dayButton5 << ui->dayButton6
+              << ui->dayButton7;
+
+  applyUnifiedStyle(ui->sourceGroupBox);
+  applyUnifiedStyle(ui->localDestinationGroupBox);
+  applyUnifiedStyle(ui->sftpSettingsGroupBox);
+  applyUnifiedStyle(ui->gcsSettingsGroupBox);
+  applyUnifiedStyle(ui->scheduleGroupBox);
+
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
-  QWidget *modeWidget = new QWidget();
-  QHBoxLayout *modeLayout = new QHBoxLayout(modeWidget);
-  modeLayout->setContentsMargins(0, 0, 0, 0);
-  modeLayout->setAlignment(Qt::AlignVCenter);
-  QLabel *modeIcon = new QLabel();
-  modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
-  modeLayout->addWidget(modeIcon);
-  QLabel *modeLabel = new QLabel(tr("<b>Backup Mode</b>"));
-  modeLayout->addWidget(modeLabel);
-  backupModeComboBox_ = new QComboBox();
+  ui->modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
   backupModeComboBox_->addItem(tr("Local Backup"));
   backupModeComboBox_->addItem(tr("SFTP Backup"));
   backupModeComboBox_->addItem(tr("Google Cloud Storage"));
-  modeLayout->addWidget(backupModeComboBox_);
-  modeLayout->addStretch();
-  mainLayout->addWidget(modeWidget);
 
-  createSourceConfigUI(mainLayout, buttonStyle);
-
-  connect(backupModeComboBox_,
-          QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-          &MainWindow::onBackupModeChanged);
-
-  createSchedulingControlsUI(mainLayout, buttonStyle);
-
-
-  QToolButton *logToggleButton = new QToolButton();
-  logToggleButton->setText(tr("Logs"));
-  logToggleButton->setCheckable(true);
-  logToggleButton->setArrowType(Qt::RightArrow);
-  mainLayout->addWidget(logToggleButton);
-  logDisplay_ = new QTextEdit();
-  logDisplay_->setReadOnly(true);
-  logDisplay_->setVisible(false);
-  logDisplay_->setMaximumHeight(150);
-  mainLayout->addWidget(logDisplay_);
-  connect(logToggleButton, &QToolButton::toggled, [this, logToggleButton](bool checked) {
-    logDisplay_->setVisible(checked);
-    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-  });
-  mainLayout->setStretchFactor(logDisplay_, 1);
-
-  // File Viewer GroupBox within a DockWidget
+  // Setup File Viewer dock widget
   fileViewerWidget_ = new FileViewerWidget();
-
-  fileViewerDockWidget_ = new QDockWidget(tr("Remote File Browser"), this);
   fileViewerDockWidget_->setWidget(fileViewerWidget_);
   fileViewerDockWidget_->setMinimumSize(250, 300);
   addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
   fileViewerDockWidget_->hide();
   viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
 
-  // Relay log messages from the viewer
+  // Connections
+  connect(sourceDirButton_, &QPushButton::clicked, this,
+          &MainWindow::selectSourceDirectory);
+  connect(destinationDirButton_, &QPushButton::clicked, this,
+          &MainWindow::selectDestinationDirectory);
+  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          this, &MainWindow::onBackupModeChanged);
+  connect(addTimeButton_, &QToolButton::clicked, this,
+          &MainWindow::onAddBackupTimeClicked);
+  connect(removeTimeButton_, &QPushButton::clicked, this,
+          &MainWindow::onRemoveBackupTimeClicked);
+  connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
+  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
+          &MainWindow::onWatchToggleChanged);
+  connect(gcsConnectButton_, &QPushButton::clicked, this,
+          &MainWindow::onGcsConnectButtonClicked);
+  connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
+          &MainWindow::onGcsTestConnectionClicked);
+  connect(gcsConnectToggleButton_, &QPushButton::clicked, this,
+          &MainWindow::onGcsConnectToggleClicked);
+  connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
+          &MainWindow::onSftpConnectToggleClicked);
+  connect(logToggleButton, &QToolButton::toggled, this, [this, logToggleButton](bool checked) {
+    logDisplay_->setVisible(checked);
+    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
+  });
   connect(fileViewerWidget_, &FileViewerWidget::logMessage, this,
           &MainWindow::updateLog);
 
@@ -1573,194 +1604,6 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
   }
 }
 
-void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
-                                      const QString &buttonStyle) {
-  QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
-  QFormLayout *sourceLayout = new QFormLayout(sourceGroupBox);
-  QHBoxLayout *srcPathLayout = new QHBoxLayout();
-  sourceDirEdit_ = new QLineEdit();
-  sourceDirEdit_->setReadOnly(true);
-  sourceDirEdit_->setPlaceholderText(tr("Select the folder to back up"));
-  srcPathLayout->addWidget(sourceDirEdit_);
-  sourceDirButton_ = new QPushButton(tr("Browse..."));
-  sourceDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
-  sourceDirButton_->setStyleSheet(buttonStyle);
-  srcPathLayout->addWidget(sourceDirButton_);
-  connect(sourceDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectSourceDirectory);
-  sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
-
-  QLabel *sourceHint = new QLabel(
-      tr("Select the folder that will serve as the source for backups."));
-  sourceHint->setWordWrap(true);
-  sourceHint->setStyleSheet("margin-top:8px; color: gray;");
-  sourceLayout->addRow(sourceHint);
-
-  mainLayout->addWidget(sourceGroupBox);
-
-  m_localDestinationGroupBox =
-      new QGroupBox(tr("Local Destination Configuration"));
-  QFormLayout *localDestLayout = new QFormLayout(m_localDestinationGroupBox);
-  QHBoxLayout *destPathLayout = new QHBoxLayout();
-  destinationDirEdit_ = new QLineEdit();
-  destinationDirEdit_->setReadOnly(true);
-  destPathLayout->addWidget(destinationDirEdit_);
-  destinationDirButton_ = new QPushButton(tr("Browse..."));
-  destinationDirButton_->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
-  destinationDirButton_->setStyleSheet(buttonStyle);
-  destPathLayout->addWidget(destinationDirButton_);
-  connect(destinationDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectDestinationDirectory);
-  localDestLayout->addRow(tr("Destination Directory (Local):"), destPathLayout);
-  QLabel *destHint =
-      new QLabel(tr("Select destination folder (local or remote)"));
-  destHint->setWordWrap(true);
-  destHint->setStyleSheet("margin-top:8px; color: gray; font-style: italic;");
-  localDestLayout->addRow(destHint);
-  mainLayout->addWidget(m_localDestinationGroupBox);
-
-  sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
-  QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
-  sftpHostLineEdit_ = new QLineEdit();
-  sftpFormLayout->addRow(new QLabel(tr("SFTP Host:")), sftpHostLineEdit_);
-  sftpPortLineEdit_ = new QLineEdit();
-  sftpPortLineEdit_->setText("22");
-  sftpPortLineEdit_->setValidator(new QIntValidator(1, 65535, this));
-  sftpFormLayout->addRow(new QLabel(tr("SFTP Port:")), sftpPortLineEdit_);
-  sftpUsernameLineEdit_ = new QLineEdit();
-  sftpFormLayout->addRow(new QLabel(tr("SFTP Username:")),
-                         sftpUsernameLineEdit_);
-  sftpPasswordLineEdit_ = new QLineEdit();
-  sftpPasswordLineEdit_->setEchoMode(QLineEdit::Password);
-  sftpFormLayout->addRow(new QLabel(tr("SFTP Password:")),
-                         sftpPasswordLineEdit_);
-  sftpSavePasswordCheckBox_ = new QCheckBox(tr("Save password securely"));
-  sftpFormLayout->addRow(sftpSavePasswordCheckBox_);
-  sftpRemotePathLineEdit_ = new QLineEdit();
-  sftpFormLayout->addRow(new QLabel(tr("SFTP Remote Path:")),
-                         sftpRemotePathLineEdit_);
-  sftpConnectToggleButton_ = new QPushButton(tr("Connect"));
-  sftpConnectToggleButton_->setStyleSheet(buttonStyle);
-  sftpFormLayout->addRow(sftpConnectToggleButton_);
-  connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onSftpConnectToggleClicked);
-  mainLayout->addWidget(sftpSettingsGroupBox_);
-
-  gcsSettingsGroupBox_ =
-      new QGroupBox(tr("Google Cloud Storage Configuration"));
-  QFormLayout *gcsFormLayout = new QFormLayout(gcsSettingsGroupBox_);
-  gcsBucketNameLineEdit_ = new QLineEdit();
-  gcsBucketNameLineEdit_->setToolTip(
-      tr("Name of your GCS bucket (must exist)"));
-  gcsFormLayout->addRow(new QLabel(tr("GCS Bucket Name:")),
-                        gcsBucketNameLineEdit_);
-  gcsAccountIdentifierLineEdit_ = new QLineEdit();
-  gcsAccountIdentifierLineEdit_->setToolTip(
-      tr("Email linked to your Google account"));
-  gcsFormLayout->addRow(new QLabel(tr("GCS Account Identifier:")),
-                        gcsAccountIdentifierLineEdit_);
-  gcsConnectButton_ = new QPushButton(tr("Log in to Google Drive"));
-  gcsConnectButton_->setStyleSheet(buttonStyle);
-  gcsFormLayout->addRow(gcsConnectButton_);
-  connect(gcsConnectButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectButtonClicked);
-  gcsAuthStatusLabel_ = new QLabel(tr("Status: Not Authenticated"));
-  gcsFormLayout->addRow(gcsAuthStatusLabel_);
-  gcsTestConnectionButton_ = new QPushButton(tr("Test Connection"));
-  gcsTestConnectionButton_->setStyleSheet(buttonStyle);
-  gcsFormLayout->addRow(gcsTestConnectionButton_);
-  connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsTestConnectionClicked);
-  gcsConnectToggleButton_ = new QPushButton(tr("Connect"));
-  gcsConnectToggleButton_->setStyleSheet(buttonStyle);
-  gcsFormLayout->addRow(gcsConnectToggleButton_);
-  connect(gcsConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectToggleClicked);
-  mainLayout->addWidget(gcsSettingsGroupBox_);
-
-  applyUnifiedStyle(sourceGroupBox);
-  applyUnifiedStyle(m_localDestinationGroupBox);
-  applyUnifiedStyle(sftpSettingsGroupBox_);
-  applyUnifiedStyle(gcsSettingsGroupBox_);
-}
-
-void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
-                                            const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Backup Settings"));
-  QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
-  scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
-  backupTimeEdit_ = new QTimeEdit();
-  backupTimeEdit_->setDisplayFormat("HH:mm");
-
-  QHBoxLayout *scheduleRow = new QHBoxLayout();
-  scheduleRow->setContentsMargins(0, 0, 0, 0);
-  scheduleRow->setSpacing(6);
-  scheduleRow->setAlignment(Qt::AlignCenter);
-  const QStringList dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
-  for (int i = 0; i < 7; ++i) {
-    QToolButton *btn = new QToolButton();
-    btn->setObjectName("daySelector");
-    btn->setText(dayLabels[i]);
-    btn->setCheckable(true);
-    btn->setFixedSize(26, 26);
-    dayButtons_.append(btn);
-    scheduleRow->addWidget(btn);
-  }
-  scheduleRow->addWidget(backupTimeEdit_);
-  addTimeButton_ = new QToolButton();
-  addTimeButton_->setText("+");
-  addTimeButton_->setFixedSize(26, 26);
-  addTimeButton_->setStyleSheet(
-      "QToolButton{border-radius:13px;border:1px solid gray;background:#e0e0e0;}");
-  scheduleRow->addWidget(addTimeButton_);
-  scheduleLayout->addLayout(scheduleRow, 0, 0, 1, 3);
-  connect(addTimeButton_, &QToolButton::clicked, this,
-          &MainWindow::onAddBackupTimeClicked);
-
-  scheduleSummaryLabel_ = new QLabel();
-  scheduleSummaryLabel_->setStyleSheet("font-weight:bold");
-  scheduleLayout->addWidget(scheduleSummaryLabel_, 1, 0, 1, 3);
-
-  scheduleLayout->addWidget(new QLabel(tr("Scheduled Times:")), 2, 0, 1, 3);
-  timeListWidget_ = new QListWidget();
-  QFrame *timesFrame = new QFrame();
-  timesFrame->setStyleSheet("background:#f0f0f0;border:1px solid #ccc;");
-  QVBoxLayout *timesLayout = new QVBoxLayout(timesFrame);
-  timesLayout->setContentsMargins(0, 0, 0, 0);
-  timesLayout->addWidget(timeListWidget_);
-  scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
-
-  QHBoxLayout *watchLayout = new QHBoxLayout();
-  watchLayout->setContentsMargins(0, 8, 0, 0);
-  watchLayout->setAlignment(Qt::AlignLeft);
-  watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
-  watchLayout->addWidget(watchToggleCheckBox_);
-  watchStatusLabel_ = new QLabel(tr("Monitoring off"));
-  watchStatusLabel_->setStyleSheet("color:#2680eb;");
-  watchLayout->addWidget(watchStatusLabel_);
-  watchLayout->addStretch();
-  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onWatchToggleChanged);
-  scheduleLayout->addLayout(watchLayout, 4, 0, 1, 3);
-
-  removeTimeButton_ = new QPushButton(tr("Remove Selected"));
-  removeTimeButton_->setStyleSheet(buttonStyle);
-  runBackupButton_ = new QPushButton(tr("Run Backup Now"));
-  runBackupButton_->setStyleSheet(buttonStyle);
-  connect(removeTimeButton_, &QPushButton::clicked, this,
-          &MainWindow::onRemoveBackupTimeClicked);
-  connect(runBackupButton_, &QPushButton::clicked, this,
-          &MainWindow::runBackupNow);
-  QHBoxLayout *buttonsLayout = new QHBoxLayout();
-  buttonsLayout->addWidget(removeTimeButton_);
-  buttonsLayout->addStretch();
-  buttonsLayout->addWidget(runBackupButton_);
-  scheduleLayout->addLayout(buttonsLayout, 5, 0, 1, 3);
-
-  mainLayout->addWidget(scheduleGroupBox);
-  applyUnifiedStyle(scheduleGroupBox);
-  updateScheduleSummary();
-}
 
 void MainWindow::updateScheduleSummary() {
   if (!scheduleSummaryLabel_ || !timeListWidget_)
