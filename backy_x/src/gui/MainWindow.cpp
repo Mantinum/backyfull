@@ -57,7 +57,7 @@ MainWindow::MainWindow(QWidget *parent)
           nullptr), // Initialize new GCS Test Connection button
       gcsAuthStatusLabel_(nullptr), gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
-      fileViewerDockWidget_(nullptr), fileViewerWidget_(nullptr), watchGroupBox_(nullptr),
+      fileViewerDockWidget_(nullptr), fileViewerWidget_(nullptr),
       watchToggleCheckBox_(nullptr), watchStatusLabel_(nullptr),
       watchManager_(nullptr),
       // Core components
@@ -385,9 +385,19 @@ void MainWindow::handleWatchTriggered(const WatchEntry &e) {
 void MainWindow::onWatchToggleChanged(bool checked) {
   if (checked) {
     watchManager_->enable();
-    onAddWatchEntry();
+    refreshWatchEntriesDisplay();
+    if (watchManager_->entries().isEmpty())
+      onAddWatchEntry();
   } else {
     watchManager_->disable();
+    for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
+      QListWidgetItem *item = timeListWidget_->item(i);
+      if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
+        delete timeListWidget_->takeItem(i);
+      }
+    }
+    watchStatusLabel_->setText(tr("Monitoring off"));
+    updateScheduleSummary();
   }
 }
 
@@ -465,6 +475,12 @@ void MainWindow::updateScheduleFromUI() {
 void MainWindow::refreshWatchEntriesDisplay() {
   if (!timeListWidget_)
     return;
+  for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
+    QListWidgetItem *item = timeListWidget_->item(i);
+    if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
+      delete timeListWidget_->takeItem(i);
+    }
+  }
   for (const WatchEntry &e : watchManager_->entries()) {
     QString destDisp;
     if (e.isSftpMode) {
@@ -485,8 +501,12 @@ void MainWindow::refreshWatchEntriesDisplay() {
     item->setData(Qt::UserRole, QStringLiteral("WATCH|") + e.source);
     timeListWidget_->addItem(item);
   }
-  watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
+  if (watchManager_->entries().isEmpty())
+    watchStatusLabel_->setText(tr("Monitoring off"));
+  else
+    watchStatusLabel_->setText(
+        tr("%1 dossier(s) surveill\u00e9(s)")
+            .arg(watchManager_->entries().size()));
   updateScheduleSummary();
 }
 
@@ -1576,19 +1596,8 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   sourceHint->setStyleSheet("margin-top:8px; color: gray;");
   sourceLayout->addRow(sourceHint);
 
-  watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
-  QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
-  watchLayout->setContentsMargins(4, 4, 4, 4);
-  watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
-  watchLayout->addWidget(watchToggleCheckBox_);
-  watchStatusLabel_ = new QLabel(tr("Monitoring off"));
-  watchStatusLabel_->setStyleSheet("color:#2680eb;");
-  watchLayout->addWidget(watchStatusLabel_);
-  watchLayout->addStretch();
-  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onWatchToggleChanged);
-  watchGroupBox_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  sourceLayout->addRow(watchGroupBox_);
+  sourceLayout->addItem(new QSpacerItem(0, 8, QSizePolicy::Minimum,
+                                        QSizePolicy::Fixed));
   mainLayout->addWidget(sourceGroupBox);
 
   m_localDestinationGroupBox =
@@ -1679,7 +1688,7 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
 
 void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
                                             const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
+  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Backup Settings"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
   scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
   backupTimeEdit_ = new QTimeEdit();
@@ -1723,6 +1732,18 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   timesLayout->addWidget(timeListWidget_);
   scheduleLayout->addWidget(timesFrame, 3, 0, 1, 3);
 
+  QHBoxLayout *watchLayout = new QHBoxLayout();
+  watchLayout->setContentsMargins(0, 8, 0, 0);
+  watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
+  watchLayout->addWidget(watchToggleCheckBox_);
+  watchStatusLabel_ = new QLabel(tr("Monitoring off"));
+  watchStatusLabel_->setStyleSheet("color:#2680eb;");
+  watchLayout->addWidget(watchStatusLabel_);
+  watchLayout->addStretch();
+  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
+          &MainWindow::onWatchToggleChanged);
+  scheduleLayout->addLayout(watchLayout, 4, 0, 1, 3);
+
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
   removeTimeButton_->setStyleSheet(buttonStyle);
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
@@ -1735,7 +1756,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   buttonsLayout->addWidget(removeTimeButton_);
   buttonsLayout->addStretch();
   buttonsLayout->addWidget(runBackupButton_);
-  scheduleLayout->addLayout(buttonsLayout, 4, 0, 1, 3);
+  scheduleLayout->addLayout(buttonsLayout, 5, 0, 1, 3);
 
   mainLayout->addWidget(scheduleGroupBox);
   applyUnifiedStyle(scheduleGroupBox);

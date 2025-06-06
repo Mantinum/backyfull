@@ -122,7 +122,6 @@ private:
   QString currentRemotePath_ = "/";
 
   // Auto Watch UI
-  QGroupBox *watchGroupBox_ = nullptr;
   QCheckBox *watchToggleCheckBox_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
 
