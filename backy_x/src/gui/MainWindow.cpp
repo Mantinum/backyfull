@@ -1499,20 +1499,6 @@ void MainWindow::browseRemotePath(const QString &path) {
     fileViewerWidget_->browsePath(path);
 }
 
-void MainWindow::onFileViewerRefreshClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->refresh();
-}
-
-void MainWindow::onFileViewerDownloadClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->downloadSelected();
-}
-
-void MainWindow::onFileViewerDeleteClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->deleteSelected();
-}
 
 
 QString MainWindow::shortenPathForDisplay(const QString &path) const {
