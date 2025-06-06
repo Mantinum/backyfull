@@ -30,6 +30,7 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QSplitter>
 #include <QTime>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -121,6 +122,9 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
+  if (auto spl = findChild<QSplitter*>("centralwidget"))
+    spl->setSizes({200, width() - 200});
+
   // Menu
   QMenu *viewMenu = ui->menuView;
   if (!viewMenu)
@@ -206,6 +210,7 @@ void MainWindow::setupUI() {
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
   connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
+  connect(ui->actionRunBackup, &QAction::triggered, this, &MainWindow::runBackupNow);
   connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
           &MainWindow::onWatchToggleChanged);
   connect(gcsConnectButton_, &QPushButton::clicked, this,

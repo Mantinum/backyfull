@@ -103,7 +103,23 @@
             </widget>
            </item>
            <item>
-            <widget class="QComboBox" name="backupModeComboBox"/>
+            <widget class="QComboBox" name="backupModeComboBox">
+             <item>
+              <property name="text">
+               <string>Local Backup</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>SFTP Backup</string>
+              </property>
+             </item>
+             <item>
+              <property name="text">
+               <string>Google Cloud Storage</string>
+              </property>
+             </item>
+            </widget>
            </item>
            <item>
             <spacer name="modeSpacer">
@@ -668,6 +684,14 @@
     <string>Remote File Browser</string>
    </property>
   </action>
+  <action name="actionRunBackup">
+   <property name="text">
+    <string>Run Backup Now</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
+  </action>
   <widget class="QMenuBar" name="menubar">
    <widget class="QMenu" name="menuView">
     <property name="title">
@@ -676,6 +700,12 @@
     <addaction name="actionToggleFileViewer"/>
    </widget>
   <addaction name="menuView"/>
+ </widget>
+ <widget class="QToolBar" name="mainToolBar">
+  <property name="windowTitle">
+   <string>Tools</string>
+  </property>
+  <addaction name="actionRunBackup"/>
  </widget>
   <widget class="QStatusBar" name="statusBar"/>
 </widget>
