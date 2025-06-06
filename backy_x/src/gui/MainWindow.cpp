@@ -48,8 +48,8 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
-      logDisplay_(nullptr), scrollArea_(nullptr), backupModeTabWidget_(nullptr),
-      backupProgressBar_(nullptr),
+      logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
+      backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
@@ -93,8 +93,8 @@ MainWindow::MainWindow(QWidget *parent)
   connect(scheduler_, &Scheduler::taskChanged, this,
           &MainWindow::onTaskChanged);
 
-  if (backupModeTabWidget_) {
-    onBackupModeChanged(backupModeTabWidget_->currentIndex());
+  if (backupModeComboBox_ && backupModeStackedWidget_) {
+    onBackupModeChanged(backupModeComboBox_->currentIndex());
   }
   onTaskChanged();
 
@@ -165,16 +165,8 @@ void MainWindow::setupUI() {
   watchToggleCheckBox_ = ui->watchToggleCheckBox;
   watchStatusLabel_ = ui->watchStatusLabel;
   fileViewerDockWidget_ = ui->fileViewerDockWidget;
-
-  backupModeTabWidget_ = new QTabWidget(this);
-  backupModeTabWidget_->addTab(m_localDestinationGroupBox, tr("Local Backup"));
-  backupModeTabWidget_->addTab(sftpSettingsGroupBox_, tr("SFTP Backup"));
-  backupModeTabWidget_->addTab(gcsSettingsGroupBox_, tr("Google Cloud Storage"));
-  int insertIndex = ui->scrollAreaLayout->indexOf(m_localDestinationGroupBox);
-  ui->scrollAreaLayout->removeWidget(m_localDestinationGroupBox);
-  ui->scrollAreaLayout->removeWidget(sftpSettingsGroupBox_);
-  ui->scrollAreaLayout->removeWidget(gcsSettingsGroupBox_);
-  ui->scrollAreaLayout->insertWidget(insertIndex, backupModeTabWidget_);
+  backupModeComboBox_ = ui->backupModeComboBox;
+  backupModeStackedWidget_ = ui->backupModeStackedWidget;
 
   // Collect day buttons
   dayButtons_.clear();
@@ -207,7 +199,7 @@ void MainWindow::setupUI() {
           &MainWindow::selectSourceDirectory);
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
-  connect(backupModeTabWidget_, &QTabWidget::currentChanged,
+  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
           this, &MainWindow::onBackupModeChanged);
   connect(addTimeButton_, &QToolButton::clicked, this,
           &MainWindow::onAddBackupTimeClicked);
@@ -328,7 +320,7 @@ void MainWindow::onAddWatchEntry() {
                          tr("Source path cannot be empty."));
     return;
   }
-  QString modeText = backupModeTabWidget_->tabText(backupModeTabWidget_->currentIndex());
+  QString modeText = backupModeComboBox_->currentText();
   bool localMode = (modeText == tr("Local Backup"));
   bool sftpMode = (modeText == tr("SFTP Backup"));
   bool gcsMode = (modeText == tr("Google Cloud Storage"));
@@ -475,7 +467,7 @@ void MainWindow::updateScheduleFromUI() {
   }
 
   QString destIdentifier;
-  QString modeText = backupModeTabWidget_->tabText(backupModeTabWidget_->currentIndex());
+  QString modeText = backupModeComboBox_->currentText();
   bool localMode = (modeText == tr("Local Backup"));
   bool sftpMode = (modeText == tr("SFTP Backup"));
   bool gcsMode = (modeText == tr("Google Cloud Storage"));
@@ -560,7 +552,7 @@ void MainWindow::runBackupNow() {
     return;
   }
 
-  QString currentModeText = backupModeTabWidget_->tabText(backupModeTabWidget_->currentIndex());
+  QString currentModeText = backupModeComboBox_->currentText();
   bool localMode = (currentModeText == tr("Local Backup"));
   bool sftpMode = (currentModeText == tr("SFTP Backup"));
   bool gcsMode = (currentModeText == tr("Google Cloud Storage"));
@@ -1202,13 +1194,13 @@ void MainWindow::onTaskChanged() {
   sourceDirEdit_->setText(scheduler_->sourcePath());
 
   if (scheduler_->isGcsMode()) {
-    backupModeTabWidget_->setCurrentIndex(2);
+    backupModeComboBox_->setCurrentIndex(2);
     gcsBucketNameLineEdit_->setText(scheduler_->gcsBucketName());
     gcsAccountIdentifierLineEdit_->setText(scheduler_->gcsAccountIdentifier());
   } else if (scheduler_->isSftpMode()) {
-    backupModeTabWidget_->setCurrentIndex(1);
+    backupModeComboBox_->setCurrentIndex(1);
   } else {
-    backupModeTabWidget_->setCurrentIndex(0);
+    backupModeComboBox_->setCurrentIndex(0);
     destinationDirEdit_->setText(scheduler_->destinationPath());
   }
 
@@ -1256,13 +1248,15 @@ void MainWindow::onTaskChanged() {
     backupTimeEdit_->setTime(QTime(23, 0));
   }
   refreshWatchEntriesDisplay();
-  onBackupModeChanged(backupModeTabWidget_->currentIndex());
+  onBackupModeChanged(backupModeComboBox_->currentIndex());
   updateLog("Task details updated in UI from Scheduler state.");
   updateScheduleSummary();
 }
 
 void MainWindow::onBackupModeChanged(int index) {
-  QString currentModeText = backupModeTabWidget_->tabText(index);
+  if (backupModeStackedWidget_)
+    backupModeStackedWidget_->setCurrentIndex(index);
+  QString currentModeText = backupModeComboBox_->itemText(index);
   bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
   bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
@@ -1302,13 +1296,6 @@ void MainWindow::onBackupModeChanged(int index) {
   }
   currentRemotePath_ = "/";
 
-  // Show/hide relevant group boxes
-  if (m_localDestinationGroupBox)
-    m_localDestinationGroupBox->setVisible(localSelected);
-  if (sftpSettingsGroupBox_)
-    sftpSettingsGroupBox_->setVisible(sftpSelected);
-  if (gcsSettingsGroupBox_)
-    gcsSettingsGroupBox_->setVisible(gcsSelected);
 
   // Show/hide file viewer group box (only for remote modes)
   bool remoteModeSelected = (sftpSelected || gcsSelected);
@@ -1342,8 +1329,10 @@ void MainWindow::loadSettings() {
     resize(800, 700);
   }
 
-  backupModeTabWidget_->setCurrentIndex(
+  backupModeComboBox_->setCurrentIndex(
       settings.value("backupModeIndex", 0).toInt());
+  if (backupModeStackedWidget_)
+    backupModeStackedWidget_->setCurrentIndex(backupModeComboBox_->currentIndex());
   settings.endGroup();
 
   settings.beginGroup("WatchEntries");
@@ -1410,7 +1399,7 @@ void MainWindow::saveSettings() {
                      QCoreApplication::applicationName());
   settings.beginGroup("MainWindow");
   settings.setValue("geometry", saveGeometry());
-  settings.setValue("backupModeIndex", backupModeTabWidget_->currentIndex());
+  settings.setValue("backupModeIndex", backupModeComboBox_->currentIndex());
   settings.endGroup();
 
   settings.beginGroup("SFTP");
@@ -1448,7 +1437,7 @@ void MainWindow::saveSettings() {
   settings.endArray();
   settings.endGroup();
 
-  if (backupModeTabWidget_->tabText(backupModeTabWidget_->currentIndex()) == tr("SFTP Backup")) {
+  if (backupModeComboBox_->currentText() == tr("SFTP Backup")) {
     QString host = sftpHostLineEdit_->text();
     QString port = sftpPortLineEdit_->text();
     QString username = sftpUsernameLineEdit_->text();
@@ -1589,7 +1578,7 @@ QString MainWindow::shortenPathForDisplay(const QString &path) const {
 }
 
 QString MainWindow::currentDestinationForDisplay() const {
-  QString currentModeText = backupModeTabWidget_->tabText(backupModeTabWidget_->currentIndex());
+  QString currentModeText = backupModeComboBox_->currentText();
   if (currentModeText == tr("SFTP Backup")) {
     return QString("%1:%2")
         .arg(sftpHostLineEdit_->text(), sftpRemotePathLineEdit_->text());

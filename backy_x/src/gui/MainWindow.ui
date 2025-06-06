@@ -76,13 +76,65 @@
           </layout>
          </widget>
         </item>
-        <!-- Local destination group -->
+        <!-- Backup mode row -->
         <item>
-         <widget class="QGroupBox" name="localDestinationGroupBox">
-          <property name="title">
-           <string>Local Destination Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="localDestLayout">
+         <widget class="QWidget" name="modeWidget">
+          <layout class="QHBoxLayout" name="modeLayout">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="modeIcon"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="modeLabel">
+             <property name="text">
+              <string>&lt;b&gt;Backup Mode&lt;/b&gt;</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="backupModeComboBox"/>
+           </item>
+           <item>
+            <spacer name="modeSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <!-- Backup mode configuration stack -->
+        <item>
+         <widget class="QStackedWidget" name="backupModeStackedWidget">
+          <widget class="QWidget" name="LocalBackupPage">
+           <layout class="QVBoxLayout" name="localBackupLayout">
+            <item>
+             <widget class="QGroupBox" name="localDestinationGroupBox">
+              <property name="title">
+               <string>Local Destination Configuration</string>
+              </property>
+              <layout class="QFormLayout" name="localDestLayout">
            <item row="0" column="0">
             <widget class="QLabel" name="labelDestDir">
              <property name="text">
@@ -119,15 +171,19 @@
             </widget>
            </item>
           </layout>
-         </widget>
-        </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
         <!-- SFTP group -->
-        <item>
-         <widget class="QGroupBox" name="sftpSettingsGroupBox">
-          <property name="title">
-           <string>SFTP Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="sftpFormLayout">
+        <widget class="QWidget" name="SFTPBackupPage">
+         <layout class="QVBoxLayout" name="sftpBackupLayout">
+          <item>
+           <widget class="QGroupBox" name="sftpSettingsGroupBox">
+            <property name="title">
+             <string>SFTP Configuration</string>
+            </property>
+            <layout class="QFormLayout" name="sftpFormLayout">
            <item row="0" column="0">
             <widget class="QLabel" name="labelSftpHost">
              <property name="text">
@@ -200,12 +256,16 @@
              </property>
             </widget>
            </item>
-          </layout>
-         </widget>
-        </item>
-        <!-- GCS group -->
-        <item>
-         <widget class="QGroupBox" name="gcsSettingsGroupBox">
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <!-- GCS group -->
+       <widget class="QWidget" name="GCSBackupPage">
+        <layout class="QVBoxLayout" name="gcsBackupLayout">
+         <item>
+          <widget class="QGroupBox" name="gcsSettingsGroupBox">
           <property name="title">
            <string>Google Cloud Storage Configuration</string>
           </property>
@@ -261,6 +321,10 @@
           </layout>
          </widget>
         </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
         <!-- Schedule group -->
         <item>
          <widget class="QGroupBox" name="scheduleGroupBox">
