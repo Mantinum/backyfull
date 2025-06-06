@@ -623,6 +623,9 @@
    <property name="visible">
     <bool>false</bool>
    </property>
+   <attribute name="dockWidgetArea">
+    <enum>Qt::RightDockWidgetArea</enum>
+   </attribute>
    <widget class="QWidget" name="dockWidgetContents">
     <layout class="QVBoxLayout" name="dockLayout">
      <item>
