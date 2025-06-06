@@ -9,6 +9,7 @@ QWidget {
 QLineEdit, QComboBox, QTextEdit {
     background: #ffffff;
     border: 1px solid #ccc;
+    border-radius: 3px;
     padding: 6px;
 }
 QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
@@ -36,9 +37,19 @@ QPushButton:pressed {
 }
 
 /* Optional day selector buttons */
-QPushButton.daySelector {
+QToolButton#daySelector {
     font-weight: bold;
     color: #007acc;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    border-radius: 13px;
+}
+QToolButton#daySelector:hover {
+    background: #e6e6e6;
+}
+QToolButton#daySelector:checked {
+    background: #dbeafe;
+    border-color: #2680eb;
 }
 
 /* Group boxes */
@@ -46,6 +57,7 @@ QGroupBox {
     border: 1px solid #ccc;
     border-radius: 6px;
     margin-top: 10px;
+    margin-bottom: 16px;
     padding: 10px;
 }
 QGroupBox::title {
@@ -53,7 +65,7 @@ QGroupBox::title {
     subcontrol-position: top left;
     padding: 0 3px;
     font-weight: bold;
-    color: #2680eb;
+    color: #3f51b5;
 }
 
 /* Labels and check boxes */

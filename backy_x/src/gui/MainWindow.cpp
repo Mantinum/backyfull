@@ -146,9 +146,10 @@ void MainWindow::setupUI() {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
-  QFrame *headerFrame = new QFrame();
-  headerFrame->setStyleSheet("background:#F5F5F5; border:1px solid #dcdcdc;");
-  QHBoxLayout *modeLayout = new QHBoxLayout(headerFrame);
+  QWidget *modeWidget = new QWidget();
+  QHBoxLayout *modeLayout = new QHBoxLayout(modeWidget);
+  modeLayout->setContentsMargins(0, 0, 0, 0);
+  modeLayout->setAlignment(Qt::AlignVCenter);
   QLabel *modeIcon = new QLabel();
   modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
   modeLayout->addWidget(modeIcon);
@@ -158,12 +159,9 @@ void MainWindow::setupUI() {
   backupModeComboBox_->addItem(tr("Local Backup"));
   backupModeComboBox_->addItem(tr("SFTP Backup"));
   backupModeComboBox_->addItem(tr("Google Cloud Storage"));
-  backupModeComboBox_->setStyleSheet(
-      "QComboBox { color: black; }"
-      "QComboBox QAbstractItemView { color: black; background: white; }");
   modeLayout->addWidget(backupModeComboBox_);
   modeLayout->addStretch();
-  mainLayout->addWidget(headerFrame);
+  mainLayout->addWidget(modeWidget);
 
   createSourceConfigUI(mainLayout, buttonStyle);
 
@@ -2221,6 +2219,12 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addRow(tr("Source Directory:"), srcPathLayout);
 
+  QLabel *sourceHint = new QLabel(
+      tr("Select the folder that will serve as the source for backups."));
+  sourceHint->setWordWrap(true);
+  sourceHint->setStyleSheet("margin-top:8px; color: gray;");
+  sourceLayout->addRow(sourceHint);
+
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QHBoxLayout *watchLayout = new QHBoxLayout(watchGroupBox_);
   watchLayout->setContentsMargins(4, 4, 4, 4);
@@ -2250,9 +2254,10 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
   localDestLayout->addRow(tr("Destination Directory (Local):"), destPathLayout);
-  QLabel *destHint = new QLabel(
-      tr("Select destination folder (local or remote)"));
-  destHint->setStyleSheet("color: gray; font-style: italic;");
+  QLabel *destHint =
+      new QLabel(tr("Select destination folder (local or remote)"));
+  destHint->setWordWrap(true);
+  destHint->setStyleSheet("margin-top:8px; color: gray; font-style: italic;");
   localDestLayout->addRow(destHint);
   mainLayout->addWidget(m_localDestinationGroupBox);
 
@@ -2336,12 +2341,10 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
   const QStringList dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
   for (int i = 0; i < 7; ++i) {
     QToolButton *btn = new QToolButton();
+    btn->setObjectName("daySelector");
     btn->setText(dayLabels[i]);
     btn->setCheckable(true);
     btn->setFixedSize(26, 26);
-    btn->setStyleSheet(
-        "QToolButton{border-radius:13px;border:1px solid gray;background:#f0f0f0;}"
-        "QToolButton:checked{background:#dbeafe;border-color:#2680eb;}");
     dayButtons_.append(btn);
     scheduleRow->addWidget(btn);
   }
