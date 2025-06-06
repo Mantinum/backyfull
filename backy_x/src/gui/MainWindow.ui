@@ -53,15 +53,224 @@
      </property>
     </item>
    </widget>
-   <widget class="QStackedWidget" name="pages">
-    <widget class="QWidget" name="pageSource"/>
-    <widget class="QWidget" name="pageDestination"/>
-    <widget class="QWidget" name="pageMode"/>
-    <widget class="QWidget" name="pageSchedule"/>
-    <widget class="QWidget" name="pageMonitoring"/>
-    <widget class="QWidget" name="pageLogs"/>
-   </widget>
   </widget>
+   <widget class="QStackedWidget" name="pages">
+    <widget class="QWidget" name="pageSource">
+     <layout class="QVBoxLayout" name="verticalLayoutSource">
+      <item>
+       <layout class="QHBoxLayout" name="sourceLayout">
+        <item>
+         <widget class="QLineEdit" name="sourceDirEdit"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="sourceDirButton">
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageDestination">
+     <layout class="QVBoxLayout" name="verticalLayoutDestination">
+      <item>
+       <layout class="QHBoxLayout" name="destLayout">
+        <item>
+         <widget class="QLineEdit" name="destinationDirEdit"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="destinationDirButton">
+          <property name="text">
+           <string>Browse...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageMode">
+     <layout class="QVBoxLayout" name="verticalLayoutMode">
+      <item>
+       <widget class="QComboBox" name="backupModeComboBox">
+        <item>
+         <property name="text"><string>Local Backup</string></property>
+        </item>
+        <item>
+         <property name="text"><string>SFTP Backup</string></property>
+        </item>
+        <item>
+         <property name="text"><string>Google Cloud Storage</string></property>
+        </item>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="sftpSettingsGroupBox">
+        <property name="title"><string>SFTP Configuration</string></property>
+        <layout class="QFormLayout" name="sftpLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="labelSftpHost">
+           <property name="text"><string>Host:</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="sftpHostLineEdit"/>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="labelSftpPort">
+           <property name="text"><string>Port:</string></property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="sftpPortLineEdit"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="labelSftpUser">
+           <property name="text"><string>User:</string></property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QLineEdit" name="sftpUsernameLineEdit"/>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="labelSftpPass">
+           <property name="text"><string>Password:</string></property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QLineEdit" name="sftpPasswordLineEdit">
+           <property name="echoMode"><enum>QLineEdit::Password</enum></property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="labelSftpRemote">
+           <property name="text"><string>Remote Path:</string></property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QLineEdit" name="sftpRemotePathLineEdit"/>
+         </item>
+         <item row="5" column="0" colspan="2">
+          <widget class="QCheckBox" name="sftpSavePasswordCheckBox">
+           <property name="text"><string>Save password</string></property>
+          </widget>
+         </item>
+         <item row="6" column="0" colspan="2" alignment="Qt::AlignLeft">
+          <widget class="QPushButton" name="sftpConnectToggleButton">
+           <property name="text"><string>Connect</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="gcsSettingsGroupBox">
+        <property name="title"><string>GCS Configuration</string></property>
+        <layout class="QFormLayout" name="gcsLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="labelGcsBucket">
+           <property name="text"><string>Bucket:</string></property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="gcsBucketNameLineEdit"/>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="labelGcsAccount">
+           <property name="text"><string>Account:</string></property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="gcsAccountIdentifierLineEdit"/>
+         </item>
+         <item row="2" column="0" colspan="2" alignment="Qt::AlignLeft">
+          <widget class="QPushButton" name="gcsConnectButton">
+           <property name="text"><string>Log in</string></property>
+          </widget>
+         </item>
+         <item row="3" column="0" colspan="2">
+          <widget class="QLabel" name="gcsAuthStatusLabel">
+           <property name="text"><string>Status: N/A</string></property>
+          </widget>
+         </item>
+         <item row="4" column="0" colspan="2" alignment="Qt::AlignLeft">
+          <widget class="QPushButton" name="gcsTestConnectionButton">
+           <property name="text"><string>Test Connection</string></property>
+          </widget>
+         </item>
+         <item row="5" column="0" colspan="2" alignment="Qt::AlignLeft">
+          <widget class="QPushButton" name="gcsConnectToggleButton">
+           <property name="text"><string>Connect</string></property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageSchedule">
+     <layout class="QVBoxLayout" name="verticalLayoutSchedule">
+      <item>
+       <layout class="QHBoxLayout" name="timeRow">
+        <item>
+         <widget class="QTimeEdit" name="backupTimeEdit"/>
+        </item>
+        <item>
+         <widget class="QToolButton" name="addTimeButton">
+          <property name="text"><string>Add</string></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QListWidget" name="timeListWidget"/>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="scheduleButtons">
+        <item>
+         <widget class="QPushButton" name="removeTimeButton">
+          <property name="text"><string>Remove Selected</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="scheduleSpacer">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeType"><enum>QSizePolicy::Expanding</enum></property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="runBackupButton">
+          <property name="text"><string>Run Now</string></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageMonitoring">
+     <layout class="QVBoxLayout" name="verticalLayoutMonitoring">
+      <item>
+       <widget class="QCheckBox" name="watchToggleCheckBox">
+        <property name="text"><string>Enable monitoring</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="watchStatusLabel">
+        <property name="text"><string>Monitoring off</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="pageLogs">
+     <layout class="QVBoxLayout" name="verticalLayoutLogs">
+      <item>
+       <widget class="QTextEdit" name="logDisplay"/>
+      </item>
+     </layout>
+    </widget>
+   </widget>
   <widget class="QMenuBar" name="menubar"/>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>

@@ -21,13 +21,13 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
-#include <QScrollArea>
 
 // Forward declaration for Scheduler
 class Scheduler;
 #include "core/IStorageTarget.h"    // For FileMetadata
 #include "util/CredentialManager.h" // For CredentialManager
 #include "gui/WatchManager.h"
+#include "gui/MainWindowViewModel.h"
 #include <memory>                   // For std::unique_ptr
 
 // Forward declaration for Storage Targets
@@ -37,6 +37,7 @@ class SftpTarget;
 class GcsTarget; // Forward declare GcsTarget
 class FileViewerWidget;
 class WatchManager;
+class MainWindowViewModel;
 
 namespace Ui {
 class MainWindow;
@@ -96,7 +97,6 @@ private:
   QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
-  QScrollArea *scrollArea_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
@@ -142,6 +142,8 @@ private:
   LocalTarget *localTarget_;
   SftpTarget *sftpTarget_;
   GcsTarget *gcsTarget_; // GCS Target instance
+
+  MainWindowViewModel *viewModel_{nullptr};
 
   std::unique_ptr<CredentialManager> m_credentialManager;
 

@@ -6,6 +6,7 @@
 #include "util/CredentialManager.h"
 #include "gui/FileViewerWidget.h"
 #include "gui/WatchManager.h"
+#include "gui/MainWindowViewModel.h"
 #include "ui_MainWindow.h"
 
 #include <QApplication>
@@ -48,7 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
-      logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
+      logDisplay_(nullptr), backupModeComboBox_(nullptr),
       backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
@@ -84,6 +85,8 @@ MainWindow::MainWindow(QWidget *parent)
   watchManager_ = new WatchManager(this);
   connect(watchManager_, &WatchManager::triggered, this,
           &MainWindow::handleWatchTriggered);
+
+  viewModel_ = new MainWindowViewModel(this);
 
   setupUI();
   loadSettings();
