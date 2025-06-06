@@ -353,6 +353,8 @@ void MainWindow::onAddWatchEntry() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
   updateScheduleSummary();
+  adjustHeightToScreen();
+}
 
 void MainWindow::handleWatchTriggered(const WatchEntry &e) {
   updateLog(tr("Modification d\u00e9tect\u00e9e dans %1, lancement de la sauvegarde.").arg(e.source));
@@ -378,8 +380,6 @@ void MainWindow::handleWatchTriggered(const WatchEntry &e) {
     performBackupInternal(e.source, t);
     delete t;
   }
-}
-  adjustHeightToScreen();
 }
 
 void MainWindow::onWatchToggleChanged(bool checked) {
@@ -488,6 +488,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
   watchStatusLabel_->setText(
       tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
   updateScheduleSummary();
+}
 
 
 void MainWindow::runBackupNow() {
@@ -1498,20 +1499,6 @@ void MainWindow::browseRemotePath(const QString &path) {
     fileViewerWidget_->browsePath(path);
 }
 
-void MainWindow::onFileViewerRefreshClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->refresh();
-}
-
-void MainWindow::onFileViewerDownloadClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->downloadSelected();
-}
-
-void MainWindow::onFileViewerDeleteClicked() {
-  if (fileViewerWidget_)
-    fileViewerWidget_->deleteSelected();
-}
 
 
 QString MainWindow::shortenPathForDisplay(const QString &path) const {
