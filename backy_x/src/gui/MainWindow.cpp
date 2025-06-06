@@ -1596,8 +1596,6 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   sourceHint->setStyleSheet("margin-top:8px; color: gray;");
   sourceLayout->addRow(sourceHint);
 
-  sourceLayout->addItem(new QSpacerItem(0, 8, QSizePolicy::Minimum,
-                                        QSizePolicy::Fixed));
   mainLayout->addWidget(sourceGroupBox);
 
   m_localDestinationGroupBox =
@@ -1734,6 +1732,7 @@ void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
 
   QHBoxLayout *watchLayout = new QHBoxLayout();
   watchLayout->setContentsMargins(0, 8, 0, 0);
+  watchLayout->setAlignment(Qt::AlignLeft);
   watchToggleCheckBox_ = new QCheckBox(tr("Enable monitoring"));
   watchLayout->addWidget(watchToggleCheckBox_);
   watchStatusLabel_ = new QLabel(tr("Monitoring off"));
