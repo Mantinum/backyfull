@@ -9,6 +9,8 @@
 #include <QToolButton>
 #include <QAbstractButton>
 #include <QComboBox>
+#include <QStackedWidget>
+#include <QProgressBar>
 #include <QDockWidget>
 #include <QFileDialog>
 #include <QGroupBox>
@@ -98,6 +100,9 @@ private:
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
+  QStackedWidget *backupModeStackedWidget_;
+
+  QProgressBar *backupProgressBar_{nullptr};
 
   // Local Backup Settings
   QGroupBox *m_localDestinationGroupBox;

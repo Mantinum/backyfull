@@ -19,9 +19,9 @@
 
 FileViewerWidget::FileViewerWidget(QWidget *parent)
     : QWidget(parent), fileTableWidget_(new QTableWidget(this)),
-      refreshButton_(new QPushButton(tr("Refresh"), this)),
-      downloadButton_(new QPushButton(tr("Download"), this)),
-      deleteButton_(new QPushButton(tr("Delete"), this)),
+      refreshButton_(new QPushButton(tr("🔁 Refresh"), this)),
+      downloadButton_(new QPushButton(tr("⬇️ Download"), this)),
+      deleteButton_(new QPushButton(tr("🗑️ Delete"), this)),
       currentPathLabel_(new QLabel(tr("Path: /"), this)),
       currentRemotePath_("/"), sftpTarget_(nullptr), gcsTarget_(nullptr) {
 

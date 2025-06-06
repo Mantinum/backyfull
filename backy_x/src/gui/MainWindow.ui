@@ -28,6 +28,54 @@
         <property name="spacing">
          <number>12</number>
         </property>
+        <!-- Source configuration group -->
+        <item>
+         <widget class="QGroupBox" name="sourceGroupBox">
+          <property name="title">
+           <string>Source Configuration</string>
+          </property>
+          <layout class="QFormLayout" name="sourceLayout">
+           <item row="0" column="0">
+            <widget class="QLabel" name="labelSourceDir">
+             <property name="text">
+              <string>Source Directory:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <layout class="QHBoxLayout" name="sourcePathLayout">
+             <item>
+              <widget class="QLineEdit" name="sourceDirEdit">
+               <property name="readOnly">
+                <bool>true</bool>
+               </property>
+               <property name="placeholderText">
+                <string>Select the folder to back up</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="sourceDirButton">
+               <property name="text">
+                <string>📂 Browse</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="1" column="0" colspan="2">
+            <widget class="QLabel" name="sourceHint">
+             <property name="text">
+              <string>Select the folder that will serve as the source for backups.</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
         <!-- Backup mode row -->
         <item>
          <widget class="QWidget" name="modeWidget">
@@ -76,61 +124,17 @@
           </layout>
          </widget>
         </item>
-        <!-- Source configuration group -->
+        <!-- Backup mode configuration stack -->
         <item>
-         <widget class="QGroupBox" name="sourceGroupBox">
-          <property name="title">
-           <string>Source Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="sourceLayout">
-           <item row="0" column="0">
-            <widget class="QLabel" name="labelSourceDir">
-             <property name="text">
-              <string>Source Directory:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <layout class="QHBoxLayout" name="sourcePathLayout">
-             <item>
-              <widget class="QLineEdit" name="sourceDirEdit">
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-               <property name="placeholderText">
-                <string>Select the folder to back up</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="sourceDirButton">
-               <property name="text">
-                <string>Browse...</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="1" column="0" colspan="2">
-            <widget class="QLabel" name="sourceHint">
-             <property name="text">
-              <string>Select the folder that will serve as the source for backups.</string>
-             </property>
-             <property name="wordWrap">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <!-- Local destination group -->
-        <item>
-         <widget class="QGroupBox" name="localDestinationGroupBox">
-          <property name="title">
-           <string>Local Destination Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="localDestLayout">
+         <widget class="QStackedWidget" name="backupModeStackedWidget">
+          <widget class="QWidget" name="LocalBackupPage">
+           <layout class="QVBoxLayout" name="localBackupLayout">
+            <item>
+             <widget class="QGroupBox" name="localDestinationGroupBox">
+              <property name="title">
+               <string>Local Destination Configuration</string>
+              </property>
+              <layout class="QFormLayout" name="localDestLayout">
            <item row="0" column="0">
             <widget class="QLabel" name="labelDestDir">
              <property name="text">
@@ -150,7 +154,7 @@
              <item>
               <widget class="QPushButton" name="destinationDirButton">
                <property name="text">
-                <string>Browse...</string>
+                <string>📂 Browse</string>
                </property>
               </widget>
              </item>
@@ -167,15 +171,19 @@
             </widget>
            </item>
           </layout>
-         </widget>
-        </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
         <!-- SFTP group -->
-        <item>
-         <widget class="QGroupBox" name="sftpSettingsGroupBox">
-          <property name="title">
-           <string>SFTP Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="sftpFormLayout">
+        <widget class="QWidget" name="SFTPBackupPage">
+         <layout class="QVBoxLayout" name="sftpBackupLayout">
+          <item>
+           <widget class="QGroupBox" name="sftpSettingsGroupBox">
+            <property name="title">
+             <string>SFTP Configuration</string>
+            </property>
+            <layout class="QFormLayout" name="sftpFormLayout">
            <item row="0" column="0">
             <widget class="QLabel" name="labelSftpHost">
              <property name="text">
@@ -248,12 +256,16 @@
              </property>
             </widget>
            </item>
-          </layout>
-         </widget>
-        </item>
-        <!-- GCS group -->
-        <item>
-         <widget class="QGroupBox" name="gcsSettingsGroupBox">
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+       <!-- GCS group -->
+       <widget class="QWidget" name="GCSBackupPage">
+        <layout class="QVBoxLayout" name="gcsBackupLayout">
+         <item>
+          <widget class="QGroupBox" name="gcsSettingsGroupBox">
           <property name="title">
            <string>Google Cloud Storage Configuration</string>
           </property>
@@ -309,6 +321,10 @@
           </layout>
          </widget>
         </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
         <!-- Schedule group -->
         <item>
          <widget class="QGroupBox" name="scheduleGroupBox">
@@ -574,8 +590,21 @@
                </property>
               </widget>
              </item>
-            </layout>
-           </item>
+           </layout>
+          </item>
+          <item row="6" column="0" colspan="3">
+           <widget class="QProgressBar" name="backupProgressBar">
+            <property name="visible">
+             <bool>false</bool>
+            </property>
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
           </layout>
          </widget>
         </item>
@@ -646,8 +675,9 @@
     </property>
     <addaction name="actionToggleFileViewer"/>
    </widget>
-   <addaction name="menuView"/>
-  </widget>
+  <addaction name="menuView"/>
+ </widget>
+  <widget class="QStatusBar" name="statusBar"/>
 </widget>
  <resources/>
  <connections/>
