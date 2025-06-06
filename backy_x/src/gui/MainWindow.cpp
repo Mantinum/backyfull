@@ -475,6 +475,12 @@ void MainWindow::updateScheduleFromUI() {
 void MainWindow::refreshWatchEntriesDisplay() {
   if (!timeListWidget_)
     return;
+  for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
+    QListWidgetItem *item = timeListWidget_->item(i);
+    if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
+      delete timeListWidget_->takeItem(i);
+    }
+  }
   for (const WatchEntry &e : watchManager_->entries()) {
     QString destDisp;
     if (e.isSftpMode) {
@@ -495,8 +501,12 @@ void MainWindow::refreshWatchEntriesDisplay() {
     item->setData(Qt::UserRole, QStringLiteral("WATCH|") + e.source);
     timeListWidget_->addItem(item);
   }
-  watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
+  if (watchManager_->entries().isEmpty())
+    watchStatusLabel_->setText(tr("Monitoring off"));
+  else
+    watchStatusLabel_->setText(
+        tr("%1 dossier(s) surveill\u00e9(s)")
+            .arg(watchManager_->entries().size()));
   updateScheduleSummary();
 }
 
