@@ -193,7 +193,6 @@ void MainWindow::setupUI() {
     setMaximumHeight(scr->availableGeometry().height());
   }
 
-  ui->modeIcon->setPixmap(style()->standardIcon(QStyle::SP_DriveHDIcon).pixmap(16, 16));
 
   // Setup File Viewer dock widget
   fileViewerWidget_ = new FileViewerWidget();
