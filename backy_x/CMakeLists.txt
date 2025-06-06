@@ -38,7 +38,9 @@ set(PROJECT_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # ============== bibliothèques internes ==============================
 add_library(backy_x_core STATIC
     src/core/Scheduler.cpp
+    src/core/BackupConfig.cpp
     ${PROJECT_INCLUDE}/core/Scheduler.h
+    ${PROJECT_INCLUDE}/core/BackupConfig.h
 )
 target_include_directories(backy_x_core PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(backy_x_core PUBLIC Qt6::Core)
@@ -106,6 +108,7 @@ target_compile_options(backy_x_cli PRIVATE -Wall -Wextra -pedantic)
 add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
+    src/gui/MainWindowViewModel.cpp
     src/gui/MainWindow.ui
     src/gui/FileViewerWidget.cpp
     src/gui/WatchManager.cpp

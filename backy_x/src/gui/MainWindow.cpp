@@ -6,6 +6,7 @@
 #include "util/CredentialManager.h"
 #include "gui/FileViewerWidget.h"
 #include "gui/WatchManager.h"
+#include "gui/MainWindowViewModel.h"
 #include "ui_MainWindow.h"
 
 #include <QApplication>
@@ -24,6 +25,7 @@
 #include <QLabel>
 #include <QTabWidget>
 #include <QProgressBar>
+#include <QPlainTextEdit>
 #include <QIntValidator>
 #include <QSizePolicy>
 #include <QScreen>
@@ -48,7 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
-      logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
+      logDisplay_(nullptr), backupModeComboBox_(nullptr),
       backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
@@ -84,6 +86,8 @@ MainWindow::MainWindow(QWidget *parent)
   watchManager_ = new WatchManager(this);
   connect(watchManager_, &WatchManager::triggered, this,
           &MainWindow::handleWatchTriggered);
+
+  viewModel_ = new MainWindowViewModel(this);
 
   setupUI();
   loadSettings();
@@ -121,110 +125,76 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
-  // Menu
-  QMenu *viewMenu = ui->menuView;
-  if (!viewMenu)
-    viewMenu = menuBar()->addMenu(tr("&View"));
-  if (ui->actionToggleFileViewer && viewMenu)
-    viewMenu->removeAction(ui->actionToggleFileViewer);
+  // Grab important widgets from the loaded UI
+  sourceDirEdit_ = findChild<QLineEdit*>("leSource");
+  sourceDirButton_ = findChild<QPushButton*>("btnBrowseSource");
+  destinationDirEdit_ = findChild<QLineEdit*>("leDest");
+  destinationDirButton_ = findChild<QPushButton*>("btnBrowseDest");
+  backupTimeEdit_ = nullptr;
+  addTimeButton_ = findChild<QPushButton*>("btnAddSched");
+  timeListWidget_ = nullptr;
+  removeTimeButton_ = findChild<QPushButton*>("btnRemoveSched");
+  runBackupButton_ = nullptr;
+  backupModeComboBox_ = findChild<QComboBox*>("cbMode");
+  backupModeStackedWidget_ = findChild<QStackedWidget*>("modePages");
+  // SFTP fields
+  sftpHostLineEdit_ = findChild<QLineEdit*>("leSftpHost");
+  sftpPortLineEdit_ = findChild<QLineEdit*>("leSftpPort");
+  sftpUsernameLineEdit_ = findChild<QLineEdit*>("leSftpUser");
+  sftpPasswordLineEdit_ = nullptr;
+  sftpRemotePathLineEdit_ = findChild<QLineEdit*>("leSftpKey");
+  sftpConnectToggleButton_ = findChild<QPushButton*>("btnTestSFTP");
+  // GCS fields
+  gcsBucketNameLineEdit_ = findChild<QLineEdit*>("leGcsBucket");
+  gcsAccountIdentifierLineEdit_ = findChild<QLineEdit*>("leGcsCred");
+  gcsTestConnectionButton_ = findChild<QPushButton*>("btnTestGCS");
+  watchToggleCheckBox_ = findChild<QCheckBox*>("cbWatch");
+  watchStatusLabel_ = nullptr;
+  logDisplay_ = findChild<QPlainTextEdit*>("teLogs");
+  gcsConnectButton_ = nullptr;
+  gcsAuthStatusLabel_ = nullptr;
+  gcsConnectToggleButton_ = nullptr;
 
-  const QString buttonStyle =
-      QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
-
-  // Store pointers to widgets from UI
-  scrollArea_ = ui->scrollArea;
-  sourceDirEdit_ = ui->sourceDirEdit;
-  sourceDirButton_ = ui->sourceDirButton;
-  destinationDirEdit_ = ui->destinationDirEdit;
-  destinationDirButton_ = ui->destinationDirButton;
-  backupTimeEdit_ = ui->backupTimeEdit;
-  addTimeButton_ = ui->addTimeButton;
-  timeListWidget_ = ui->timeListWidget;
-  removeTimeButton_ = ui->removeTimeButton;
-  runBackupButton_ = ui->runBackupButton;
-  scheduleSummaryLabel_ = ui->scheduleSummaryLabel;
-  logDisplay_ = ui->logDisplay;
-  backupProgressBar_ = ui->backupProgressBar;
-  QToolButton *logToggleButton = ui->logToggleButton;
-  m_localDestinationGroupBox = ui->localDestinationGroupBox;
-  sftpSettingsGroupBox_ = ui->sftpSettingsGroupBox;
-  sftpHostLineEdit_ = ui->sftpHostLineEdit;
-  sftpPortLineEdit_ = ui->sftpPortLineEdit;
-  sftpUsernameLineEdit_ = ui->sftpUsernameLineEdit;
-  sftpPasswordLineEdit_ = ui->sftpPasswordLineEdit;
-  sftpRemotePathLineEdit_ = ui->sftpRemotePathLineEdit;
-  sftpSavePasswordCheckBox_ = ui->sftpSavePasswordCheckBox;
-  sftpConnectToggleButton_ = ui->sftpConnectToggleButton;
-  gcsSettingsGroupBox_ = ui->gcsSettingsGroupBox;
-  gcsBucketNameLineEdit_ = ui->gcsBucketNameLineEdit;
-  gcsAccountIdentifierLineEdit_ = ui->gcsAccountIdentifierLineEdit;
-  gcsConnectButton_ = ui->gcsConnectButton;
-  gcsTestConnectionButton_ = ui->gcsTestConnectionButton;
-  gcsAuthStatusLabel_ = ui->gcsAuthStatusLabel;
-  gcsConnectToggleButton_ = ui->gcsConnectToggleButton;
-  watchToggleCheckBox_ = ui->watchToggleCheckBox;
-  watchStatusLabel_ = ui->watchStatusLabel;
-  fileViewerDockWidget_ = ui->fileViewerDockWidget;
-  backupModeComboBox_ = ui->backupModeComboBox;
-  backupModeStackedWidget_ = ui->backupModeStackedWidget;
-
-  // Collect day buttons
-  dayButtons_.clear();
-  dayButtons_ << ui->dayButton1 << ui->dayButton2 << ui->dayButton3
-              << ui->dayButton4 << ui->dayButton5 << ui->dayButton6
-              << ui->dayButton7;
-
-  applyUnifiedStyle(ui->sourceGroupBox);
-  applyUnifiedStyle(ui->localDestinationGroupBox);
-  applyUnifiedStyle(ui->sftpSettingsGroupBox);
-  applyUnifiedStyle(ui->gcsSettingsGroupBox);
-  applyUnifiedStyle(ui->scheduleGroupBox);
-
-  setMinimumSize(800, 600);
-  if (QScreen *scr = QApplication::primaryScreen()) {
-    setMaximumHeight(scr->availableGeometry().height());
+  QListWidget *navList = findChild<QListWidget *>("navList");
+  QStackedWidget *pages = findChild<QStackedWidget *>("pages");
+  if (navList && pages) {
+    connect(navList, &QListWidget::currentRowChanged, pages,
+            &QStackedWidget::setCurrentIndex);
+    navList->setCurrentRow(0);
   }
 
-
-  // Setup File Viewer dock widget
-  fileViewerWidget_ = new FileViewerWidget();
-  fileViewerDockWidget_->setWidget(fileViewerWidget_);
-  fileViewerDockWidget_->setMinimumSize(250, 300);
-  addDockWidget(Qt::RightDockWidgetArea, fileViewerDockWidget_);
-  fileViewerDockWidget_->hide();
-  viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
-
-  // Connections
-  connect(sourceDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectSourceDirectory);
-  connect(destinationDirButton_, &QPushButton::clicked, this,
-          &MainWindow::selectDestinationDirectory);
-  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          this, &MainWindow::onBackupModeChanged);
-  connect(addTimeButton_, &QToolButton::clicked, this,
-          &MainWindow::onAddBackupTimeClicked);
-  connect(removeTimeButton_, &QPushButton::clicked, this,
-          &MainWindow::onRemoveBackupTimeClicked);
-  connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
-  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onWatchToggleChanged);
-  connect(gcsConnectButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectButtonClicked);
-  connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsTestConnectionClicked);
-  connect(gcsConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onGcsConnectToggleClicked);
-  connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
-          &MainWindow::onSftpConnectToggleClicked);
-  connect(logToggleButton, &QToolButton::toggled, this, [this, logToggleButton](bool checked) {
-    logDisplay_->setVisible(checked);
-    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-  });
-  connect(fileViewerWidget_, &FileViewerWidget::logMessage, this,
-          &MainWindow::updateLog);
+  if (sourceDirButton_)
+    connect(sourceDirButton_, &QPushButton::clicked, this,
+            &MainWindow::browseSource);
+  if (destinationDirButton_)
+    connect(destinationDirButton_, &QPushButton::clicked, this,
+            &MainWindow::browseDestination);
+  if (backupModeComboBox_)
+    connect(backupModeComboBox_,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onBackupModeChanged);
+  if (addTimeButton_)
+    connect(addTimeButton_, &QPushButton::clicked, this, &MainWindow::addSchedule);
+  if (removeTimeButton_)
+    connect(removeTimeButton_, &QPushButton::clicked, this,
+            &MainWindow::onRemoveBackupTimeClicked);
+  if (runBackupButton_)
+    connect(runBackupButton_, &QPushButton::clicked, this,
+            &MainWindow::runBackupNow);
+  if (watchToggleCheckBox_)
+    connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
+            &MainWindow::onWatchToggleChanged);
+  if (gcsConnectButton_)
+    connect(gcsConnectButton_, &QPushButton::clicked, this,
+            &MainWindow::onGcsConnectButtonClicked);
+  if (gcsTestConnectionButton_)
+    connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
+            &MainWindow::testGcs);
+  if (sftpConnectToggleButton_)
+    connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
+            &MainWindow::testSftp);
 
   fileDialog_ = new QFileDialog(this);
-  adjustHeightToScreen();
 }
 
 void MainWindow::selectSourceDirectory() {
@@ -258,6 +228,16 @@ void MainWindow::selectDestinationDirectory() {
     updateLog(QString("Destination directory selected: %1").arg(directory));
   }
 }
+
+void MainWindow::browseSource() { selectSourceDirectory(); }
+
+void MainWindow::browseDestination() { selectDestinationDirectory(); }
+
+void MainWindow::testSftp() { updateLog("SFTP test requested"); }
+
+void MainWindow::testGcs() { updateLog("GCS test requested"); }
+
+void MainWindow::addSchedule() { updateLog("Add schedule clicked"); }
 
 void MainWindow::onAddBackupTimeClicked() {
   QTime t = backupTimeEdit_->time();
@@ -1186,7 +1166,8 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
 
 void MainWindow::updateLog(const QString &message) {
   QString timestamp = QTime::currentTime().toString("HH:mm:ss");
-  logDisplay_->append(QString("[%1] %2").arg(timestamp, message));
+  if (logDisplay_)
+    logDisplay_->appendPlainText(QString("[%1] %2").arg(timestamp, message));
   qDebug() << "[GUI Log]" << message;
 }
 
