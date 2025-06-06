@@ -124,12 +124,78 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
+  // Grab important widgets from the loaded UI
+  sourceDirEdit_ = findChild<QLineEdit*>("sourceDirEdit");
+  sourceDirButton_ = findChild<QPushButton*>("sourceDirButton");
+  destinationDirEdit_ = findChild<QLineEdit*>("destinationDirEdit");
+  destinationDirButton_ = findChild<QPushButton*>("destinationDirButton");
+  backupTimeEdit_ = findChild<QTimeEdit*>("backupTimeEdit");
+  addTimeButton_ = findChild<QToolButton*>("addTimeButton");
+  timeListWidget_ = findChild<QListWidget*>("timeListWidget");
+  removeTimeButton_ = findChild<QPushButton*>("removeTimeButton");
+  runBackupButton_ = findChild<QPushButton*>("runBackupButton");
+  backupModeComboBox_ = findChild<QComboBox*>("backupModeComboBox");
+  sftpSettingsGroupBox_ = findChild<QGroupBox*>("sftpSettingsGroupBox");
+  sftpHostLineEdit_ = findChild<QLineEdit*>("sftpHostLineEdit");
+  sftpPortLineEdit_ = findChild<QLineEdit*>("sftpPortLineEdit");
+  sftpUsernameLineEdit_ = findChild<QLineEdit*>("sftpUsernameLineEdit");
+  sftpPasswordLineEdit_ = findChild<QLineEdit*>("sftpPasswordLineEdit");
+  sftpRemotePathLineEdit_ = findChild<QLineEdit*>("sftpRemotePathLineEdit");
+  sftpSavePasswordCheckBox_ = findChild<QCheckBox*>("sftpSavePasswordCheckBox");
+  sftpConnectToggleButton_ = findChild<QPushButton*>("sftpConnectToggleButton");
+  gcsSettingsGroupBox_ = findChild<QGroupBox*>("gcsSettingsGroupBox");
+  gcsBucketNameLineEdit_ = findChild<QLineEdit*>("gcsBucketNameLineEdit");
+  gcsAccountIdentifierLineEdit_ =
+      findChild<QLineEdit*>("gcsAccountIdentifierLineEdit");
+  gcsConnectButton_ = findChild<QPushButton*>("gcsConnectButton");
+  gcsTestConnectionButton_ = findChild<QPushButton*>("gcsTestConnectionButton");
+  gcsAuthStatusLabel_ = findChild<QLabel*>("gcsAuthStatusLabel");
+  gcsConnectToggleButton_ = findChild<QPushButton*>("gcsConnectToggleButton");
+  watchToggleCheckBox_ = findChild<QCheckBox*>("watchToggleCheckBox");
+  watchStatusLabel_ = findChild<QLabel*>("watchStatusLabel");
+  logDisplay_ = findChild<QTextEdit*>("logDisplay");
+
   QListWidget *navList = findChild<QListWidget *>("navList");
   QStackedWidget *pages = findChild<QStackedWidget *>("pages");
   if (navList && pages) {
     connect(navList, &QListWidget::currentRowChanged, pages,
             &QStackedWidget::setCurrentIndex);
   }
+
+  if (sourceDirButton_)
+    connect(sourceDirButton_, &QPushButton::clicked, this,
+            &MainWindow::selectSourceDirectory);
+  if (destinationDirButton_)
+    connect(destinationDirButton_, &QPushButton::clicked, this,
+            &MainWindow::selectDestinationDirectory);
+  if (backupModeComboBox_)
+    connect(backupModeComboBox_,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            &MainWindow::onBackupModeChanged);
+  if (addTimeButton_)
+    connect(addTimeButton_, &QToolButton::clicked, this,
+            &MainWindow::onAddBackupTimeClicked);
+  if (removeTimeButton_)
+    connect(removeTimeButton_, &QPushButton::clicked, this,
+            &MainWindow::onRemoveBackupTimeClicked);
+  if (runBackupButton_)
+    connect(runBackupButton_, &QPushButton::clicked, this,
+            &MainWindow::runBackupNow);
+  if (watchToggleCheckBox_)
+    connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
+            &MainWindow::onWatchToggleChanged);
+  if (gcsConnectButton_)
+    connect(gcsConnectButton_, &QPushButton::clicked, this,
+            &MainWindow::onGcsConnectButtonClicked);
+  if (gcsTestConnectionButton_)
+    connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
+            &MainWindow::onGcsTestConnectionClicked);
+  if (gcsConnectToggleButton_)
+    connect(gcsConnectToggleButton_, &QPushButton::clicked, this,
+            &MainWindow::onGcsConnectToggleClicked);
+  if (sftpConnectToggleButton_)
+    connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
+            &MainWindow::onSftpConnectToggleClicked);
 
   fileDialog_ = new QFileDialog(this);
 }
