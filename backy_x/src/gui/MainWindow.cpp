@@ -169,7 +169,7 @@ void MainWindow::setupUI() {
           QOverload<int>::of(&QComboBox::currentIndexChanged), this,
           &MainWindow::onBackupModeChanged);
 
-  createSchedulingControlsUI(mainLayout, buttonStyle);
+  createBackupSettingsUI(mainLayout, buttonStyle);
 
 
   QToolButton *logToggleButton = new QToolButton();
@@ -401,7 +401,7 @@ void MainWindow::onAddWatchEntry() {
   watchEntries_.append(entry);
   dirWatcher_->addPath(dir);
 
-  QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
+  QString display = QString::fromUtf8("\xF0\x9F\x9F\xA2 ") +
                     tr(" Monitoring | %1 \u2192 %2")
                         .arg(shortenPathForDisplay(dir),
                              currentDestinationForDisplay());
@@ -552,7 +552,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
       destDisp = e.destination;
     }
     destDisp = shortenPathForDisplay(destDisp);
-    QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
+    QString display = QString::fromUtf8("\xF0\x9F\x9F\xA2 ") +
                       tr(" Monitoring | %1 \u2192 %2")
                           .arg(shortenPathForDisplay(e.source), destDisp);
     QListWidgetItem *item = new QListWidgetItem(display);
@@ -2326,9 +2326,9 @@ void MainWindow::createSourceConfigUI(QVBoxLayout *mainLayout,
   applyUnifiedStyle(gcsSettingsGroupBox_);
 }
 
-void MainWindow::createSchedulingControlsUI(QVBoxLayout *mainLayout,
-                                            const QString &buttonStyle) {
-  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
+void MainWindow::createBackupSettingsUI(QVBoxLayout *mainLayout,
+                                        const QString &buttonStyle) {
+  QGroupBox *scheduleGroupBox = new QGroupBox(tr("Backup Settings"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
   scheduleGroupBox->setStyleSheet("QGroupBox{background:#f5f5f5;}");
   backupTimeEdit_ = new QTimeEdit();
