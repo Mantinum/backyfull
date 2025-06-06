@@ -3,6 +3,9 @@
 #include <QCoreApplication> // For setting Org/App name
 #include <curl/curl.h>      // For libcurl global init/cleanup
 #include <iostream>         // For std::cout
+#include <QFile>
+#include <QIODevice>
+#include <QString>
 
 int main(int argc, char *argv[]) {
     // Initialize libcurl globally
@@ -14,6 +17,12 @@ int main(int argc, char *argv[]) {
     std::cout << "libcurl global init/cleanup managed in GUI." << std::endl;
 
     QApplication app(argc, argv);
+
+    QFile styleFile(":/resources/theme.qss");
+    if (styleFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString styleSheet = styleFile.readAll();
+        app.setStyleSheet(styleSheet);
+    }
 
     // Set OrganizationName and ApplicationName for QSettings to work predictably
     // This is important for Scheduler and MainWindow settings.

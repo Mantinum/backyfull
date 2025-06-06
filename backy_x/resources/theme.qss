@@ -1,0 +1,18 @@
+QWidget {
+    background-color: #fefefe; /* temporary to confirm stylesheet loading */
+}
+
+QPushButton {
+    min-height: 28px;
+    min-width: 100px;
+    margin: 6px;
+}
+
+QLineEdit, QComboBox, QTextEdit {
+    margin: 6px;
+}
+
+QGroupBox {
+    margin-top: 12px;
+    padding: 12px;
+}
