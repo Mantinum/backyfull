@@ -11,7 +11,6 @@
 #include <QComboBox>
 #include <QDockWidget>
 #include <QFileDialog>
-#include <QFileSystemWatcher>
 #include <QGroupBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
 #include <QLineEdit>
@@ -20,19 +19,13 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
-#include <QTimer>
-#include <QSet>
 #include <QScrollArea>
-// Forward declarations for Qt UI elements related to File Viewer
-QT_BEGIN_NAMESPACE
-class QTableWidget;
-class QTableWidgetItem;
-QT_END_NAMESPACE
 
 // Forward declaration for Scheduler
 class Scheduler;
 #include "core/IStorageTarget.h"    // For FileMetadata
 #include "util/CredentialManager.h" // For CredentialManager
+#include "gui/WatchManager.h"
 #include <memory>                   // For std::unique_ptr
 
 // Forward declaration for Storage Targets
@@ -40,19 +33,8 @@ class IStorageTarget;
 class LocalTarget;
 class SftpTarget;
 class GcsTarget; // Forward declare GcsTarget
-
-struct WatchEntry {
-  QString source;
-  QString destination;
-  bool isSftpMode = false;
-  bool isGcsMode = false;
-  QString sftpHost;
-  int sftpPort = 22;
-  QString sftpUsername;
-  QString sftpRemotePath;
-  QString gcsBucketName;
-  QString gcsAccountId;
-};
+class FileViewerWidget;
+class WatchManager;
 
 class MainWindow : public QMainWindow {
   Q_OBJECT
@@ -77,19 +59,14 @@ private slots:
   void onGcsTestConnectionClicked(); // Slot for GCS Test Connection
   void onSftpConnectToggleClicked();
   void onGcsConnectToggleClicked();
-  // Slots for File Viewer
-  void onFileViewerRefreshClicked();
-  void onFileViewerDownloadClicked();
-  void onFileViewerDeleteClicked();
-  void onFileTableItemDoubleClicked(QTableWidgetItem *item);
+  // Slots for File Viewer handled by FileViewerWidget
   void onAddBackupTimeClicked();
   void onRemoveBackupTimeClicked();
 
   // Auto watch slots
   void onAddWatchEntry();
   void onWatchToggleChanged(bool checked);
-  void onDirectoryChanged(const QString &path);
-  void onWatchTimerTimeout();
+  void handleWatchTriggered(const WatchEntry &entry);
 
 private:
   void setupUI();
@@ -97,8 +74,6 @@ private:
   void saveSettings();
   void updateScheduleFromUI();
   void refreshWatchEntriesDisplay();
-  void enableWatch();
-  void disableWatch();
 
   // UI Elements
   QLineEdit *sourceDirEdit_;
@@ -144,11 +119,7 @@ private:
   // File Viewer UI Elements
   QGroupBox *fileViewerGroupBox_ = nullptr;
   QDockWidget *fileViewerDockWidget_ = nullptr;
-  QTableWidget *fileTableWidget_ = nullptr;
-  QPushButton *refreshButton_ = nullptr;
-  QPushButton *downloadButton_ = nullptr;
-  QPushButton *deleteButton_ = nullptr;
-  QLabel *currentPathLabel_ = nullptr;
+  FileViewerWidget *fileViewerWidget_ = nullptr;
   QString currentRemotePath_ = "/";
 
   // Auto Watch UI
@@ -156,10 +127,7 @@ private:
   QCheckBox *watchToggleCheckBox_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
 
-  QFileSystemWatcher *dirWatcher_ = nullptr;
-  QTimer *watchTriggerTimer_ = nullptr;
-  QList<WatchEntry> watchEntries_;
-  QSet<QString> pendingWatchPaths_;
+  WatchManager *watchManager_ = nullptr;
 
   // Core components
   Scheduler *scheduler_;

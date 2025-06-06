@@ -4,6 +4,8 @@
 #include "targets/LocalTarget.h"
 #include "targets/SftpTarget.h"
 #include "util/CredentialManager.h"
+#include "gui/FileViewerWidget.h"
+#include "gui/WatchManager.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -14,7 +16,6 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFileSystemWatcher>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -27,7 +28,6 @@
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTime>
-#include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <filesystem>
@@ -61,12 +61,9 @@ MainWindow::MainWindow(QWidget *parent)
       gcsAuthStatusLabel_(nullptr), gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
       fileViewerGroupBox_(nullptr), fileViewerDockWidget_(nullptr),
-      fileTableWidget_(nullptr), refreshButton_(nullptr),
-      downloadButton_(nullptr), deleteButton_(nullptr), currentPathLabel_(nullptr),
-      currentRemotePath_("/"), // Initialize currentRemotePath_
-      watchGroupBox_(nullptr),
+      fileViewerWidget_(nullptr), watchGroupBox_(nullptr),
       watchToggleCheckBox_(nullptr), watchStatusLabel_(nullptr),
-      dirWatcher_(nullptr), watchTriggerTimer_(nullptr),
+      watchManager_(nullptr),
       // Core components
       scheduler_(nullptr), localTarget_(nullptr), sftpTarget_(nullptr),
       gcsTarget_(nullptr), // Initialize GCS target member
@@ -84,13 +81,9 @@ MainWindow::MainWindow(QWidget *parent)
       std::unique_ptr<CredentialManager>(createPlatformCredentialManager());
   scheduler_ = new Scheduler(QString(), this);
 
-  dirWatcher_ = new QFileSystemWatcher(this);
-  watchTriggerTimer_ = new QTimer(this);
-  watchTriggerTimer_->setSingleShot(true);
-  connect(dirWatcher_, &QFileSystemWatcher::directoryChanged, this,
-          &MainWindow::onDirectoryChanged);
-  connect(watchTriggerTimer_, &QTimer::timeout, this,
-          &MainWindow::onWatchTimerTimeout);
+  watchManager_ = new WatchManager(this);
+  connect(watchManager_, &WatchManager::triggered, this,
+          &MainWindow::handleWatchTriggered);
 
   setupUI();
   loadSettings();
@@ -326,18 +319,12 @@ void MainWindow::onRemoveBackupTimeClicked() {
     QString data = item->data(Qt::UserRole).toString();
     if (data.startsWith("WATCH|")) {
       QString path = data.mid(QStringLiteral("WATCH|").length());
-      for (int i = 0; i < watchEntries_.size(); ++i) {
-        if (watchEntries_[i].source == path) {
-          dirWatcher_->removePath(path);
-          watchEntries_.removeAt(i);
-          break;
-        }
-      }
+      watchManager_->removeEntry(path);
     }
     delete item;
   }
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
   updateScheduleFromUI();
 }
 
@@ -390,16 +377,14 @@ void MainWindow::onAddWatchEntry() {
     entry.gcsAccountId = gcsAccountIdentifierLineEdit_->text();
   }
 
-  for (const WatchEntry &e : watchEntries_) {
+  for (const WatchEntry &e : watchManager_->entries()) {
     if (e.source == dir) {
       QMessageBox::information(this, tr("Already Watching"),
                                tr("This directory is already being watched."));
       return;
     }
   }
-
-  watchEntries_.append(entry);
-  dirWatcher_->addPath(dir);
+  watchManager_->addEntry(entry);
 
   QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
                     tr(" Monitoring | %1 \u2192 %2")
@@ -413,61 +398,46 @@ void MainWindow::onAddWatchEntry() {
   timeListWidget_->addItem(item);
 
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
   updateScheduleSummary();
+
+void MainWindow::handleWatchTriggered(const WatchEntry &e) {
+  updateLog(tr("Modification d\u00e9tect\u00e9e dans %1, lancement de la sauvegarde.").arg(e.source));
+  if (e.isGcsMode) {
+    std::map<std::string, std::string> cfg;
+    cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
+    cfg["gcs_account_identifier"] = e.gcsAccountId.toStdString();
+    cfg["gcs_object_prefix"] = "";
+    GcsTarget *t = new GcsTarget(cfg, m_credentialManager.get());
+    performBackupInternal(e.source, t);
+    delete t;
+  } else if (e.isSftpMode) {
+    std::map<std::string, std::string> cfg;
+    cfg["host"] = e.sftpHost.toStdString();
+    cfg["port"] = QString::number(e.sftpPort).toStdString();
+    cfg["username"] = e.sftpUsername.toStdString();
+    cfg["remoteBasePath"] = e.sftpRemotePath.toStdString();
+    SftpTarget *t = new SftpTarget(cfg);
+    performBackupInternal(e.source, t);
+    delete t;
+  } else {
+    LocalTarget *t = new LocalTarget(e.destination.toStdString());
+    performBackupInternal(e.source, t);
+    delete t;
+  }
+}
   adjustHeightToScreen();
 }
 
 void MainWindow::onWatchToggleChanged(bool checked) {
   if (checked) {
-    enableWatch();
+    watchManager_->enable();
     onAddWatchEntry();
   } else {
-    disableWatch();
+    watchManager_->disable();
   }
 }
 
-void MainWindow::onDirectoryChanged(const QString &path) {
-  pendingWatchPaths_.insert(path);
-  watchStatusLabel_->setText(tr("Dernier changement: %1")
-                                 .arg(QDateTime::currentDateTime().toString()));
-  if (!watchTriggerTimer_->isActive())
-    watchTriggerTimer_->start(3000);
-}
-
-void MainWindow::onWatchTimerTimeout() {
-  for (const QString &p : pendingWatchPaths_) {
-    for (const WatchEntry &e : watchEntries_) {
-      if (e.source == p) {
-        updateLog(tr("Modification détectée dans %1, lancement de la sauvegarde.")
-                      .arg(e.source));
-        if (e.isGcsMode) {
-          std::map<std::string, std::string> cfg;
-          cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
-          cfg["gcs_account_identifier"] = e.gcsAccountId.toStdString();
-          cfg["gcs_object_prefix"] = "";
-          GcsTarget *t = new GcsTarget(cfg, m_credentialManager.get());
-          performBackupInternal(e.source, t);
-          delete t;
-        } else if (e.isSftpMode) {
-          std::map<std::string, std::string> cfg;
-          cfg["host"] = e.sftpHost.toStdString();
-          cfg["port"] = QString::number(e.sftpPort).toStdString();
-          cfg["username"] = e.sftpUsername.toStdString();
-          cfg["remoteBasePath"] = e.sftpRemotePath.toStdString();
-          SftpTarget *t = new SftpTarget(cfg);
-          performBackupInternal(e.source, t);
-          delete t;
-        } else {
-          LocalTarget *t = new LocalTarget(e.destination.toStdString());
-          performBackupInternal(e.source, t);
-          delete t;
-        }
-      }
-    }
-  }
-  pendingWatchPaths_.clear();
-}
 
 void MainWindow::updateScheduleFromUI() {
   QString sourcePath = sourceDirEdit_->text();
@@ -542,7 +512,7 @@ void MainWindow::updateScheduleFromUI() {
 void MainWindow::refreshWatchEntriesDisplay() {
   if (!timeListWidget_)
     return;
-  for (const WatchEntry &e : watchEntries_) {
+  for (const WatchEntry &e : watchManager_->entries()) {
     QString destDisp;
     if (e.isSftpMode) {
       destDisp = QString("%1:%2").arg(e.sftpHost, e.sftpRemotePath);
@@ -563,28 +533,8 @@ void MainWindow::refreshWatchEntriesDisplay() {
     timeListWidget_->addItem(item);
   }
   watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
+      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
   updateScheduleSummary();
-}
-
-void MainWindow::disableWatch() {
-  for (const WatchEntry &e : watchEntries_) {
-    dirWatcher_->removePath(e.source);
-  }
-  pendingWatchPaths_.clear();
-  watchStatusLabel_->setText(tr("Monitoring off"));
-  updateScheduleSummary();
-}
-
-void MainWindow::enableWatch() {
-  for (const WatchEntry &e : watchEntries_) {
-    if (!dirWatcher_->directories().contains(e.source))
-      dirWatcher_->addPath(e.source);
-  }
-  watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchEntries_.size()));
-  updateScheduleSummary();
-}
 
 
 void MainWindow::runBackupNow() {
@@ -1442,8 +1392,7 @@ void MainWindow::loadSettings() {
     e.gcsBucketName = settings.value("gcsBucket").toString();
     e.gcsAccountId = settings.value("gcsAccount").toString();
     if (!e.source.isEmpty()) {
-      watchEntries_.append(e);
-      dirWatcher_->addPath(e.source);
+      watchManager_->addEntry(e);
     }
   }
   settings.endArray();
@@ -1451,10 +1400,10 @@ void MainWindow::loadSettings() {
   refreshWatchEntriesDisplay();
   if (watchToggleCheckBox_) {
     bool blocked = watchToggleCheckBox_->blockSignals(true);
-    watchToggleCheckBox_->setChecked(!watchEntries_.isEmpty());
+    watchToggleCheckBox_->setChecked(!watchManager_->entries().isEmpty());
     watchToggleCheckBox_->blockSignals(blocked);
-    if (!watchEntries_.isEmpty())
-      enableWatch();
+    if (!watchManager_->entries().isEmpty())
+      watchManager_->enable();
   }
 
   settings.beginGroup("SFTP");
@@ -1511,9 +1460,10 @@ void MainWindow::saveSettings() {
 
   settings.beginGroup("WatchEntries");
   settings.beginWriteArray("entries");
-  for (int i = 0; i < watchEntries_.size(); ++i) {
+  const auto &entries = watchManager_->entries();
+  for (int i = 0; i < entries.size(); ++i) {
     settings.setArrayIndex(i);
-    const WatchEntry &e = watchEntries_[i];
+    const WatchEntry &e = entries[i];
     settings.setValue("source", e.source);
     settings.setValue("destination", e.destination);
     settings.setValue("isSftp", e.isSftpMode);
