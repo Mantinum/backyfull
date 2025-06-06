@@ -19,7 +19,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QTimeEdit>
 
 // Forward declaration for Scheduler
@@ -56,6 +56,11 @@ protected:
 private slots:
   void selectSourceDirectory();
   void selectDestinationDirectory();
+  void browseSource();
+  void browseDestination();
+  void testSftp();
+  void testGcs();
+  void addSchedule();
   void runBackupNow();
   void updateLog(const QString &message);
   void onTaskChanged();
@@ -90,12 +95,12 @@ private:
   QPushButton *destinationDirButton_;
   QTimeEdit *backupTimeEdit_;
   QList<QAbstractButton *> dayButtons_;
-  QToolButton *addTimeButton_;
+  QPushButton *addTimeButton_;
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
   QLabel *scheduleSummaryLabel_{nullptr};
-  QTextEdit *logDisplay_;
+  QPlainTextEdit *logDisplay_;
 
 
   // Backup Mode Selection
