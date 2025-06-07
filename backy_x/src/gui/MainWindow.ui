@@ -148,18 +148,33 @@
             <item>
              <widget class="QGroupBox" name="localDestinationGroupBox">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
               <property name="maximumHeight">
-               <number>120</number>
+               <number>0</number>
               </property>
               <property name="title">
                <string>Local Destination Configuration</string>
               </property>
               <layout class="QFormLayout" name="localDestLayout">
+               <property name="leftMargin">
+                <number>9</number>
+               </property>
+               <property name="topMargin">
+                <number>9</number>
+               </property>
+               <property name="rightMargin">
+                <number>9</number>
+               </property>
+               <property name="bottomMargin">
+                <number>9</number>
+               </property>
+               <property name="spacing">
+                <number>6</number>
+               </property>
            <item row="0" column="0">
             <widget class="QLabel" name="labelDestDir">
              <property name="text">
