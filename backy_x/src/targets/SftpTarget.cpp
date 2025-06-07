@@ -188,14 +188,6 @@ curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE,   0L);            // déjà fait
         return true;
     };
 
-    // Helper lambda for setting non-critical options.
-    // On failure, it logs a warning. lastError_ is not set here to avoid overwriting a critical error.
-    auto setopt_non_critical = [&](CURLoption opt, auto val, const char* opt_name) {
-        res_setopt = curl_easy_setopt(m_curlHandle, opt, val);
-        if (res_setopt != CURLE_OK) {
-            std::cerr << "SftpTarget::setupCurlHandleForOperation: WARNING - Failed to set non-critical SFTP option " + std::string(opt_name) + ": " << curl_easy_strerror(res_setopt) << std::endl;
-        }
-    };
 
     // Set critical options
     if (!setopt_critical(CURLOPT_USERNAME, m_username.c_str(), "CURLOPT_USERNAME")) return false;
@@ -220,8 +212,7 @@ curl_easy_setopt(m_curlHandle, CURLOPT_VERBOSE,   0L);            // déjà fait
         if (!setopt_critical(CURLOPT_KEYPASSWD, m_sshKeyPassphrase.c_str(), "CURLOPT_KEYPASSWD")) return false;
     }
 
-    // Set non-critical options
-    // setopt_non_critical(CURLOPT_VERBOSE, m_verboseLogging ? 1L : 0L, "CURLOPT_VERBOSE"); // This line is intentionally removed/commented.
+    // Set non-critical options (none currently)
 
     // Enable CURLOPT_VERBOSE so that the CURLOPT_DEBUGFUNCTION is called.
     // The noop_debug_callback will then discard the actual verbose output.

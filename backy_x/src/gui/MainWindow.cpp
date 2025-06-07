@@ -355,7 +355,7 @@ void MainWindow::onRemoveSelectedJob() {
   QList<int> toRemove;
   for (const QModelIndex &idx : rows)
     toRemove << idx.row();
-  jobsModel_->removeRows(toRemove);
+  jobsModel_->removeJobRows(toRemove);
   scheduler_->computeNextRuns(jobsModel_);
   updateScheduleSummary();
 }
@@ -489,7 +489,7 @@ void MainWindow::onWatchToggled(bool checked) {
     for (int r = 0; r < jobsModel_->rowCount(); ++r)
       if (jobsModel_->jobRef(r).type == JobType::Watch)
         rows << r;
-    jobsModel_->removeRows(rows);
+    jobsModel_->removeJobRows(rows);
   }
   sbWatchInterval_->setEnabled(checked);
   if (checked)

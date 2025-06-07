@@ -573,6 +573,8 @@
           </item>
           </layout>
          </widget>
+        </item>
+        </layout>
         </widget>
         <widget class="QWidget" name="wdWatch">
          <layout class="QVBoxLayout" name="vlWatch">

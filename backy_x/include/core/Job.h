@@ -30,7 +30,7 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const override;
 
     void addJob(const Job &job);
-    void removeRows(const QList<int> &rows);
+    void removeJobRows(const QList<int> &rows);
 
     Job &jobRef(int row) { return jobs_[row]; }
     const QList<Job> &jobs() const { return jobs_; }

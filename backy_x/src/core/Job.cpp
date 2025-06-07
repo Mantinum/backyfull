@@ -63,7 +63,7 @@ void JobsModel::addJob(const Job &job) {
     endInsertRows();
 }
 
-void JobsModel::removeRows(const QList<int> &rows) {
+void JobsModel::removeJobRows(const QList<int> &rows) {
     QList<int> sorted = rows;
     std::sort(sorted.begin(), sorted.end(), std::greater<int>());
     for (int r : sorted) {
