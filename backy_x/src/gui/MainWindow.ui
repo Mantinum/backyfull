@@ -146,10 +146,10 @@
           <widget class="QWidget" name="LocalBackupPage">
            <layout class="QVBoxLayout" name="localBackupLayout">
            <property name="stretch">
-            <list>
-             <number>0</number>
-             <number>1</number>
-            </list>
+            <stringlist>
+             <string>0</string>
+             <string>1</string>
+            </stringlist>
            </property>
             <item>
              <widget class="QGroupBox" name="localDestinationGroupBox">
@@ -223,10 +223,10 @@
         <widget class="QWidget" name="SFTPBackupPage">
          <layout class="QVBoxLayout" name="sftpBackupLayout">
          <property name="stretch">
-          <list>
-           <number>0</number>
-           <number>1</number>
-          </list>
+          <stringlist>
+           <string>0</string>
+           <string>1</string>
+          </stringlist>
          </property>
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
@@ -337,10 +337,10 @@
        <widget class="QWidget" name="GCSBackupPage">
         <layout class="QVBoxLayout" name="gcsBackupLayout">
          <property name="stretch">
-          <list>
-           <number>0</number>
-           <number>1</number>
-          </list>
+          <stringlist>
+           <string>0</string>
+           <string>1</string>
+          </stringlist>
          </property>
          <item>
           <widget class="QGroupBox" name="gcsSettingsGroupBox">
