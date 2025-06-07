@@ -2,17 +2,22 @@
 
 WatchManager::WatchManager(QObject *parent)
     : QObject(parent), watcher_(new QFileSystemWatcher(this)),
-      timer_(new QTimer(this)), enabled_(false) {
+      timer_(new QTimer(this)), enabled_(false), error_(false) {
     timer_->setSingleShot(true);
     connect(watcher_, &QFileSystemWatcher::directoryChanged, this,
             &WatchManager::onDirectoryChanged);
     connect(timer_, &QTimer::timeout, this, &WatchManager::onTimeout);
 }
 
+void WatchManager::setInterval(int seconds) {
+    intervalMs_ = qMax(1, seconds) * 1000;
+}
+
 void WatchManager::addEntry(const WatchEntry &entry) {
     entries_.append(entry);
     if (enabled_) {
-        watcher_->addPath(entry.source);
+        if (!watcher_->addPath(entry.source))
+            error_ = true;
     }
 }
 
@@ -40,9 +45,11 @@ void WatchManager::enable() {
     if (enabled_)
         return;
     enabled_ = true;
+    error_ = false;
     for (const WatchEntry &e : entries_) {
         if (!watcher_->directories().contains(e.source)) {
-            watcher_->addPath(e.source);
+            if (!watcher_->addPath(e.source))
+                error_ = true;
         }
     }
 }
@@ -58,7 +65,7 @@ void WatchManager::disable() {
 void WatchManager::onDirectoryChanged(const QString &path) {
     pending_.insert(path);
     if (!timer_->isActive())
-        timer_->start(3000);
+        timer_->start(intervalMs_);
 }
 
 void WatchManager::onTimeout() {

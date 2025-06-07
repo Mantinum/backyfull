@@ -27,6 +27,8 @@
 #include <QIntValidator>
 #include <QSizePolicy>
 #include <QScreen>
+#include <QPixmap>
+#include "util/IconUtils.h"
 #include <QMessageBox>
 #include <QSettings>
 #include <QStandardPaths>
@@ -63,7 +65,8 @@ MainWindow::MainWindow(QWidget *parent)
       gcsAuthStatusLabel_(nullptr), gcsConnectToggleButton_(nullptr),
       // File Viewer UI Elements
       fileViewerDockWidget_(nullptr), fileViewerWidget_(nullptr),
-      watchToggleCheckBox_(nullptr), watchStatusLabel_(nullptr),
+      cbWatch_(nullptr), lblWatchStatus_(nullptr), sbWatchInterval_(nullptr),
+      lblLastEvent_(nullptr),
       watchManager_(nullptr),
       // Core components
       scheduler_(nullptr), localTarget_(nullptr), sftpTarget_(nullptr),
@@ -166,8 +169,10 @@ void MainWindow::setupUI() {
   gcsTestConnectionButton_ = ui->gcsTestConnectionButton;
   gcsAuthStatusLabel_ = ui->gcsAuthStatusLabel;
   gcsConnectToggleButton_ = ui->gcsConnectToggleButton;
-  watchToggleCheckBox_ = ui->watchToggleCheckBox;
-  watchStatusLabel_ = ui->watchStatusLabel;
+  cbWatch_ = ui->cbWatch;
+  lblWatchStatus_ = ui->lblWatchStatus;
+  sbWatchInterval_ = ui->sbWatchInterval;
+  lblLastEvent_ = ui->lblLastEvent;
   fileViewerDockWidget_ = ui->fileViewerDockWidget;
   backupModeComboBox_ = ui->backupModeComboBox;
   backupModeStackedWidget_ = ui->backupModeStackedWidget;
@@ -182,7 +187,7 @@ void MainWindow::setupUI() {
   applyUnifiedStyle(ui->localDestinationGroupBox);
   applyUnifiedStyle(ui->sftpSettingsGroupBox);
   applyUnifiedStyle(ui->gcsSettingsGroupBox);
-  applyUnifiedStyle(ui->scheduleGroupBox);
+  applyUnifiedStyle(ui->gbSchedule);
 
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {
@@ -211,8 +216,9 @@ void MainWindow::setupUI() {
           &MainWindow::onRemoveBackupTimeClicked);
   connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
   connect(ui->actionRunBackup, &QAction::triggered, this, &MainWindow::runBackupNow);
-  connect(watchToggleCheckBox_, &QCheckBox::toggled, this,
-          &MainWindow::onWatchToggleChanged);
+  connect(cbWatch_, &QCheckBox::toggled, this, &MainWindow::onWatchToggled);
+  connect(sbWatchInterval_, QOverload<int>::of(&QSpinBox::valueChanged), this,
+          [this](int v) { watchManager_->setInterval(v); });
   connect(gcsConnectButton_, &QPushButton::clicked, this,
           &MainWindow::onGcsConnectButtonClicked);
   connect(gcsTestConnectionButton_, &QPushButton::clicked, this,
@@ -313,8 +319,8 @@ void MainWindow::onRemoveBackupTimeClicked() {
     }
     delete item;
   }
-  watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
+  lblWatchStatus_->setText("");
+  updateWatchStatusIcon();
   updateScheduleFromUI();
 }
 
@@ -387,14 +393,17 @@ void MainWindow::onAddWatchEntry() {
   item->setData(Qt::UserRole, QStringLiteral("WATCH|") + dir);
   timeListWidget_->addItem(item);
 
-  watchStatusLabel_->setText(
-      tr("%1 dossier(s) surveill\u00e9(s)").arg(watchManager_->entries().size()));
+  lblWatchStatus_->setText("");
+  updateWatchStatusIcon();
   updateScheduleSummary();
   adjustHeightToScreen();
 }
 
 void MainWindow::handleWatchTriggered(const WatchEntry &e) {
   updateLog(tr("Modification d\u00e9tect\u00e9e dans %1, lancement de la sauvegarde.").arg(e.source));
+  if (lblLastEvent_)
+    lblLastEvent_->setText(tr("Last event: %1").arg(QDateTime::currentDateTime().toString("dd/MM/yyyy HH:mm:ss")));
+  updateWatchStatusIcon();
   if (e.isGcsMode) {
     std::map<std::string, std::string> cfg;
     cfg["gcs_bucket_name"] = e.gcsBucketName.toStdString();
@@ -419,7 +428,7 @@ void MainWindow::handleWatchTriggered(const WatchEntry &e) {
   }
 }
 
-void MainWindow::onWatchToggleChanged(bool checked) {
+void MainWindow::onWatchToggled(bool checked) {
   if (checked) {
     watchManager_->enable();
     refreshWatchEntriesDisplay();
@@ -433,9 +442,13 @@ void MainWindow::onWatchToggleChanged(bool checked) {
         delete timeListWidget_->takeItem(i);
       }
     }
-    watchStatusLabel_->setText(tr("Monitoring off"));
+    lblWatchStatus_->setText("");
+    updateWatchStatusIcon();
     updateScheduleSummary();
   }
+  sbWatchInterval_->setEnabled(checked);
+  if (checked)
+    watchManager_->setInterval(sbWatchInterval_->value());
 }
 
 
@@ -538,12 +551,7 @@ void MainWindow::refreshWatchEntriesDisplay() {
     item->setData(Qt::UserRole, QStringLiteral("WATCH|") + e.source);
     timeListWidget_->addItem(item);
   }
-  if (watchManager_->entries().isEmpty())
-    watchStatusLabel_->setText(tr("Monitoring off"));
-  else
-    watchStatusLabel_->setText(
-        tr("%1 dossier(s) surveill\u00e9(s)")
-            .arg(watchManager_->entries().size()));
+  updateWatchStatusIcon();
   updateScheduleSummary();
 }
 
@@ -1362,10 +1370,10 @@ void MainWindow::loadSettings() {
   settings.endArray();
   settings.endGroup();
   refreshWatchEntriesDisplay();
-  if (watchToggleCheckBox_) {
-    bool blocked = watchToggleCheckBox_->blockSignals(true);
-    watchToggleCheckBox_->setChecked(!watchManager_->entries().isEmpty());
-    watchToggleCheckBox_->blockSignals(blocked);
+  if (cbWatch_) {
+    bool blocked = cbWatch_->blockSignals(true);
+    cbWatch_->setChecked(!watchManager_->entries().isEmpty());
+    cbWatch_->blockSignals(blocked);
     if (!watchManager_->entries().isEmpty())
       watchManager_->enable();
   }
@@ -1602,6 +1610,15 @@ void MainWindow::adjustHeightToScreen() {
   adjustSize();
   if (height() > avail)
     resize(width(), avail);
+}
+
+void MainWindow::updateWatchStatusIcon() {
+  if (!lblWatchStatus_ || !watchManager_)
+    return;
+  QColor col = watchManager_->hasError() ? Qt::yellow
+               : watchManager_->isEnabled() ? Qt::green
+               : Qt::red;
+  lblWatchStatus_->setPixmap(makeStatusDot(col));
 }
 
 void MainWindow::applyUnifiedStyle(QWidget *widget) {
