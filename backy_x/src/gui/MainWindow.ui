@@ -147,6 +147,15 @@
            <layout class="QVBoxLayout" name="localBackupLayout">
             <item>
              <widget class="QGroupBox" name="localDestinationGroupBox">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="maximumHeight">
+               <number>120</number>
+              </property>
               <property name="title">
                <string>Local Destination Configuration</string>
               </property>
@@ -189,6 +198,16 @@
           </layout>
            </widget>
           </item>
+           <item>
+            <spacer name="localSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeType">
+              <enum>QSizePolicy::Expanding</enum>
+             </property>
+            </spacer>
+           </item>
          </layout>
         </widget>
         <!-- SFTP group -->
@@ -196,6 +215,15 @@
          <layout class="QVBoxLayout" name="sftpBackupLayout">
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="maximumHeight">
+             <number>120</number>
+            </property>
             <property name="title">
              <string>SFTP Configuration</string>
             </property>
@@ -275,6 +303,16 @@
            </layout>
           </widget>
          </item>
+         <item>
+          <spacer name="sftpSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Expanding</enum>
+           </property>
+          </spacer>
+         </item>
         </layout>
        </widget>
        <!-- GCS group -->
@@ -282,6 +320,15 @@
         <layout class="QVBoxLayout" name="gcsBackupLayout">
          <item>
           <widget class="QGroupBox" name="gcsSettingsGroupBox">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumHeight">
+           <number>120</number>
+          </property>
           <property name="title">
            <string>Google Cloud Storage Configuration</string>
           </property>
@@ -337,10 +384,30 @@
           </layout>
          </widget>
         </item>
+       <item>
+        <spacer name="gcsSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
        </layout>
       </widget>
      </widget>
     </item>
+       <item>
+        <spacer name="destEndSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
         <item>
          <widget class="QSplitter" name="splitPlanVsWatch">
           <property name="orientation">
