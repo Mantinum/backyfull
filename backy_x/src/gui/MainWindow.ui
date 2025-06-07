@@ -341,13 +341,19 @@
       </widget>
      </widget>
     </item>
-        <!-- Schedule group -->
         <item>
-         <widget class="QGroupBox" name="gbSchedule">
-          <property name="title">
-           <string>Backup Schedule</string>
+         <widget class="QSplitter" name="splitPlanVsWatch">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
           </property>
-          <layout class="QGridLayout" name="scheduleLayout">
+          <widget class="QWidget" name="wdPlan">
+           <layout class="QVBoxLayout" name="vlPlan">
+            <item>
+             <widget class="QGroupBox" name="gbPlan">
+              <property name="title">
+               <string>Backup Schedule</string>
+              </property>
+              <layout class="QGridLayout" name="scheduleLayout">
            <!-- Row 0: day buttons, time and add -->
            <item row="0" column="0" colspan="3">
             <layout class="QHBoxLayout" name="scheduleRow">
@@ -513,7 +519,7 @@
               </widget>
              </item>
              <item>
-              <widget class="QToolButton" name="addTimeButton">
+              <widget class="QToolButton" name="btnAddSched">
                <property name="text">
                 <string>+</string>
                </property>
@@ -552,34 +558,6 @@
              </layout>
             </widget>
            </item>
-           <item row="5" column="0" colspan="3">
-            <layout class="QHBoxLayout" name="buttonsLayout">
-             <item>
-              <widget class="QPushButton" name="removeTimeButton">
-               <property name="text">
-                <string>Remove Selected</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <spacer name="buttonsSpacer">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeType">
-                <enum>QSizePolicy::Expanding</enum>
-               </property>
-              </spacer>
-             </item>
-             <item>
-              <widget class="QPushButton" name="runBackupButton">
-               <property name="text">
-                <string>Run Backup Now</string>
-               </property>
-              </widget>
-             </item>
-           </layout>
-          </item>
           <item row="6" column="0" colspan="3">
            <widget class="QProgressBar" name="backupProgressBar">
             <property name="visible">
@@ -595,9 +573,11 @@
           </item>
           </layout>
          </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="gbWatch">
+        </widget>
+        <widget class="QWidget" name="wdWatch">
+         <layout class="QVBoxLayout" name="vlWatch">
+          <item>
+           <widget class="QGroupBox" name="gbWatch">
           <property name="title">
            <string>Real-Time Folder Watch</string>
           </property>
@@ -667,9 +647,48 @@
             </widget>
            </item>
           </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTableView" name="tvJobs">
+        <property name="selectionBehavior">
+         <enum>QAbstractItemView::SelectRows</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="bottomButtons">
+        <item>
+         <spacer name="bottomSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Expanding</enum>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnRunNow">
+          <property name="text">
+           <string>Run Now</string>
+          </property>
          </widget>
         </item>
-        <!-- Log toggle and display -->
+        <item>
+         <widget class="QPushButton" name="btnRemoveSelected">
+          <property name="text">
+           <string>Remove Selected</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <!-- Log toggle and display -->
         <item>
          <layout class="QVBoxLayout" name="logLayout">
           <item>

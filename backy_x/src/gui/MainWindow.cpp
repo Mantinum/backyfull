@@ -7,6 +7,7 @@
 #include "gui/FileViewerWidget.h"
 #include "gui/WatchManager.h"
 #include "ui_MainWindow.h"
+#include "core/Job.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -145,10 +146,13 @@ void MainWindow::setupUI() {
   destinationDirEdit_ = ui->destinationDirEdit;
   destinationDirButton_ = ui->destinationDirButton;
   backupTimeEdit_ = ui->backupTimeEdit;
-  addTimeButton_ = ui->addTimeButton;
+  addTimeButton_ = ui->btnAddSched;
   timeListWidget_ = ui->timeListWidget;
-  removeTimeButton_ = ui->removeTimeButton;
-  runBackupButton_ = ui->runBackupButton;
+  removeTimeButton_ = ui->btnRemoveSelected;
+  runBackupButton_ = ui->btnRunNow;
+  tvJobs_ = ui->tvJobs;
+  btnRunNow_ = ui->btnRunNow;
+  btnRemoveSelected_ = ui->btnRemoveSelected;
   scheduleSummaryLabel_ = ui->scheduleSummaryLabel;
   logDisplay_ = ui->logDisplay;
   backupProgressBar_ = ui->backupProgressBar;
@@ -176,6 +180,17 @@ void MainWindow::setupUI() {
   fileViewerDockWidget_ = ui->fileViewerDockWidget;
   backupModeComboBox_ = ui->backupModeComboBox;
   backupModeStackedWidget_ = ui->backupModeStackedWidget;
+  jobsModel_ = new JobsModel(this);
+  if (tvJobs_) {
+    tvJobs_->setModel(jobsModel_);
+    tvJobs_->setSelectionBehavior(QAbstractItemView::SelectRows);
+  }
+  if (ui->wdPlan)
+    ui->wdPlan->setMinimumWidth(320);
+  if (ui->wdWatch)
+    ui->wdWatch->setMinimumWidth(320);
+  if (ui->splitPlanVsWatch)
+    ui->splitPlanVsWatch->setSizes({1, 1});
 
   // Collect day buttons
   dayButtons_.clear();
@@ -213,7 +228,7 @@ void MainWindow::setupUI() {
   connect(addTimeButton_, &QToolButton::clicked, this,
           &MainWindow::onAddBackupTimeClicked);
   connect(removeTimeButton_, &QPushButton::clicked, this,
-          &MainWindow::onRemoveBackupTimeClicked);
+          &MainWindow::onRemoveSelectedJob);
   connect(runBackupButton_, &QPushButton::clicked, this, &MainWindow::runBackupNow);
   connect(ui->actionRunBackup, &QAction::triggered, this, &MainWindow::runBackupNow);
   connect(cbWatch_, &QCheckBox::toggled, this, &MainWindow::onWatchToggled);
@@ -306,7 +321,16 @@ void MainWindow::onAddBackupTimeClicked() {
   timeListWidget_->addItem(item);
   for (QAbstractButton *btn : dayButtons_)
     btn->setChecked(false);
-  updateScheduleFromUI();
+  Job j;
+  j.type = JobType::Scheduled;
+  j.time = t;
+  QBitArray mask(7);
+  for (int i = 0; i < dayNums.size(); ++i)
+    mask.setBit(dayNums[i].toInt() - 1, true);
+  j.daysMask = mask;
+  jobsModel_->addJob(j);
+  scheduler_->computeNextRuns(jobsModel_);
+  updateScheduleSummary();
 }
 
 void MainWindow::onRemoveBackupTimeClicked() {
@@ -322,6 +346,18 @@ void MainWindow::onRemoveBackupTimeClicked() {
   lblWatchStatus_->setText("");
   updateWatchStatusIcon();
   updateScheduleFromUI();
+}
+
+void MainWindow::onRemoveSelectedJob() {
+  if (!tvJobs_)
+    return;
+  QModelIndexList rows = tvJobs_->selectionModel()->selectedRows();
+  QList<int> toRemove;
+  for (const QModelIndex &idx : rows)
+    toRemove << idx.row();
+  jobsModel_->removeRows(toRemove);
+  scheduler_->computeNextRuns(jobsModel_);
+  updateScheduleSummary();
 }
 
 void MainWindow::onAddWatchEntry() {
@@ -434,6 +470,10 @@ void MainWindow::onWatchToggled(bool checked) {
     refreshWatchEntriesDisplay();
     if (watchManager_->entries().isEmpty())
       onAddWatchEntry();
+    Job j;
+    j.type = JobType::Watch;
+    j.interval = sbWatchInterval_->value();
+    jobsModel_->addJob(j);
   } else {
     watchManager_->disable();
     for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
@@ -445,10 +485,16 @@ void MainWindow::onWatchToggled(bool checked) {
     lblWatchStatus_->setText("");
     updateWatchStatusIcon();
     updateScheduleSummary();
+    QList<int> rows;
+    for (int r = 0; r < jobsModel_->rowCount(); ++r)
+      if (jobsModel_->jobRef(r).type == JobType::Watch)
+        rows << r;
+    jobsModel_->removeRows(rows);
   }
   sbWatchInterval_->setEnabled(checked);
   if (checked)
     watchManager_->setInterval(sbWatchInterval_->value());
+  scheduler_->computeNextRuns(jobsModel_);
 }
 
 
@@ -1644,24 +1690,21 @@ void MainWindow::applyUnifiedStyle(QWidget *widget) {
 
 
 void MainWindow::updateScheduleSummary() {
-  if (!scheduleSummaryLabel_ || !timeListWidget_)
+  if (!scheduleSummaryLabel_ || !jobsModel_)
     return;
   int count = 0;
-  QTime earliest;
-  bool first = true;
-  for (int i = 0; i < timeListWidget_->count(); ++i) {
-    QString data = timeListWidget_->item(i)->data(Qt::UserRole).toString();
-    if (data.startsWith("WATCH|"))
+  QDateTime earliest;
+  for (int r = 0; r < jobsModel_->rowCount(); ++r) {
+    const Job &j = jobsModel_->jobRef(r);
+    if (j.type != JobType::Scheduled)
       continue;
-    QString timeStr = data.split('|').value(0);
-    QTime t = QTime::fromString(timeStr, "HH:mm");
-    if (t.isValid() && (first || t < earliest)) {
-      earliest = t;
-      first = false;
-    }
     ++count;
+    if (j.next.isValid() && (!earliest.isValid() || j.next < earliest))
+      earliest = j.next;
   }
-  QString nextText = earliest.isValid() ? earliest.toString("HH:mm") : "--:--";
+  QString nextText = earliest.isValid()
+                           ? earliest.toString("yyyy-MM-dd HH:mm")
+                           : "--";
   scheduleSummaryLabel_->setText(
       QString::fromUtf8("\xF0\x9F\x93\x85 %1 scheduled backup%2 | \xF0\x9F\x95\x92 Next: %3")
           .arg(count)

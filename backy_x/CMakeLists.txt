@@ -38,7 +38,9 @@ set(PROJECT_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 # ============== bibliothèques internes ==============================
 add_library(backy_x_core STATIC
     src/core/Scheduler.cpp
+    src/core/Job.cpp
     ${PROJECT_INCLUDE}/core/Scheduler.h
+    ${PROJECT_INCLUDE}/core/Job.h
 )
 target_include_directories(backy_x_core PUBLIC ${PROJECT_INCLUDE})
 target_link_libraries(backy_x_core PUBLIC Qt6::Core)

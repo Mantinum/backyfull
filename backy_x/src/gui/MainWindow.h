@@ -26,6 +26,7 @@
 
 // Forward declaration for Scheduler
 class Scheduler;
+#include "core/Job.h"
 #include "core/IStorageTarget.h"    // For FileMetadata
 #include "util/CredentialManager.h" // For CredentialManager
 #include "gui/WatchManager.h"
@@ -69,6 +70,7 @@ private slots:
   // Slots for File Viewer handled by FileViewerWidget
   void onAddBackupTimeClicked();
   void onRemoveBackupTimeClicked();
+  void onRemoveSelectedJob();
 
   // Auto watch slots
   void onAddWatchEntry();
@@ -95,6 +97,10 @@ private:
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
+  QTableView *tvJobs_ = nullptr;
+  QPushButton *btnRunNow_ = nullptr;
+  QPushButton *btnRemoveSelected_ = nullptr;
+  JobsModel *jobsModel_ = nullptr;
   QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
