@@ -202,7 +202,7 @@ void MainWindow::setupUI() {
   applyUnifiedStyle(ui->localDestinationGroupBox);
   applyUnifiedStyle(ui->sftpSettingsGroupBox);
   applyUnifiedStyle(ui->gcsSettingsGroupBox);
-  applyUnifiedStyle(ui->gbSchedule);
+  applyUnifiedStyle(ui->gbPlan);
 
   setMinimumSize(800, 600);
   if (QScreen *scr = QApplication::primaryScreen()) {

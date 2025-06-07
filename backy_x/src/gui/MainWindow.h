@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QObject>
 #include <QString>
 
 // Qt class includes
@@ -19,6 +20,7 @@
 #include <QListWidget>
 #include <QSpinBox>
 #include <QPushButton>
+#include <QTableView>
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
