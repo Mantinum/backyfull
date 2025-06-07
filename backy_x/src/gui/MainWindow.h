@@ -17,6 +17,7 @@
 #include <QLabel> // Added for gcsAuthStatusLabel_
 #include <QLineEdit>
 #include <QListWidget>
+#include <QSpinBox>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QTextEdit>
@@ -71,7 +72,8 @@ private slots:
 
   // Auto watch slots
   void onAddWatchEntry();
-  void onWatchToggleChanged(bool checked);
+  void onWatchToggled(bool checked);
+  void updateWatchStatusIcon();
   void handleWatchTriggered(const WatchEntry &entry);
 
 private:
@@ -132,8 +134,10 @@ private:
   QString currentRemotePath_ = "/";
 
   // Auto Watch UI
-  QCheckBox *watchToggleCheckBox_ = nullptr;
-  QLabel *watchStatusLabel_ = nullptr;
+  QCheckBox *cbWatch_ = nullptr;
+  QLabel *lblWatchStatus_ = nullptr;
+  QSpinBox *sbWatchInterval_ = nullptr;
+  QLabel *lblLastEvent_ = nullptr;
 
   WatchManager *watchManager_ = nullptr;
 

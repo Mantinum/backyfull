@@ -27,6 +27,10 @@ class WatchManager : public QObject
 public:
     explicit WatchManager(QObject *parent = nullptr);
 
+    void setInterval(int seconds);
+    int interval() const { return intervalMs_ / 1000; }
+    bool hasError() const { return error_; }
+
     void addEntry(const WatchEntry &entry);
     void removeEntry(const QString &path);
     const QList<WatchEntry> &entries() const { return entries_; }
@@ -48,6 +52,8 @@ private:
     QList<WatchEntry> entries_;
     QSet<QString> pending_;
     bool enabled_;
+    int intervalMs_ = 3000;
+    bool error_ = false;
 };
 
 #endif // WATCHMANAGER_H
