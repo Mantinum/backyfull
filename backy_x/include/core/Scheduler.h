@@ -9,6 +9,7 @@
 #include <QTime>
 #include <QTimer>
 #include <Qt>
+#include "core/Job.h"
 
 struct ScheduleEntry {
   QTime time;
@@ -71,6 +72,9 @@ public:
   QString gcsBucketName() const;
   QString gcsObjectPrefix() const;
   QString gcsAccountIdentifier() const;
+
+  // Compute and update next run datetime for jobs in model
+  void computeNextRuns(JobsModel *model) const;
 
 signals:
   // Emitted when a scheduled backup is due

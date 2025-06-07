@@ -378,6 +378,37 @@ QString Scheduler::gcsAccountIdentifier() const {
                             // identifier
 }
 
+void Scheduler::computeNextRuns(JobsModel *model) const {
+  if (!model)
+    return;
+  QDateTime now = QDateTime::currentDateTime();
+  for (int r = 0; r < model->rowCount(); ++r) {
+    Job &j = model->jobRef(r);
+    if (j.type != JobType::Scheduled || !j.enabled) {
+      model->setJobNext(r, QDateTime());
+      continue;
+    }
+    QDateTime best;
+    bool found = false;
+    for (int offset = 0; offset < 7; ++offset) {
+      QDate date = now.date().addDays(offset);
+      int idx = date.dayOfWeek() - 1;
+      if (j.daysMask.size() == 7 && !j.daysMask.testBit(idx))
+        continue;
+      QDateTime cand(date, j.time);
+      if (cand <= now)
+        continue;
+      if (!found || cand < best) {
+        best = cand;
+        found = true;
+      }
+      if (found)
+        break;
+    }
+    model->setJobNext(r, found ? best : QDateTime());
+  }
+}
+
 // Example of how triggerBackupNow could be implemented if needed:
 // void Scheduler::triggerBackupNow() {
 //     if (taskEnabled_ && !currentSourcePath_.isEmpty() &&
