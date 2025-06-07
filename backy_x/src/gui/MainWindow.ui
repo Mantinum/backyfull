@@ -144,7 +144,7 @@
         <item>
          <widget class="QStackedWidget" name="backupModeStackedWidget">
           <widget class="QWidget" name="LocalBackupPage">
-          <layout class="QVBoxLayout" name="localBackupLayout">
+           <layout class="QVBoxLayout" name="localBackupLayout">
            <property name="stretch">
             <list>
              <number>0</number>
@@ -152,7 +152,7 @@
             </list>
            </property>
             <item>
-            <widget class="QGroupBox" name="localDestinationGroupBox">
+             <widget class="QGroupBox" name="localDestinationGroupBox">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                 <horstretch>0</horstretch>
@@ -204,9 +204,9 @@
              </property>
             </widget>
            </item>
-           </layout>
-            </widget>
-           </item>
+          </layout>
+           </widget>
+          </item>
            <item>
             <spacer name="localSpacer">
              <property name="orientation">
@@ -217,17 +217,17 @@
              </property>
             </spacer>
            </item>
-          </layout>
+         </layout>
         </widget>
         <!-- SFTP group -->
         <widget class="QWidget" name="SFTPBackupPage">
          <layout class="QVBoxLayout" name="sftpBackupLayout">
-          <property name="stretch">
-           <list>
-            <number>0</number>
-            <number>1</number>
-           </list>
-          </property>
+         <property name="stretch">
+          <list>
+           <number>0</number>
+           <number>1</number>
+          </list>
+         </property>
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
             <property name="sizePolicy">
@@ -318,18 +318,18 @@
              </property>
             </widget>
            </item>
-           <item>
-            <spacer name="sftpSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Expanding</enum>
-             </property>
-            </spacer>
-           </item>
            </layout>
           </widget>
+         </item>
+         <item>
+          <spacer name="sftpSpacer">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeType">
+            <enum>QSizePolicy::Expanding</enum>
+           </property>
+          </spacer>
          </item>
         </layout>
        </widget>
@@ -408,23 +408,33 @@
              </property>
             </widget>
            </item>
-           <item>
-            <spacer name="gcsSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Expanding</enum>
-             </property>
-            </spacer>
-           </item>
           </layout>
          </widget>
         </item>
+       <item>
+        <spacer name="gcsSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
        </layout>
       </widget>
      </widget>
     </item>
+       <item>
+        <spacer name="destEndSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
         <item>
          <widget class="QSplitter" name="splitPlanVsWatch">
           <property name="orientation">
@@ -804,16 +814,6 @@
            </widget>
           </item>
          </layout>
-        </item>
-        <item>
-         <spacer name="destEndSpacer">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeType">
-           <enum>QSizePolicy::Expanding</enum>
-          </property>
-         </spacer>
         </item>
        </layout>
       </widget>
