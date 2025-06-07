@@ -145,12 +145,6 @@
          <widget class="QStackedWidget" name="backupModeStackedWidget">
           <widget class="QWidget" name="LocalBackupPage">
            <layout class="QVBoxLayout" name="localBackupLayout">
-           <property name="stretch">
-            <stringlist>
-             <string>0</string>
-             <string>1</string>
-            </stringlist>
-           </property>
             <item>
              <widget class="QGroupBox" name="localDestinationGroupBox">
               <property name="sizePolicy">
@@ -158,9 +152,6 @@
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
-              </property>
-              <property name="sizeAdjustPolicy">
-               <enum>QWidget::AdjustToContents</enum>
               </property>
               <property name="maximumHeight">
                <number>120</number>
@@ -222,12 +213,6 @@
         <!-- SFTP group -->
         <widget class="QWidget" name="SFTPBackupPage">
          <layout class="QVBoxLayout" name="sftpBackupLayout">
-         <property name="stretch">
-          <stringlist>
-           <string>0</string>
-           <string>1</string>
-          </stringlist>
-         </property>
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
             <property name="sizePolicy">
@@ -235,9 +220,6 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
-            </property>
-            <property name="sizeAdjustPolicy">
-             <enum>QWidget::AdjustToContents</enum>
             </property>
             <property name="maximumHeight">
              <number>120</number>
@@ -336,12 +318,6 @@
        <!-- GCS group -->
        <widget class="QWidget" name="GCSBackupPage">
         <layout class="QVBoxLayout" name="gcsBackupLayout">
-         <property name="stretch">
-          <stringlist>
-           <string>0</string>
-           <string>1</string>
-          </stringlist>
-         </property>
          <item>
           <widget class="QGroupBox" name="gcsSettingsGroupBox">
           <property name="sizePolicy">
@@ -349,9 +325,6 @@
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
-          </property>
-          <property name="sizeAdjustPolicy">
-           <enum>QWidget::AdjustToContents</enum>
           </property>
           <property name="maximumHeight">
            <number>120</number>
