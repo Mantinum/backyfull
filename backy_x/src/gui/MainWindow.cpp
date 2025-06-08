@@ -189,9 +189,7 @@ void MainWindow::setupUI() {
     ui->wdPlan->setMinimumWidth(320);
   if (ui->wdWatch)
     ui->wdWatch->setMinimumWidth(320);
-  // "splitPlanVsWatch" used to be a splitter for planning vs watch panes.
-  // It is now a plain container, so removing old splitter sizing call.
-  // if (ui->splitPlanVsWatch) ui->splitPlanVsWatch->setSizes({1, 1});
+
 
   // Collect day buttons
   dayButtons_.clear();
