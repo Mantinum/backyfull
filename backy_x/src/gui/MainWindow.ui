@@ -474,8 +474,7 @@
         </spacer>
        </item>
         <item>
-         <widget class="QWidget" name="splitPlanVsWatch">
-          <layout class="QHBoxLayout" name="planWatchLayout">
+         <layout class="QHBoxLayout" name="planWatchLayout">
            <item>
             <widget class="QWidget" name="wdPlan">
            <layout class="QVBoxLayout" name="vlPlan">
@@ -772,14 +771,13 @@
         </widget>
        </item>
       </layout>
-     </widget>
     </item>
       <item>
        <widget class="QTableView" name="tvJobs">
-        <property name="selectionBehavior">
-         <enum>QAbstractItemView::SelectRows</enum>
-        </property>
-       </widget>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
+      </widget>
       </item>
       <item>
        <layout class="QHBoxLayout" name="bottomButtons">
