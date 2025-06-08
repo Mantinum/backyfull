@@ -1210,7 +1210,6 @@ void MainWindow::onBackupModeChanged(int index) {
   if (backupModeStackedWidget_)
     backupModeStackedWidget_->setCurrentIndex(index);
   QString currentModeText = backupModeComboBox_->itemText(index);
-  bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
   bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 

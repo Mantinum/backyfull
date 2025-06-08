@@ -467,12 +467,13 @@
          </property>
         </spacer>
        </item>
-        <item>
-         <widget class="QWidget" name="splitPlanVsWatch">
-          <layout class="QHBoxLayout" name="planWatchLayout">
-           <item>
-            <widget class="QWidget" name="wdPlan">
-           <layout class="QVBoxLayout" name="vlPlan">
+       <item>
+        <widget class="QSplitter" name="splitPlanVsWatch">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <widget class="QWidget" name="wdPlan">
+          <layout class="QVBoxLayout" name="vlPlan">
             <item>
              <widget class="QGroupBox" name="gbPlan">
               <property name="title">
@@ -683,11 +684,9 @@
           </layout>
          </widget>
         </item>
-        </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QWidget" name="wdWatch">
+       </layout>
+       </widget>
+       <widget class="QWidget" name="wdWatch">
          <layout class="QVBoxLayout" name="vlWatch">
           <item>
            <widget class="QGroupBox" name="gbWatch">
@@ -764,9 +763,7 @@
           </item>
          </layout>
         </widget>
-       </item>
-      </layout>
-     </widget>
+      </widget>
     </item>
       <item>
        <widget class="QTableView" name="tvJobs">
