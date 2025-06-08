@@ -190,7 +190,6 @@ void MainWindow::setupUI() {
   if (ui->wdWatch)
     ui->wdWatch->setMinimumWidth(320);
 
-
   // Collect day buttons
   dayButtons_.clear();
   dayButtons_ << ui->dayButton1 << ui->dayButton2 << ui->dayButton3
