@@ -153,8 +153,11 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
+              <property name="sizeAdjustPolicy">
+               <enum>QWidget::AdjustToContents</enum>
+              </property>
               <property name="maximumHeight">
-               <number>120</number>
+               <number>0</number>
               </property>
               <property name="title">
                <string>Local Destination Configuration</string>
@@ -231,13 +234,16 @@
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
+            <property name="sizeAdjustPolicy">
+             <enum>QWidget::AdjustToContents</enum>
+            </property>
             <property name="maximumHeight">
-             <number>120</number>
+             <number>0</number>
             </property>
             <property name="title">
              <string>SFTP Configuration</string>
