@@ -154,7 +154,7 @@
                </sizepolicy>
               </property>
               <property name="maximumHeight">
-               <number>0</number>
+               <number>120</number>
               </property>
               <property name="title">
                <string>Local Destination Configuration</string>
