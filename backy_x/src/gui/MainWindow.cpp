@@ -50,7 +50,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
-      timeListWidget_(nullptr), removeTimeButton_(nullptr),
+      removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
       logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
       backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
@@ -147,7 +147,6 @@ void MainWindow::setupUI() {
   destinationDirButton_ = ui->destinationDirButton;
   backupTimeEdit_ = ui->backupTimeEdit;
   addTimeButton_ = ui->btnAddSched;
-  timeListWidget_ = ui->timeListWidget;
   removeTimeButton_ = ui->btnRemoveSelected;
   runBackupButton_ = ui->btnRunNow;
   tvJobs_ = ui->tvJobs;
@@ -297,55 +296,24 @@ void MainWindow::onAddBackupTimeClicked() {
       dayNums << QString::number(i + 1); // Qt day numbers
     }
   }
-  QString dataString = t.toString("HH:mm");
-  if (!dayNums.isEmpty())
-    dataString += "|" + dayNums.join(',');
+  QBitArray mask(7);
+  for (int i = 0; i < dayNums.size(); ++i)
+    mask.setBit(dayNums[i].toInt() - 1, true);
 
-  for (int i = 0; i < timeListWidget_->count(); ++i) {
-    if (timeListWidget_->item(i)->data(Qt::UserRole).toString() == dataString)
+  for (const Job &j : jobsModel_->jobs()) {
+    if (j.type == JobType::Scheduled && j.time == t && j.daysMask == mask)
       return; // duplicate
   }
 
-  QString display = t.toString("HH:mm");
-  if (!dayNames.isEmpty())
-    display += " (" + dayNames.join(',') + ")";
-  else
-    display += tr(" (All)");
-  QString srcDisp = shortenPathForDisplay(sourceDirEdit_->text());
-  QString destDisp = shortenPathForDisplay(currentDestinationForDisplay());
-  if (!srcDisp.isEmpty() && !destDisp.isEmpty()) {
-    display += QString(" | %1 \u2192 %2").arg(srcDisp, destDisp);
-  }
-  QListWidgetItem *item = new QListWidgetItem(display);
-  item->setData(Qt::UserRole, dataString);
-  timeListWidget_->addItem(item);
   for (QAbstractButton *btn : dayButtons_)
     btn->setChecked(false);
   Job j;
   j.type = JobType::Scheduled;
   j.time = t;
-  QBitArray mask(7);
-  for (int i = 0; i < dayNums.size(); ++i)
-    mask.setBit(dayNums[i].toInt() - 1, true);
   j.daysMask = mask;
   jobsModel_->addJob(j);
   scheduler_->computeNextRuns(jobsModel_);
   updateScheduleSummary();
-}
-
-void MainWindow::onRemoveBackupTimeClicked() {
-  const QList<QListWidgetItem *> items = timeListWidget_->selectedItems();
-  for (QListWidgetItem *item : items) {
-    QString data = item->data(Qt::UserRole).toString();
-    if (data.startsWith("WATCH|")) {
-      QString path = data.mid(QStringLiteral("WATCH|").length());
-      watchManager_->removeEntry(path);
-    }
-    delete item;
-  }
-  lblWatchStatus_->setText("");
-  updateWatchStatusIcon();
-  updateScheduleFromUI();
 }
 
 void MainWindow::onRemoveSelectedJob() {
@@ -418,17 +386,6 @@ void MainWindow::onAddWatchEntry() {
   }
   watchManager_->addEntry(entry);
 
-  QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
-                    tr(" Monitoring | %1 \u2192 %2")
-                        .arg(shortenPathForDisplay(dir),
-                             currentDestinationForDisplay());
-  QListWidgetItem *item = new QListWidgetItem(display);
-  QFont f = item->font();
-  f.setItalic(true);
-  item->setFont(f);
-  item->setData(Qt::UserRole, QStringLiteral("WATCH|") + dir);
-  timeListWidget_->addItem(item);
-
   lblWatchStatus_->setText("");
   updateWatchStatusIcon();
   updateScheduleSummary();
@@ -476,12 +433,6 @@ void MainWindow::onWatchToggled(bool checked) {
     jobsModel_->addJob(j);
   } else {
     watchManager_->disable();
-    for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
-      QListWidgetItem *item = timeListWidget_->item(i);
-      if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
-        delete timeListWidget_->takeItem(i);
-      }
-    }
     lblWatchStatus_->setText("");
     updateWatchStatusIcon();
     updateScheduleSummary();
@@ -501,25 +452,14 @@ void MainWindow::onWatchToggled(bool checked) {
 void MainWindow::updateScheduleFromUI() {
   QString sourcePath = sourceDirEdit_->text();
   QList<ScheduleEntry> entries;
-  for (int i = 0; i < timeListWidget_->count(); ++i) {
-    QString data = timeListWidget_->item(i)->data(Qt::UserRole).toString();
-    if (data.startsWith("WATCH|"))
-      continue;
-    QStringList parts = data.split('|');
-    QTime t = QTime::fromString(parts.value(0), "HH:mm");
-    if (!t.isValid())
+  for (const Job &j : jobsModel_->jobs()) {
+    if (j.type != JobType::Scheduled)
       continue;
     ScheduleEntry se;
-    se.time = t;
-    if (parts.size() > 1) {
-      QStringList ds = parts[1].split(',');
-      for (const QString &dsItem : ds) {
-        bool ok = false;
-        int val = dsItem.toInt(&ok);
-        if (ok)
-          se.days.insert(static_cast<Qt::DayOfWeek>(val));
-      }
-    }
+    se.time = j.time;
+    for (int d = 0; d < j.daysMask.size(); ++d)
+      if (j.daysMask.testBit(d))
+        se.days.insert(static_cast<Qt::DayOfWeek>(d + 1));
     entries.append(se);
   }
 
@@ -569,34 +509,6 @@ void MainWindow::updateScheduleFromUI() {
 }
 
 void MainWindow::refreshWatchEntriesDisplay() {
-  if (!timeListWidget_)
-    return;
-  for (int i = timeListWidget_->count() - 1; i >= 0; --i) {
-    QListWidgetItem *item = timeListWidget_->item(i);
-    if (item->data(Qt::UserRole).toString().startsWith("WATCH|")) {
-      delete timeListWidget_->takeItem(i);
-    }
-  }
-  for (const WatchEntry &e : watchManager_->entries()) {
-    QString destDisp;
-    if (e.isSftpMode) {
-      destDisp = QString("%1:%2").arg(e.sftpHost, e.sftpRemotePath);
-    } else if (e.isGcsMode) {
-      destDisp = QString("gcs://%1").arg(e.gcsBucketName);
-    } else {
-      destDisp = e.destination;
-    }
-    destDisp = shortenPathForDisplay(destDisp);
-    QString display = QString::fromUtf8("\xF0\x9F\x91\x81 ") +
-                      tr(" Monitoring | %1 \u2192 %2")
-                          .arg(shortenPathForDisplay(e.source), destDisp);
-    QListWidgetItem *item = new QListWidgetItem(display);
-    QFont f = item->font();
-    f.setItalic(true);
-    item->setFont(f);
-    item->setData(Qt::UserRole, QStringLiteral("WATCH|") + e.source);
-    timeListWidget_->addItem(item);
-  }
   updateWatchStatusIcon();
   updateScheduleSummary();
 }
@@ -1263,44 +1175,21 @@ void MainWindow::onTaskChanged() {
     destinationDirEdit_->setText(scheduler_->destinationPath());
   }
 
-  timeListWidget_->clear();
+  QList<int> rowsToRemove;
+  for (int r = 0; r < jobsModel_->rowCount(); ++r)
+    rowsToRemove << r;
+  jobsModel_->removeJobRows(rowsToRemove); // clear model
   QList<ScheduleEntry> entries = scheduler_->scheduleEntries();
   if (!entries.isEmpty()) {
     for (const ScheduleEntry &se : entries) {
-      QString data = se.time.toString("HH:mm");
-      QString display = se.time.toString("HH:mm");
-      if (!se.days.isEmpty()) {
-        QStringList names;
-        QStringList nums;
-        const QStringList dayLabels = {tr("Mon"), tr("Tue"), tr("Wed"),
-                                       tr("Thu"), tr("Fri"), tr("Sat"),
-                                       tr("Sun")};
-        for (Qt::DayOfWeek d : se.days) {
-          names << dayLabels[d - 1];
-          nums << QString::number(int(d));
-        }
-        display += " (" + names.join(',') + ")";
-        data += "|" + nums.join(',');
-      } else {
-        display += tr(" (All)");
-      }
-      QString srcDisp = shortenPathForDisplay(scheduler_->sourcePath());
-      QString destDisp;
-      if (scheduler_->isSftpMode()) {
-        destDisp = QString("%1:%2")
-                       .arg(scheduler_->sftpHost(), scheduler_->sftpRemotePath());
-      } else if (scheduler_->isGcsMode()) {
-        destDisp = QString("gcs://%1").arg(scheduler_->gcsBucketName());
-      } else {
-        destDisp = scheduler_->destinationPath();
-      }
-      destDisp = shortenPathForDisplay(destDisp);
-      if (!srcDisp.isEmpty() && !destDisp.isEmpty()) {
-        display += QString(" | %1 \u2192 %2").arg(srcDisp, destDisp);
-      }
-      QListWidgetItem *item = new QListWidgetItem(display);
-      item->setData(Qt::UserRole, data);
-      timeListWidget_->addItem(item);
+      Job j;
+      j.type = JobType::Scheduled;
+      j.time = se.time;
+      QBitArray mask(7);
+      for (Qt::DayOfWeek d : se.days)
+        mask.setBit(int(d) - 1, true);
+      j.daysMask = mask;
+      jobsModel_->addJob(j);
     }
     backupTimeEdit_->setTime(entries.first().time);
   } else {

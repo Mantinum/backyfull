@@ -17,7 +17,6 @@
 #include <QGroupBox>
 #include <QLabel> // Added for gcsAuthStatusLabel_
 #include <QLineEdit>
-#include <QListWidget>
 #include <QSpinBox>
 #include <QPushButton>
 #include <QTableView>
@@ -71,7 +70,6 @@ private slots:
   void onGcsConnectToggleClicked();
   // Slots for File Viewer handled by FileViewerWidget
   void onAddBackupTimeClicked();
-  void onRemoveBackupTimeClicked();
   void onRemoveSelectedJob();
 
   // Auto watch slots
@@ -96,7 +94,6 @@ private:
   QTimeEdit *backupTimeEdit_;
   QList<QAbstractButton *> dayButtons_;
   QToolButton *addTimeButton_;
-  QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
   QTableView *tvJobs_ = nullptr;

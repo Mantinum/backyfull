@@ -8,7 +8,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_main">
     <property name="spacing">
-     <number>12</number>
+     <number>9</number>
     </property>
     <item>
      <widget class="QScrollArea" name="scrollArea">
@@ -26,7 +26,7 @@
        </property>
        <layout class="QVBoxLayout" name="scrollAreaLayout">
         <property name="spacing">
-         <number>12</number>
+         <number>9</number>
         </property>
         <!-- Source configuration group -->
         <item>
@@ -148,13 +148,13 @@
             <item>
              <widget class="QGroupBox" name="localDestinationGroupBox">
               <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
                 <horstretch>0</horstretch>
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
               <property name="maximumHeight">
-               <number>0</number>
+               <number>16777215</number>
               </property>
               <property name="title">
                <string>Local Destination Configuration</string>
@@ -214,14 +214,20 @@
            </widget>
           </item>
            <item>
-            <spacer name="localSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeType">
-              <enum>QSizePolicy::Expanding</enum>
-             </property>
-            </spacer>
+           <spacer name="localSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeType">
+             <enum>QSizePolicy::Preferred</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>8</height>
+             </size>
+            </property>
+           </spacer>
            </item>
          </layout>
         </widget>
@@ -231,13 +237,13 @@
           <item>
            <widget class="QGroupBox" name="sftpSettingsGroupBox">
             <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
             </property>
             <property name="maximumHeight">
-             <number>120</number>
+             <number>16777215</number>
             </property>
             <property name="title">
              <string>SFTP Configuration</string>
@@ -324,7 +330,13 @@
             <enum>Qt::Vertical</enum>
            </property>
            <property name="sizeType">
-            <enum>QSizePolicy::Expanding</enum>
+            <enum>QSizePolicy::Preferred</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>8</height>
+            </size>
            </property>
           </spacer>
          </item>
@@ -336,13 +348,13 @@
          <item>
           <widget class="QGroupBox" name="gcsSettingsGroupBox">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
+           <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="maximumHeight">
-           <number>120</number>
+           <number>16777215</number>
           </property>
           <property name="title">
            <string>Google Cloud Storage Configuration</string>
@@ -405,7 +417,13 @@
           <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Expanding</enum>
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>8</height>
+          </size>
          </property>
         </spacer>
        </item>
@@ -419,7 +437,13 @@
           <enum>Qt::Vertical</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Expanding</enum>
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>8</height>
+          </size>
          </property>
         </spacer>
        </item>
@@ -624,23 +648,7 @@
            <item row="1" column="0" colspan="3">
             <widget class="QLabel" name="scheduleSummaryLabel"/>
            </item>
-           <item row="2" column="0" colspan="3">
-            <widget class="QLabel" name="labelScheduledTimes">
-             <property name="text">
-              <string>Scheduled Times:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0" colspan="3">
-            <widget class="QFrame" name="timesFrame">
-             <layout class="QVBoxLayout" name="timesLayout">
-              <item>
-               <widget class="QListWidget" name="timeListWidget"/>
-              </item>
-             </layout>
-            </widget>
-           </item>
-          <item row="6" column="0" colspan="3">
+          <item row="2" column="0" colspan="3">
            <widget class="QProgressBar" name="backupProgressBar">
             <property name="visible">
              <bool>false</bool>
