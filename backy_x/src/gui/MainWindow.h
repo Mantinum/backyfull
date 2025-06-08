@@ -23,7 +23,7 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
-#include <QScrollArea>
+#include <QListWidget>
 
 // Forward declaration for Scheduler
 class Scheduler;
@@ -40,6 +40,7 @@ class SftpTarget;
 class GcsTarget; // Forward declare GcsTarget
 class FileViewerWidget;
 class WatchManager;
+class DestinationPage;
 
 namespace Ui {
 class MainWindow;
@@ -103,11 +104,12 @@ private:
   QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
-  QScrollArea *scrollArea_ = nullptr;
+  QListWidget *navSteps_ = nullptr;
+  QStackedWidget *pages_ = nullptr;
+  DestinationPage *destinationPage_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
-  QStackedWidget *backupModeStackedWidget_;
 
   QProgressBar *backupProgressBar_{nullptr};
 

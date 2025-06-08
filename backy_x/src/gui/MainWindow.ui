@@ -11,20 +11,40 @@
      <number>9</number>
     </property>
     <item>
-     <widget class="QScrollArea" name="scrollArea">
-      <property name="widgetResizable">
-       <bool>true</bool>
+     <widget class="QSplitter" name="splitMain">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QWidget" name="scrollAreaWidgetContents">
-       <property name="geometry">
-        <rect>
-         <x>0</x>
-         <y>0</y>
-         <width>100</width>
-         <height>30</height>
-        </rect>
-       </property>
-       <layout class="QVBoxLayout" name="scrollAreaLayout">
+      <widget class="QListWidget" name="navSteps">
+       <item>
+        <property name="text">
+         <string>Source</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Destination</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Schedule</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Watch</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Logs</string>
+        </property>
+       </item>
+      </widget>
+      <widget class="QStackedWidget" name="pages">
+       <widget class="QWidget" name="pageSource">
+        <layout class="QVBoxLayout" name="scrollAreaLayout">
         <property name="spacing">
          <number>9</number>
         </property>
@@ -140,315 +160,20 @@
           </layout>
          </widget>
         </item>
-        <!-- Backup mode configuration stack -->
-        <item>
-         <widget class="QStackedWidget" name="backupModeStackedWidget">
-          <widget class="QWidget" name="LocalBackupPage">
-           <layout class="QVBoxLayout" name="localBackupLayout">
+         <item>
+          <widget class="QGroupBox" name="destinationGroupBox">
+           <property name="title">
+            <string>Destination</string>
+           </property>
+           <layout class="QVBoxLayout" name="destinationLayout">
             <item>
-             <widget class="QGroupBox" name="localDestinationGroupBox">
-              <property name="sizePolicy">
-               <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-               </sizepolicy>
-              </property>
-              <property name="maximumHeight">
-               <number>16777215</number>
-              </property>
-              <property name="title">
-               <string>Local Destination Configuration</string>
-              </property>
-              <layout class="QFormLayout" name="localDestLayout">
-               <property name="leftMargin">
-                <number>9</number>
-               </property>
-               <property name="topMargin">
-                <number>9</number>
-               </property>
-               <property name="rightMargin">
-                <number>9</number>
-               </property>
-               <property name="bottomMargin">
-                <number>9</number>
-               </property>
-               <property name="spacing">
-                <number>6</number>
-               </property>
-           <item row="0" column="0">
-            <widget class="QLabel" name="labelDestDir">
-             <property name="text">
-              <string>Destination Directory (Local):</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <layout class="QHBoxLayout" name="destPathLayout">
-             <item>
-              <widget class="QLineEdit" name="destinationDirEdit">
-               <property name="readOnly">
-                <bool>true</bool>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="destinationDirButton">
-               <property name="text">
-                <string>📂 Browse</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="1" column="0" colspan="2">
-            <widget class="QLabel" name="destHint">
-             <property name="text">
-              <string>Select destination folder (local or remote)</string>
-             </property>
-             <property name="wordWrap">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
-           </widget>
-          </item>
-           <item>
-           <spacer name="localSpacer">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeType">
-             <enum>QSizePolicy::Preferred</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>8</height>
-             </size>
-            </property>
-           </spacer>
-           </item>
-         </layout>
-        </widget>
-        <!-- SFTP group -->
-        <widget class="QWidget" name="SFTPBackupPage">
-         <layout class="QVBoxLayout" name="sftpBackupLayout">
-          <item>
-           <widget class="QGroupBox" name="sftpSettingsGroupBox">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="maximumHeight">
-             <number>16777215</number>
-            </property>
-            <property name="title">
-             <string>SFTP Configuration</string>
-            </property>
-            <layout class="QFormLayout" name="sftpFormLayout">
-           <item row="0" column="0">
-            <widget class="QLabel" name="labelSftpHost">
-             <property name="text">
-              <string>SFTP Host:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QLineEdit" name="sftpHostLineEdit"/>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="labelSftpPort">
-             <property name="text">
-              <string>SFTP Port:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLineEdit" name="sftpPortLineEdit">
-             <property name="text">
-              <string>22</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="labelSftpUser">
-             <property name="text">
-              <string>SFTP Username:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="1">
-            <widget class="QLineEdit" name="sftpUsernameLineEdit"/>
-           </item>
-           <item row="3" column="0">
-            <widget class="QLabel" name="labelSftpPass">
-             <property name="text">
-              <string>SFTP Password:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="1">
-            <widget class="QLineEdit" name="sftpPasswordLineEdit">
-             <property name="echoMode">
-              <enum>QLineEdit::Password</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0" colspan="2">
-            <widget class="QCheckBox" name="sftpSavePasswordCheckBox">
-             <property name="text">
-              <string>Save password securely</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="labelSftpRemote">
-             <property name="text">
-              <string>SFTP Remote Path:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="1">
-            <widget class="QLineEdit" name="sftpRemotePathLineEdit"/>
-           </item>
-           <item row="6" column="0" colspan="2" alignment="Qt::AlignLeft">
-            <widget class="QPushButton" name="sftpConnectToggleButton">
-             <property name="text">
-              <string>Connect</string>
-             </property>
-            </widget>
-           </item>
+             <widget class="DestinationPage" name="destinationPage"/>
+            </item>
            </layout>
           </widget>
          </item>
          <item>
-          <spacer name="sftpSpacer">
-           <property name="orientation">
-            <enum>Qt::Vertical</enum>
-           </property>
-           <property name="sizeType">
-            <enum>QSizePolicy::Preferred</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>20</width>
-             <height>8</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-       <!-- GCS group -->
-       <widget class="QWidget" name="GCSBackupPage">
-        <layout class="QVBoxLayout" name="gcsBackupLayout">
-         <item>
-          <widget class="QGroupBox" name="gcsSettingsGroupBox">
-          <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-           </sizepolicy>
-          </property>
-          <property name="maximumHeight">
-           <number>16777215</number>
-          </property>
-          <property name="title">
-           <string>Google Cloud Storage Configuration</string>
-          </property>
-          <layout class="QFormLayout" name="gcsFormLayout">
-           <item row="0" column="0">
-            <widget class="QLabel" name="labelGcsBucket">
-             <property name="text">
-              <string>GCS Bucket Name:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QLineEdit" name="gcsBucketNameLineEdit"/>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="labelGcsAccount">
-             <property name="text">
-              <string>GCS Account Identifier:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLineEdit" name="gcsAccountIdentifierLineEdit"/>
-           </item>
-           <item row="2" column="0" colspan="2" alignment="Qt::AlignLeft">
-            <widget class="QPushButton" name="gcsConnectButton">
-             <property name="text">
-              <string>Log in to Google Drive</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0" colspan="2">
-            <widget class="QLabel" name="gcsAuthStatusLabel">
-             <property name="text">
-              <string>Status: Not Authenticated</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0" colspan="2" alignment="Qt::AlignLeft">
-            <widget class="QPushButton" name="gcsTestConnectionButton">
-             <property name="text">
-              <string>Test Connection</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0" colspan="2" alignment="Qt::AlignLeft">
-            <widget class="QPushButton" name="gcsConnectToggleButton">
-             <property name="text">
-              <string>Connect</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-       <item>
-        <spacer name="gcsSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Preferred</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>8</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       </layout>
-      </widget>
-     </widget>
-    </item>
-       <item>
-        <spacer name="destEndSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Preferred</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>8</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-        <item>
-         <widget class="QSplitter" name="splitPlanVsWatch">
+          <widget class="QSplitter" name="splitPlanVsWatch">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -813,10 +538,16 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="pageDestination"/>
+      <widget class="QWidget" name="pageSchedule"/>
+      <widget class="QWidget" name="pageWatch"/>
+      <widget class="QWidget" name="pageLogs"/>
+      <widget class="QWidget" name="pageExtra"/>
      </widget>
-    </item>
-   </layout>
-  </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
   <widget class="QDockWidget" name="fileViewerDockWidget">
    <property name="windowTitle">
     <string>Remote File Browser</string>
