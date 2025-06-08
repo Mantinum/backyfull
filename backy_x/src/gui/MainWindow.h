@@ -23,7 +23,7 @@
 #include <QVBoxLayout>
 #include <QTextEdit>
 #include <QTimeEdit>
-#include <QScrollArea>
+#include <QListWidget>
 
 // Forward declaration for Scheduler
 class Scheduler;
@@ -103,7 +103,8 @@ private:
   QLabel *scheduleSummaryLabel_{nullptr};
   QTextEdit *logDisplay_;
 
-  QScrollArea *scrollArea_ = nullptr;
+  QListWidget *navSteps_ = nullptr;
+  QStackedWidget *pages_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;

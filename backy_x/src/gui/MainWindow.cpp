@@ -52,8 +52,8 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
-      logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
-      backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
+      logDisplay_(nullptr), navSteps_(nullptr), pages_(nullptr),
+      backupModeComboBox_(nullptr), backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
@@ -140,7 +140,8 @@ void MainWindow::setupUI() {
       QStringLiteral("QPushButton{padding:4px 12px;border-radius:4px;}");
 
   // Store pointers to widgets from UI
-  scrollArea_ = ui->scrollArea;
+  navSteps_ = ui->navSteps;
+  pages_ = ui->pages;
   sourceDirEdit_ = ui->sourceDirEdit;
   sourceDirButton_ = ui->sourceDirButton;
   destinationDirEdit_ = ui->destinationDirEdit;
@@ -218,6 +219,10 @@ void MainWindow::setupUI() {
   viewMenu->addAction(fileViewerDockWidget_->toggleViewAction());
 
   // Connections
+  if (navSteps_ && pages_)
+    connect(navSteps_, &QListWidget::currentRowChanged, pages_,
+            &QStackedWidget::setCurrentIndex);
+
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   connect(destinationDirButton_, &QPushButton::clicked, this,
