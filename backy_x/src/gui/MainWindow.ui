@@ -153,9 +153,6 @@
                 <verstretch>0</verstretch>
                </sizepolicy>
               </property>
-              <property name="sizeAdjustPolicy">
-               <enum>QWidget::AdjustToContents</enum>
-              </property>
               <property name="maximumHeight">
                <number>0</number>
               </property>
@@ -238,9 +235,6 @@
               <horstretch>0</horstretch>
               <verstretch>0</verstretch>
              </sizepolicy>
-            </property>
-            <property name="sizeAdjustPolicy">
-             <enum>QWidget::AdjustToContents</enum>
             </property>
             <property name="maximumHeight">
              <number>0</number>
