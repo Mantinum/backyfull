@@ -109,8 +109,6 @@ add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
     src/gui/MainWindow.ui
-    src/gui/DestinationPage.cpp
-    src/gui/DestinationPage.ui
     src/gui/FileViewerWidget.cpp
     src/gui/WatchManager.cpp
 )

@@ -40,7 +40,6 @@ class SftpTarget;
 class GcsTarget; // Forward declare GcsTarget
 class FileViewerWidget;
 class WatchManager;
-class DestinationPage;
 
 namespace Ui {
 class MainWindow;
@@ -106,10 +105,10 @@ private:
 
   QListWidget *navSteps_ = nullptr;
   QStackedWidget *pages_ = nullptr;
-  DestinationPage *destinationPage_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
+  QStackedWidget *backupModeStackedWidget_;
 
   QProgressBar *backupProgressBar_{nullptr};
 

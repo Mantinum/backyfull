@@ -5,7 +5,6 @@
 #include "targets/SftpTarget.h"
 #include "util/CredentialManager.h"
 #include "gui/FileViewerWidget.h"
-#include "gui/DestinationPage.h"
 #include "gui/WatchManager.h"
 #include "ui_MainWindow.h"
 #include "core/Job.h"
@@ -53,8 +52,8 @@ MainWindow::MainWindow(QWidget *parent)
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       removeTimeButton_(nullptr),
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
-      logDisplay_(nullptr), navSteps_(nullptr), pages_(nullptr), destinationPage_(nullptr), backupModeComboBox_(nullptr),
-      backupProgressBar_(nullptr),
+      logDisplay_(nullptr), navSteps_(nullptr), pages_(nullptr),
+      backupModeComboBox_(nullptr), backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
       m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
@@ -99,8 +98,7 @@ MainWindow::MainWindow(QWidget *parent)
   connect(scheduler_, &Scheduler::taskChanged, this,
           &MainWindow::onTaskChanged);
 
-  if (backupModeComboBox_ && destinationPage_) {
-    destinationPage_->setCurrentIndex(backupModeComboBox_->currentIndex());
+  if (backupModeComboBox_ && backupModeStackedWidget_) {
     onBackupModeChanged(backupModeComboBox_->currentIndex());
   }
   onTaskChanged();
@@ -144,26 +142,10 @@ void MainWindow::setupUI() {
   // Store pointers to widgets from UI
   navSteps_ = ui->navSteps;
   pages_ = ui->pages;
-  destinationPage_ = ui->destinationPage;
   sourceDirEdit_ = ui->sourceDirEdit;
   sourceDirButton_ = ui->sourceDirButton;
-  if (destinationPage_) {
-    destinationDirEdit_ = destinationPage_->findChild<QLineEdit*>("destinationDirEdit");
-    destinationDirButton_ = destinationPage_->findChild<QPushButton*>("destinationDirButton");
-    sftpHostLineEdit_ = destinationPage_->findChild<QLineEdit*>("sftpHostLineEdit");
-    sftpPortLineEdit_ = destinationPage_->findChild<QLineEdit*>("sftpPortLineEdit");
-    sftpUsernameLineEdit_ = destinationPage_->findChild<QLineEdit*>("sftpUsernameLineEdit");
-    sftpPasswordLineEdit_ = destinationPage_->findChild<QLineEdit*>("sftpPasswordLineEdit");
-    sftpRemotePathLineEdit_ = destinationPage_->findChild<QLineEdit*>("sftpRemotePathLineEdit");
-    sftpSavePasswordCheckBox_ = destinationPage_->findChild<QCheckBox*>("sftpSavePasswordCheckBox");
-    sftpConnectToggleButton_ = destinationPage_->findChild<QPushButton*>("sftpConnectToggleButton");
-    gcsBucketNameLineEdit_ = destinationPage_->findChild<QLineEdit*>("gcsBucketNameLineEdit");
-    gcsAccountIdentifierLineEdit_ = destinationPage_->findChild<QLineEdit*>("gcsAccountIdentifierLineEdit");
-    gcsConnectButton_ = destinationPage_->findChild<QPushButton*>("gcsConnectButton");
-    gcsTestConnectionButton_ = destinationPage_->findChild<QPushButton*>("gcsTestConnectionButton");
-    gcsAuthStatusLabel_ = destinationPage_->findChild<QLabel*>("gcsAuthStatusLabel");
-    gcsConnectToggleButton_ = destinationPage_->findChild<QPushButton*>("gcsConnectToggleButton");
-  }
+  destinationDirEdit_ = ui->destinationDirEdit;
+  destinationDirButton_ = ui->destinationDirButton;
   backupTimeEdit_ = ui->backupTimeEdit;
   addTimeButton_ = ui->btnAddSched;
   removeTimeButton_ = ui->btnRemoveSelected;
@@ -175,15 +157,29 @@ void MainWindow::setupUI() {
   logDisplay_ = ui->logDisplay;
   backupProgressBar_ = ui->backupProgressBar;
   QToolButton *logToggleButton = ui->logToggleButton;
-  m_localDestinationGroupBox = nullptr;
-  sftpSettingsGroupBox_ = nullptr;
-  gcsSettingsGroupBox_ = nullptr;
+  m_localDestinationGroupBox = ui->localDestinationGroupBox;
+  sftpSettingsGroupBox_ = ui->sftpSettingsGroupBox;
+  sftpHostLineEdit_ = ui->sftpHostLineEdit;
+  sftpPortLineEdit_ = ui->sftpPortLineEdit;
+  sftpUsernameLineEdit_ = ui->sftpUsernameLineEdit;
+  sftpPasswordLineEdit_ = ui->sftpPasswordLineEdit;
+  sftpRemotePathLineEdit_ = ui->sftpRemotePathLineEdit;
+  sftpSavePasswordCheckBox_ = ui->sftpSavePasswordCheckBox;
+  sftpConnectToggleButton_ = ui->sftpConnectToggleButton;
+  gcsSettingsGroupBox_ = ui->gcsSettingsGroupBox;
+  gcsBucketNameLineEdit_ = ui->gcsBucketNameLineEdit;
+  gcsAccountIdentifierLineEdit_ = ui->gcsAccountIdentifierLineEdit;
+  gcsConnectButton_ = ui->gcsConnectButton;
+  gcsTestConnectionButton_ = ui->gcsTestConnectionButton;
+  gcsAuthStatusLabel_ = ui->gcsAuthStatusLabel;
+  gcsConnectToggleButton_ = ui->gcsConnectToggleButton;
   cbWatch_ = ui->cbWatch;
   lblWatchStatus_ = ui->lblWatchStatus;
   sbWatchInterval_ = ui->sbWatchInterval;
   lblLastEvent_ = ui->lblLastEvent;
   fileViewerDockWidget_ = ui->fileViewerDockWidget;
   backupModeComboBox_ = ui->backupModeComboBox;
+  backupModeStackedWidget_ = ui->backupModeStackedWidget;
   jobsModel_ = new JobsModel(this);
   if (tvJobs_) {
     tvJobs_->setModel(jobsModel_);
@@ -203,8 +199,9 @@ void MainWindow::setupUI() {
               << ui->dayButton7;
 
   applyUnifiedStyle(ui->sourceGroupBox);
-  if (destinationPage_)
-    applyUnifiedStyle(destinationPage_);
+  applyUnifiedStyle(ui->localDestinationGroupBox);
+  applyUnifiedStyle(ui->sftpSettingsGroupBox);
+  applyUnifiedStyle(ui->gcsSettingsGroupBox);
   applyUnifiedStyle(ui->gbPlan);
 
   setMinimumSize(800, 600);
@@ -225,6 +222,7 @@ void MainWindow::setupUI() {
   if (navSteps_ && pages_)
     connect(navSteps_, &QListWidget::currentRowChanged, pages_,
             &QStackedWidget::setCurrentIndex);
+
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   connect(destinationDirButton_, &QPushButton::clicked, this,
@@ -1209,8 +1207,8 @@ void MainWindow::onTaskChanged() {
 }
 
 void MainWindow::onBackupModeChanged(int index) {
-  if (destinationPage_)
-    destinationPage_->setCurrentIndex(index);
+  if (backupModeStackedWidget_)
+    backupModeStackedWidget_->setCurrentIndex(index);
   QString currentModeText = backupModeComboBox_->itemText(index);
   bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
@@ -1286,8 +1284,8 @@ void MainWindow::loadSettings() {
 
   backupModeComboBox_->setCurrentIndex(
       settings.value("backupModeIndex", 0).toInt());
-  if (destinationPage_)
-    destinationPage_->setCurrentIndex(backupModeComboBox_->currentIndex());
+  if (backupModeStackedWidget_)
+    backupModeStackedWidget_->setCurrentIndex(backupModeComboBox_->currentIndex());
   settings.endGroup();
 
   settings.beginGroup("WatchEntries");
