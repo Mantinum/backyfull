@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>MainWindow</class>
+ <customwidgets>
+  <customwidget>
+   <class>DestinationPage</class>
+   <extends>QWidget</extends>
+   <header>gui/DestinationPage.h</header>
+  </customwidget>
+ </customwidgets>
  <widget class="QMainWindow" name="MainWindow">
   <property name="windowTitle">
    <string>BackyFull - Backup Configuration</string>
