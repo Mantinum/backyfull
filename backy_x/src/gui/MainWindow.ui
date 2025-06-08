@@ -154,7 +154,7 @@
                </sizepolicy>
               </property>
               <property name="maximumHeight">
-               <number>0</number>
+               <number>16777215</number>
               </property>
               <property name="title">
                <string>Local Destination Configuration</string>
@@ -237,7 +237,7 @@
              </sizepolicy>
             </property>
             <property name="maximumHeight">
-             <number>0</number>
+             <number>16777215</number>
             </property>
             <property name="title">
              <string>SFTP Configuration</string>
@@ -336,13 +336,13 @@
          <item>
           <widget class="QGroupBox" name="gcsSettingsGroupBox">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-            <horstretch>0</horstretch>
-            <verstretch>0</verstretch>
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="maximumHeight">
-           <number>120</number>
+           <number>16777215</number>
           </property>
           <property name="title">
            <string>Google Cloud Storage Configuration</string>
