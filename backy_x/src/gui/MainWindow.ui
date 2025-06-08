@@ -11,11 +11,17 @@
      <number>9</number>
     </property>
     <item>
-     <widget class="QSplitter" name="mainSplitter">
+     <widget class="QSplitter" name="splitMain">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
       <widget class="QListWidget" name="navSteps">
+       <property name="minimumWidth">
+        <number>170</number>
+       </property>
+       <property name="maximumWidth">
+        <number>170</number>
+       </property>
        <item>
         <property name="text">
          <string>Source</string>
@@ -468,8 +474,7 @@
         </spacer>
        </item>
         <item>
-         <widget class="QWidget" name="splitPlanVsWatch">
-          <layout class="QHBoxLayout" name="planWatchLayout">
+         <layout class="QHBoxLayout" name="planWatchLayout">
            <item>
             <widget class="QWidget" name="wdPlan">
            <layout class="QVBoxLayout" name="vlPlan">
@@ -766,14 +771,13 @@
         </widget>
        </item>
       </layout>
-     </widget>
     </item>
       <item>
        <widget class="QTableView" name="tvJobs">
-        <property name="selectionBehavior">
-         <enum>QAbstractItemView::SelectRows</enum>
-        </property>
-       </widget>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
+      </widget>
       </item>
       <item>
        <layout class="QHBoxLayout" name="bottomButtons">
@@ -836,10 +840,6 @@
         </item>
         </layout>
        </widget>
-       <widget class="QWidget" name="pageDestination"/>
-       <widget class="QWidget" name="pageSchedule"/>
-       <widget class="QWidget" name="pageWatch"/>
-       <widget class="QWidget" name="pageLogs"/>
       </widget>
      </widget>
     </item>

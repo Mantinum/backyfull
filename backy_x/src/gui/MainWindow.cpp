@@ -126,8 +126,8 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
-  if (auto spl = findChild<QSplitter*>("centralwidget"))
-    spl->setSizes({200, width() - 200});
+  if (auto spl = findChild<QSplitter*>("splitMain"))
+    spl->setSizes({170, width() - 170});
 
   // Menu
   QMenu *viewMenu = ui->menuView;
@@ -189,8 +189,6 @@ void MainWindow::setupUI() {
     ui->wdPlan->setMinimumWidth(320);
   if (ui->wdWatch)
     ui->wdWatch->setMinimumWidth(320);
-  if (ui->splitPlanVsWatch)
-    ui->splitPlanVsWatch->setSizes({1, 1});
 
   // Collect day buttons
   dayButtons_.clear();
@@ -1210,7 +1208,6 @@ void MainWindow::onBackupModeChanged(int index) {
   if (backupModeStackedWidget_)
     backupModeStackedWidget_->setCurrentIndex(index);
   QString currentModeText = backupModeComboBox_->itemText(index);
-  bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
   bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 
