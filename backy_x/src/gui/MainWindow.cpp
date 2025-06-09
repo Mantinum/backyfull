@@ -38,6 +38,7 @@
 #include <QMenuBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
@@ -122,6 +123,14 @@ void MainWindow::closeEvent(QCloseEvent *event) {
   QMainWindow::closeEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent *event) {
+  QMainWindow::resizeEvent(event);
+  if (sourceDestLayout_) {
+    sourceDestLayout_->setDirection(
+        width() >= 1000 ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+  }
+}
+
 void MainWindow::setupUI() {
   setWindowTitle(tr("BackyFull - Backup Configuration"));
 
@@ -172,7 +181,6 @@ void MainWindow::setupUI() {
   connect(addWatchButton_, &QPushButton::clicked, this,
           &MainWindow::onAddWatchEntry);
   sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
-  mainLayout->addWidget(sourceGroupBox);
 
   destinationStack_ = new DestinationStack();
   destinationDirEdit_ = destinationStack_->lineEdit();
@@ -180,7 +188,20 @@ void MainWindow::setupUI() {
   destinationDirButton_ = destinationStack_->browseButton();
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
-  mainLayout->addWidget(destinationStack_);
+
+  QGroupBox *destGroupBox =
+      new QGroupBox(tr("Local Destination Configuration"));
+  QVBoxLayout *destLayout = new QVBoxLayout(destGroupBox);
+  destLayout->setSpacing(8);
+  destGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
+  destLayout->addWidget(destinationStack_);
+
+  sourceDestLayout_ = new QBoxLayout(QBoxLayout::TopToBottom);
+  sourceDestLayout_->addWidget(sourceGroupBox, 1);
+  sourceDestLayout_->addWidget(destGroupBox, 1);
+  mainLayout->addLayout(sourceDestLayout_);
+  sourceDestLayout_->setDirection(width() >= 1000 ? QBoxLayout::LeftToRight
+                                                : QBoxLayout::TopToBottom);
 
   connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
           destinationStack_, &DestinationStack::setCurrentIndex);

@@ -25,6 +25,7 @@
 QT_BEGIN_NAMESPACE
 class QTableWidget;
 class QTableWidgetItem;
+class QBoxLayout;
 QT_END_NAMESPACE
 
 // Forward declaration for Scheduler
@@ -61,6 +62,7 @@ public:
 
 protected:
   void closeEvent(QCloseEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 
 private slots:
   void selectSourceDirectory();
@@ -110,6 +112,7 @@ private:
   QTextEdit *logDisplay_;
 
   QScrollArea *scrollArea_ = nullptr;
+  QBoxLayout *sourceDestLayout_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
