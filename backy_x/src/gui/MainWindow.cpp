@@ -19,6 +19,7 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QSpinBox>
 #include <QScreen>
 #include <QMessageBox>
 #include <QSettings>
