@@ -107,10 +107,11 @@ add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
     src/gui/DestinationStack.cpp
+    src/cloud/gcs/GcsAuth.cpp
 )
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
-    PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network
+    PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network Qt6::NetworkAuth
             LocalTarget_lib SftpTarget_lib GcsTarget_lib CredentialManager_lib)
 target_compile_options(backy_full_gui PRIVATE -Wall -Wextra -pedantic)
 if(WIN32)

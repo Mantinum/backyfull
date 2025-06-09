@@ -2,6 +2,7 @@
 #include "core/Scheduler.h"
 #include "targets/GcsTarget.h" // Added for GCS Target
 #include "targets/LocalTarget.h"
+#include "cloud/gcs/GcsAuth.h"
 #include "targets/SftpTarget.h"
 #include "util/CredentialManager.h"
 
@@ -838,81 +839,9 @@ void MainWindow::runBackupNow() {
 }
 
 void MainWindow::onGcsConnectButtonClicked() {
-  updateLog(
-      tr("GCS 'Connect to Google Account' button clicked (OAuth process)."));
-  QString bucketName = gcsBucketNameLineEdit_->text();
-  QString accountId = gcsAccountIdentifierLineEdit_->text();
-
-  if (bucketName.isEmpty() || accountId.isEmpty()) {
-    QMessageBox::warning(this, tr("GCS Configuration Error"),
-                         tr("GCS Bucket Name and Account Identifier must be "
-                            "provided before connecting for OAuth."));
-    updateLog(tr("GCS OAuth: Bucket Name or Account Identifier missing."));
-    return;
-  }
-
-  std::map<std::string, std::string> gcsConfig;
-  gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
-  gcsConfig["gcs_account_identifier"] = accountId.toStdString();
-
-  GcsTarget tempGcsTargetForOAuth(
-      gcsConfig,
-      m_credentialManager.get()); // Create a temporary target for OAuth
-
-  gcsAuthStatusLabel_->setText(tr("Status: Authenticating..."));
-  updateLog(QString("GCS OAuth: Attempting authentication for account '%1' "
-                    "(bucket '%2' context for token).")
-                .arg(accountId, bucketName));
-
-  if (tempGcsTargetForOAuth
-          .initiateOAuthAndStoreToken()) { // Use the temporary target
-    gcsAuthStatusLabel_->setText(
-        tr("Status: Authentication Successful for %1").arg(accountId));
-    updateLog(QString("GCS OAuth: Authentication successful for account '%1'.")
-                  .arg(accountId));
-
-    QSettings settings(QCoreApplication::organizationName(),
-                       QCoreApplication::applicationName());
-    settings.beginGroup("GCS");
-    settings.setValue("gcs_last_authenticated_account", accountId);
-    settings.endGroup();
-    updateLog(QString("GCS OAuth: Stored '%1' as last authenticated account.")
-                  .arg(accountId));
-
-    // IMPORTANT: DO NOT automatically connect for listing or browseRemotePath
-    // here. User must click the new gcsConnectToggleButton_ for that. Also, DO
-    // NOT change gcsConnectToggleButton_ text here.
-
-  } else {
-    gcsAuthStatusLabel_->setText(
-        tr("Status: Authentication Failed. Check logs."));
-    QString gcsError =
-        QString::fromStdString(tempGcsTargetForOAuth.getLastError());
-    updateLog(
-        QString("GCS OAuth: Authentication failed for account '%1'. Error: %2")
-            .arg(accountId, gcsError));
-    QMessageBox::critical(this, tr("GCS Authentication Failed"),
-                          tr("Could not authenticate with Google Cloud Storage "
-                             "for account '%1'. Error: %2")
-                              .arg(accountId, gcsError));
-
-    // Reset UI related to listing, as it cannot proceed if OAuth fails
-    if (gcsConnectToggleButton_) { // Ensure button exists
-      gcsConnectToggleButton_->setText(tr("Connect"));
-    }
-    if (fileTableWidget_) { // Ensure table exists
-      fileTableWidget_->setRowCount(0);
-    }
-    currentRemotePath_ = "/";
-    if (currentPathLabel_) { // Ensure label exists
-      currentPathLabel_->setText(tr("Path: /"));
-    }
-    // QSettings settings(QCoreApplication::organizationName(),
-    // QCoreApplication::applicationName());
-    // settings.remove("GCS/gcs_last_authenticated_account");
-  }
-  // tempGcsTargetForOAuth goes out of scope here.
-  // The main gcsTarget_ (for listing) is managed by onGcsConnectToggleClicked.
+  updateLog(tr("GCS 'Connect to Google Account' button clicked."));
+  static GcsAuth gcsAuth(this);
+  gcsAuth.startInteractiveAuth();
 }
 
 void MainWindow::onSftpConnectToggleClicked() {

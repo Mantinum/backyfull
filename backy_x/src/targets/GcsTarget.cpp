@@ -9,8 +9,6 @@
 #include <algorithm> // for std::remove for local file deletion on failed download
 
 // Qt includes
-#include <QTcpServer>
-#include <QTcpSocket>
 #include <QUrl>
 #include <QUrlQuery>
 #include <QJsonDocument>
@@ -18,9 +16,6 @@
 #include <QJsonValue>
 #include <QJsonArray>
 #include <QFile>
-#include <QDesktopServices>
-#include <QCoreApplication>
-#include <QTimer>
 #include <QDateTime>
 #include <QTimeZone>
 
@@ -74,8 +69,6 @@ GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, Credentia
     : m_credentialManager(credentialManager),
       m_curlHandle(nullptr),
       m_accessTokenExpiryTime(0),
-      m_oauthCallbackServer(nullptr),
-      m_oauthFlowCompletedSuccessfully(false),
       m_properlyConfigured(true) {
 
     if (!m_credentialManager) {
@@ -142,7 +135,6 @@ GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, Credentia
 
 GcsTarget::~GcsTarget() {
     if (m_curlHandle) curl_easy_cleanup(m_curlHandle);
-    stopLocalCallbackServer();
 }
 
 bool GcsTarget::beginSession() {
@@ -353,21 +345,6 @@ bool GcsTarget::testConnection(std::string& errorMsg) {
     return false;
 }
 
-bool GcsTarget::initiateOAuthAndStoreToken() {
-    m_lastError.clear();
-    if (m_clientId.empty() || m_clientSecret.empty()) {
-        m_lastError = "OAuth client_id or client_secret not available.";
-        std::cerr << "GcsTarget: CRITICAL - " << m_lastError << std::endl;
-        return false;
-    }
-    if (m_accountIdentifier.empty()) { m_lastError = "Account Identifier not set."; std::cerr << "GcsTarget: " << m_lastError << std::endl; return false; }
-
-    if (!performInitialOAuthFlow()) {
-        if (m_lastError.empty()) m_lastError = "OAuth flow failed or cancelled.";
-        return false;
-    }
-    return true;
-}
 
 std::string GcsTarget::getLastError() const { return m_lastError; }
 
@@ -381,7 +358,7 @@ std::string GcsTarget::getAccessToken() {
         return m_currentAccessToken;
     }
     if (!refreshAccessToken()) {
-        if (!performInitialOAuthFlow()) { return ""; }
+        return "";
     }
     return m_currentAccessToken;
 }
@@ -422,54 +399,6 @@ bool GcsTarget::refreshAccessToken() {
     return false;
 }
 
-bool GcsTarget::performInitialOAuthFlow() {
-    // ... (Implementation as before, ensuring m_lastError is set on failure)
-    m_oauthFlowCompletedSuccessfully = false; m_authorizationCode.clear();
-    m_oauthCallbackServer = new QTcpServer();
-    // Connect signals for m_oauthCallbackServer... (condensed for brevity)
-    QObject::connect(m_oauthCallbackServer, &QTcpServer::newConnection, [&]() { /* ... see original ... */ });
-    if (!m_oauthCallbackServer->listen(QHostAddress::LocalHost, QUrl(QString::fromStdString(m_redirectUri)).port(8765))) {
-        m_lastError = "Failed to start callback server: " + m_oauthCallbackServer->errorString().toStdString(); delete m_oauthCallbackServer; m_oauthCallbackServer = nullptr; return false;
-    }
-    QUrl authUrl("https://accounts.google.com/o/oauth2/v2/auth");
-    QUrlQuery query; /* ... set query items ... */ query.addQueryItem("client_id", QString::fromStdString(m_clientId)); query.addQueryItem("redirect_uri", QString::fromStdString(m_redirectUri)); query.addQueryItem("response_type", "code"); query.addQueryItem("scope", "https://www.googleapis.com/auth/devstorage.read_write"); query.addQueryItem("access_type", "offline"); query.addQueryItem("prompt", "consent");
-    authUrl.setQuery(query);
-    QDesktopServices::openUrl(authUrl);
-    QEventLoop loop; QTimer timer; timer.setSingleShot(true); QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit); timer.start(120000);
-    loop.exec(); // Wait for callback or timeout
-    stopLocalCallbackServer();
-    if (!m_oauthFlowCompletedSuccessfully || m_authorizationCode.empty()) { if(m_lastError.empty()) m_lastError = "OAuth: No auth code."; return false; }
-
-    std::string tokenUrl = "https://oauth2.googleapis.com/token";
-    std::string postData = "client_id=" + QUrl::toPercentEncoding(QString::fromStdString(m_clientId)).toStdString() +
-                           "&client_secret=" + QUrl::toPercentEncoding(QString::fromStdString(m_clientSecret)).toStdString() +
-                           "&code=" + QUrl::toPercentEncoding(QString::fromStdString(m_authorizationCode)).toStdString() +
-                           "&redirect_uri=" + QUrl::toPercentEncoding(QString::fromStdString(m_redirectUri)).toStdString() +
-                           "&grant_type=authorization_code";
-    std::vector<std::string> headers = {"Content-Type: application/x-www-form-urlencoded"};
-    std::string responseBody; long responseCode = 0;
-    CURLcode res = performCurlRequest(tokenUrl, "POST", headers, postData, nullptr, responseBody, responseCode);
-    if (res == CURLE_OK && responseCode == 200) {
-        QJsonDocument jsonDoc = QJsonDocument::fromJson(QString::fromStdString(responseBody).toUtf8());
-        QJsonObject jsonObj = jsonDoc.object();
-        if (jsonObj.contains("access_token") && jsonObj.contains("expires_in")) {
-            m_currentAccessToken = jsonObj["access_token"].toString().toStdString();
-            m_accessTokenExpiryTime = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + jsonObj["expires_in"].toInt() - 60;
-            if (jsonObj.contains("refresh_token") && m_credentialManager && !m_accountIdentifier.empty()) {
-                m_credentialManager->storeGcsRefreshToken(QString::fromStdString(m_accountIdentifier), jsonObj["refresh_token"].toString());
-            }
-            return true;
-        } m_lastError = "Token exchange JSON missing fields: " + responseBody;
-    } else { m_lastError = "Token exchange failed. HTTP " + std::to_string(responseCode) + ", Curl: " + curl_easy_strerror(res) + ", Resp: " + parseGcsError(responseBody); }
-    return false;
-}
-
-void GcsTarget::stopLocalCallbackServer() {
-    if (m_oauthCallbackServer) {
-        if (m_oauthCallbackServer->isListening()) m_oauthCallbackServer->close();
-        delete m_oauthCallbackServer; m_oauthCallbackServer = nullptr;
-    }
-}
 
 size_t GcsTarget::writeCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
     size_t newLength = size * nmemb;
