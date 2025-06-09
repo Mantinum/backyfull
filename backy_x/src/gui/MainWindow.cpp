@@ -185,12 +185,6 @@ void MainWindow::setupUI() {
     tvJobs_->setModel(jobsModel_);
     tvJobs_->setSelectionBehavior(QAbstractItemView::SelectRows);
   }
-  if (ui->wdPlan)
-    ui->wdPlan->setMinimumWidth(320);
-  if (ui->wdWatch)
-    ui->wdWatch->setMinimumWidth(320);
-  if (ui->splitPlanVsWatch)
-    ui->splitPlanVsWatch->setSizes({1, 1});
 
   // Collect day buttons
   dayButtons_.clear();
