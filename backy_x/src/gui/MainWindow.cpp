@@ -134,10 +134,8 @@ void MainWindow::setupUI() {
   scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-  setMinimumSize(800, 600);
-  if (QScreen *scr = QApplication::primaryScreen()) {
-    setMaximumHeight(scr->availableGeometry().height());
-  }
+  mainLayout->setSpacing(8);
+  mainLayout->setContentsMargins(12, 12, 12, 12);
 
   QHBoxLayout *modeLayout = new QHBoxLayout();
   modeLayout->addWidget(new QLabel(tr("Backup Mode:")));
@@ -151,6 +149,8 @@ void MainWindow::setupUI() {
 
   QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
   QGridLayout *sourceLayout = new QGridLayout(sourceGroupBox);
+  sourceLayout->setSpacing(8);
+  sourceGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
   sourceLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
@@ -162,6 +162,8 @@ void MainWindow::setupUI() {
 
   watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
   QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
+  watchLayout->setSpacing(8);
+  watchGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
   addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"));
   watchLayout->addWidget(addWatchButton_, 0, 0, 1, 3);
   watchStatusLabel_ = new QLabel(tr("Aucune surveillance"));
@@ -174,6 +176,8 @@ void MainWindow::setupUI() {
   m_localDestinationGroupBox =
       new QGroupBox(tr("Local Destination Configuration"));
   QGridLayout *localDestLayout = new QGridLayout(m_localDestinationGroupBox);
+  localDestLayout->setSpacing(8);
+  m_localDestinationGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
   localDestLayout->addWidget(new QLabel(tr("Destination Directory (Local):")),
                              0, 0);
   destinationDirEdit_ = new QLineEdit();
@@ -187,6 +191,8 @@ void MainWindow::setupUI() {
 
   sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
   QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
+  sftpFormLayout->setSpacing(8);
+  sftpSettingsGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
   sftpHostLineEdit_ = new QLineEdit();
   sftpFormLayout->addRow(new QLabel(tr("SFTP Host:")), sftpHostLineEdit_);
   sftpPortLineEdit_ = new QLineEdit();
@@ -214,6 +220,8 @@ void MainWindow::setupUI() {
   gcsSettingsGroupBox_ =
       new QGroupBox(tr("Google Cloud Storage Configuration"));
   QFormLayout *gcsFormLayout = new QFormLayout(gcsSettingsGroupBox_);
+  gcsFormLayout->setSpacing(8);
+  gcsSettingsGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
   gcsBucketNameLineEdit_ = new QLineEdit();
   gcsFormLayout->addRow(new QLabel(tr("GCS Bucket Name:")),
                         gcsBucketNameLineEdit_);
@@ -244,6 +252,8 @@ void MainWindow::setupUI() {
 
   QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
+  scheduleLayout->setSpacing(8);
+  scheduleGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
   scheduleLayout->addWidget(new QLabel(tr("Backup Time:")), 0, 0);
   backupTimeEdit_ = new QTimeEdit();
   backupTimeEdit_->setDisplayFormat("HH:mm");
@@ -286,6 +296,8 @@ void MainWindow::setupUI() {
   fileViewerGroupBox_ = new QGroupBox(tr("Remote File Viewer"));
   QVBoxLayout *fileViewerLayout =
       new QVBoxLayout(); // No parent here, will be set on the group box
+  fileViewerLayout->setSpacing(8);
+  fileViewerLayout->setContentsMargins(12, 12, 12, 12);
 
   currentPathLabel_ =
       new QLabel(tr("Path: /"), fileViewerGroupBox_);       // Parented
@@ -309,6 +321,7 @@ void MainWindow::setupUI() {
       new QPushButton(tr("Delete"), fileViewerGroupBox_); // Parented
 
   QHBoxLayout *buttonLayout = new QHBoxLayout(); // No parent here
+  buttonLayout->setSpacing(8);
   buttonLayout->addWidget(refreshButton_);
   buttonLayout->addWidget(downloadButton_);
   buttonLayout->addWidget(deleteButton_);
