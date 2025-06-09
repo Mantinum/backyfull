@@ -1,4 +1,4 @@
-#include "cloud/gcs/GcsAuth.h"
+#include "GcsAuth.h"
 #include <QDesktopServices>
 #include <QFile>
 #include <QJsonDocument>
@@ -69,5 +69,4 @@ void GcsAuth::startInteractiveAuth()
     oauth_.grant();
 }
 
-#include "moc_GcsAuth.cpp"
 
