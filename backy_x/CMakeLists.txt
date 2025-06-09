@@ -108,7 +108,6 @@ add_executable(backy_full_gui
     src/gui/MainWindow.cpp
     src/gui/DestinationStack.cpp
     src/cloud/gcs/GcsAuth.cpp
-    src/cloud/gcs/GcsAuth.h
 )
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
