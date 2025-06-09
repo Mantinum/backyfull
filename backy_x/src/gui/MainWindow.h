@@ -20,6 +20,7 @@
 #include <QTimer>
 #include <QSet>
 #include <QScrollArea>
+#include "DestinationStack.h"
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
 class QTableWidget;
@@ -99,6 +100,7 @@ private:
   QPushButton *sourceDirButton_;
   QLineEdit *destinationDirEdit_;
   QPushButton *destinationDirButton_;
+  DestinationStack *destinationStack_;
   QTimeEdit *backupTimeEdit_;
   QList<QCheckBox *> dayCheckBoxes_;
   QPushButton *addTimeButton_;
@@ -113,7 +115,6 @@ private:
   QComboBox *backupModeComboBox_;
 
   // Local Backup Settings
-  QGroupBox *m_localDestinationGroupBox;
 
   // SFTP Settings
   QGroupBox *sftpSettingsGroupBox_;

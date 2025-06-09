@@ -42,11 +42,12 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
+      destinationStack_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       runBackupButton_(nullptr),
       logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
-      m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
+      sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr), sftpSavePasswordCheckBox_(nullptr),
@@ -173,21 +174,16 @@ void MainWindow::setupUI() {
   sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
   mainLayout->addWidget(sourceGroupBox);
 
-  m_localDestinationGroupBox =
-      new QGroupBox(tr("Local Destination Configuration"));
-  QGridLayout *localDestLayout = new QGridLayout(m_localDestinationGroupBox);
-  localDestLayout->setSpacing(8);
-  m_localDestinationGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
-  localDestLayout->addWidget(new QLabel(tr("Destination Directory (Local):")),
-                             0, 0);
-  destinationDirEdit_ = new QLineEdit();
+  destinationStack_ = new DestinationStack();
+  destinationDirEdit_ = destinationStack_->lineEdit();
   destinationDirEdit_->setReadOnly(true);
-  localDestLayout->addWidget(destinationDirEdit_, 0, 1);
-  destinationDirButton_ = new QPushButton(tr("Browse..."));
+  destinationDirButton_ = destinationStack_->browseButton();
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
-  localDestLayout->addWidget(destinationDirButton_, 0, 2);
-  mainLayout->addWidget(m_localDestinationGroupBox);
+  mainLayout->addWidget(destinationStack_);
+
+  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
+          destinationStack_, &DestinationStack::setCurrentIndex);
 
   sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
   QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
@@ -1454,8 +1450,6 @@ void MainWindow::onBackupModeChanged(int index) {
   }
 
   // Show/hide relevant group boxes
-  if (m_localDestinationGroupBox)
-    m_localDestinationGroupBox->setVisible(localSelected);
   if (sftpSettingsGroupBox_)
     sftpSettingsGroupBox_->setVisible(sftpSelected);
   if (gcsSettingsGroupBox_)
