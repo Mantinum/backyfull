@@ -15,6 +15,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
@@ -89,6 +90,7 @@ private slots:
   void onAddWatchEntry();
   void onDirectoryChanged(const QString &path);
   void onWatchTimerTimeout();
+  void toggleWatch(bool checked);
 
 private:
   void setupUI();
@@ -152,6 +154,8 @@ private:
   QGroupBox *watchGroupBox_ = nullptr;
   QPushButton *addWatchButton_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
+  QCheckBox *realTimeWatchCheckBox_ = nullptr;
+  QSpinBox *watchIntervalSpinBox_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
   QTimer *watchTriggerTimer_ = nullptr;
@@ -178,6 +182,9 @@ private:
 
   QString shortenPathForDisplay(const QString &path) const;
   QString currentDestinationForDisplay() const;
+
+  void startFolderWatch(int seconds);
+  void stopFolderWatch();
 
   void adjustHeightToScreen();
 };

@@ -181,12 +181,14 @@ void MainWindow::setupUI() {
   QWidget *watchRow = new QWidget();
   QHBoxLayout *watchLayout = new QHBoxLayout(watchRow);
   watchLayout->setContentsMargins(0, 0, 0, 0);
-  QCheckBox *cbWatch = new QCheckBox(tr("Enable real-time watch"));
-  QSpinBox *sbInterval = new QSpinBox();
-  sbInterval->setSuffix(tr(" s"));
-  sbInterval->setRange(5, 3600);
-  watchLayout->addWidget(cbWatch);
-  watchLayout->addWidget(sbInterval);
+  realTimeWatchCheckBox_ = new QCheckBox(tr("Enable real-time watch"));
+  watchIntervalSpinBox_ = new QSpinBox();
+  watchIntervalSpinBox_->setSuffix(tr(" s"));
+  watchIntervalSpinBox_->setRange(5, 3600);
+  watchLayout->addWidget(realTimeWatchCheckBox_);
+  watchLayout->addWidget(watchIntervalSpinBox_);
+  connect(realTimeWatchCheckBox_, &QCheckBox::toggled, this,
+          &MainWindow::toggleWatch);
   sourceLayout->addRow(QString(), watchRow);
 
   addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"),
@@ -598,6 +600,18 @@ void MainWindow::onWatchTimerTimeout() {
     }
   }
   pendingWatchPaths_.clear();
+}
+
+void MainWindow::toggleWatch(bool checked) {
+  if (checked) {
+    int s = watchIntervalSpinBox_->value();
+    startFolderWatch(s);
+    logDisplay_->appendPlainText(
+        tr("Real-time watch enabled (%1 s)").arg(s));
+  } else {
+    stopFolderWatch();
+    logDisplay_->appendPlainText(tr("Real-time watch disabled"));
+  }
 }
 
 void MainWindow::updateScheduleFromUI() {
@@ -2266,6 +2280,20 @@ QString MainWindow::currentDestinationForDisplay() const {
     return QString("gcs://%1").arg(gcsBucketNameLineEdit_->text());
   }
   return destinationDirEdit_->text();
+}
+
+void MainWindow::startFolderWatch(int seconds) {
+  if (!dirWatcher_->directories().contains(sourceDirEdit_->text()))
+    dirWatcher_->addPath(sourceDirEdit_->text());
+  watchTriggerTimer_->setInterval(seconds * 1000);
+  if (!watchTriggerTimer_->isActive())
+    watchTriggerTimer_->start();
+}
+
+void MainWindow::stopFolderWatch() {
+  dirWatcher_->removePath(sourceDirEdit_->text());
+  watchTriggerTimer_->stop();
+  pendingWatchPaths_.clear();
 }
 
 void MainWindow::adjustHeightToScreen() {
