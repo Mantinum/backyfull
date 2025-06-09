@@ -62,8 +62,12 @@ GcsAuth::GcsAuth(QObject* parent)
     });
 }
 
+GcsAuth::~GcsAuth() = default;
+
 void GcsAuth::startInteractiveAuth()
 {
     oauth_.grant();
 }
+
+#include "moc_GcsAuth.cpp"
 

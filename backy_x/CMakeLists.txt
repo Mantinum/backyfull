@@ -107,8 +107,11 @@ add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
     src/gui/DestinationStack.cpp
-    src/cloud/gcs/GcsAuth.cpp
 )
+target_sources(backy_full_gui PRIVATE src/cloud/gcs/GcsAuth.cpp)
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cloud/gcs/GcsAuth.cpp")
+    message(FATAL_ERROR "GcsAuth.cpp missing from target!")
+endif()
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
     PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network Qt6::NetworkAuth

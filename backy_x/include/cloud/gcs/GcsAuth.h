@@ -4,10 +4,10 @@
 #include <QtNetworkAuth/qoauth2authorizationcodeflow.h>
 
 class GcsAuth : public QObject {
-    Q_OBJECT                // <= imperative
+    Q_OBJECT                               // <-- indispensable
 public:
     explicit GcsAuth(QObject* parent = nullptr);
-    ~GcsAuth() override = default;   // force vtable generation
+    ~GcsAuth() override;                   // out-of-line to ensure vtable
 
     void startInteractiveAuth();
 
