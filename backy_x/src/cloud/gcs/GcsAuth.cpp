@@ -6,7 +6,9 @@
 #include <QUrl>
 #include <QStandardPaths>
 #include <QDebug>
+#include <QSettings>
 #include <optional>
+#include <QVariant>
 #include <QtNetworkAuth/qoauthhttpserverreplyhandler.h>
 
 namespace {
@@ -51,14 +53,46 @@ GcsAuth::GcsAuth(QObject* parent)
     oauth_.setRequestedScopeTokens({
         "https://www.googleapis.com/auth/devstorage.read_write"});
 
+    credentialManager_ = std::unique_ptr<CredentialManager>(createPlatformCredentialManager());
+
+    QSettings settings;
+    settings.beginGroup("GCS");
+    accountIdentifier_ = settings.value("gcs_account_identifier", "default").toString();
+    settings.endGroup();
+
+    if (credentialManager_) {
+        auto tokenOpt = credentialManager_->retrieveGcsRefreshToken(accountIdentifier_);
+        if (tokenOpt && !tokenOpt->isEmpty()) {
+            oauth_.setRefreshToken(*tokenOpt);
+        }
+    }
+
     auto *handler = new QOAuthHttpServerReplyHandler(0, this);
     oauth_.setReplyHandler(handler);
+
+    // Extra params for Google
+    oauth_.setModifyParametersFunction(
+        [](QAbstractOAuth::Stage stage, QVariantMap *params) {
+            if (stage == QAbstractOAuth::Stage::RequestingAuthorization) {
+                params->insert("access_type",  "offline");
+                params->insert("prompt",       "consent");
+            }
+        });
 
     connect(&oauth_, &QOAuth2AuthorizationCodeFlow::authorizeWithBrowser,
             [](const QUrl &url) { QDesktopServices::openUrl(url); });
 
     connect(&oauth_, &QOAuth2AuthorizationCodeFlow::granted, this, [this]() {
         qInfo() << "GCS auth success, token:" << oauth_.token();
+        QString rt = oauth_.refreshToken();
+        if (credentialManager_ && !rt.isEmpty()) {
+            credentialManager_->storeGcsRefreshToken(accountIdentifier_, rt);
+        }
+
+        QSettings s;
+        s.beginGroup("GCS");
+        s.setValue("gcs_last_authenticated_account", accountIdentifier_);
+        s.endGroup();
     });
 }
 
