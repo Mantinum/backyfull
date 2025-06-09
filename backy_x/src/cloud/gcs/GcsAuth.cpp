@@ -40,14 +40,15 @@ GcsAuth::GcsAuth(QObject* parent)
     : QObject(parent)
 {
     oauth_.setAuthorizationUrl(QUrl("https://accounts.google.com/o/oauth2/v2/auth"));
-    oauth_.setAccessTokenUrl(QUrl("https://oauth2.googleapis.com/token"));
+    oauth_.setTokenUrl(QUrl("https://oauth2.googleapis.com/token"));
 
     if (auto creds = loadCredentials()) {
         oauth_.setClientIdentifier(creds->clientId);
         oauth_.setClientIdentifierSharedKey(creds->clientSecret);
     }
 
-    oauth_.setScope("https://www.googleapis.com/auth/devstorage.read_write");
+    oauth_.setRequestedScopeTokens({
+        "https://www.googleapis.com/auth/devstorage.read_write"});
 
     auto *handler = new QOAuthHttpServerReplyHandler(0, this);
     oauth_.setReplyHandler(handler);
