@@ -3,205 +3,398 @@
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
   <property name="windowTitle">
-   <string>BackyFull - Backup Configuration</string>
+   <string>BackyFull</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_main">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing"><number>8</number></property>
+    <property name="leftMargin"><number>9</number></property>
+    <property name="topMargin"><number>9</number></property>
+    <property name="rightMargin"><number>9</number></property>
+    <property name="bottomMargin"><number>9</number></property>
     <item>
-     <widget class="QSplitter" name="mainSplitter">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <widget class="QListWidget" name="navSteps">
-       <item><property name="text"><string>Source</string></property></item>
-       <item><property name="text"><string>Destination</string></property></item>
-       <item><property name="text"><string>Schedule</string></property></item>
-       <item><property name="text"><string>Watch</string></property></item>
-       <item><property name="text"><string>Logs</string></property></item>
+     <widget class="QSplitter" name="splitRoot">
+      <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      <widget class="QWidget" name="navPrimary">
+       <property name="minimumSize"><size><width>180</width><height>0</height></size></property>
+       <property name="maximumSize"><size><width>180</width><height>16777215</height></size></property>
+       <property name="styleSheet"><string notr="true">background-color:#1B2530;color:#EAECEF;</string></property>
+       <layout class="QVBoxLayout" name="layoutNav">
+        <property name="spacing"><number>8</number></property>
+        <property name="leftMargin"><number>9</number></property>
+        <property name="topMargin"><number>9</number></property>
+        <property name="rightMargin"><number>9</number></property>
+        <property name="bottomMargin"><number>9</number></property>
+        <item>
+         <widget class="QLabel" name="logoBackyFull">
+          <property name="text"><string>BackyFull</string></property>
+          <property name="alignment"><set>Qt::AlignCenter</set></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QListWidget" name="navList">
+          <item><property name="text"><string>Dashboard</string></property></item>
+          <item><property name="text"><string>Backups</string></property></item>
+          <item><property name="text"><string>Settings</string></property></item>
+          <item><property name="text"><string>Help</string></property></item>
+         </widget>
+        </item>
+        <item>
+         <spacer name="navSpacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0">
+           <size><width>20</width><height>40</height></size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
       </widget>
-      <widget class="QStackedWidget" name="pages">
-       <widget class="QWidget" name="pageSource">
-        <layout class="QVBoxLayout" name="vlSource">
+      <widget class="QStackedWidget" name="mainStack">
+       <property name="currentIndex"><number>0</number></property>
+       <widget class="QWidget" name="pageDashboard">
+        <layout class="QVBoxLayout" name="layoutDashboard">
+         <property name="spacing"><number>8</number></property>
+         <property name="leftMargin"><number>9</number></property>
+         <property name="topMargin"><number>9</number></property>
+         <property name="rightMargin"><number>9</number></property>
+         <property name="bottomMargin"><number>9</number></property>
          <item>
-          <widget class="QGroupBox" name="sourceGroupBox">
-           <property name="title"><string>Source Configuration</string></property>
-           <layout class="QFormLayout" name="sourceLayout">
-            <item row="0" column="0"><widget class="QLabel" name="labelSourceDir"><property name="text"><string>Source Directory:</string></property></widget></item>
-            <item row="0" column="1">
-             <layout class="QHBoxLayout" name="sourcePathLayout">
-              <item><widget class="QLineEdit" name="sourceDirEdit"><property name="readOnly"><bool>true</bool></property></widget></item>
-              <item><widget class="QPushButton" name="sourceDirButton"><property name="text"><string>📂 Browse</string></property></widget></item>
-             </layout>
-            </item>
-           </layout>
+          <widget class="QLabel" name="labelDashboard">
+           <property name="text"><string>Welcome to BackyFull</string></property>
           </widget>
          </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="pageBackups">
+        <layout class="QVBoxLayout" name="layoutPageBackups">
+         <property name="spacing"><number>8</number></property>
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
          <item>
-          <layout class="QHBoxLayout" name="modeLayout">
-           <item><widget class="QLabel" name="modeLabel"><property name="text"><string>Backup Mode:</string></property></widget></item>
-           <item>
-            <widget class="QComboBox" name="backupModeComboBox">
-             <item><property name="text"><string>Local Backup</string></property></item>
-             <item><property name="text"><string>SFTP Backup</string></property></item>
-             <item><property name="text"><string>Google Cloud Storage</string></property></item>
-            </widget>
-           </item>
-           <item><spacer name="modeSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-          </layout>
-         </item>
-         <item>
-          <widget class="QStackedWidget" name="backupModeStackedWidget">
-           <widget class="QWidget" name="LocalBackupPage"/>
-           <widget class="QWidget" name="SFTPBackupPage">
-            <layout class="QFormLayout" name="sftpFormLayout">
-             <item row="0" column="0"><widget class="QLabel" name="labelSftpHost"><property name="text"><string>SFTP Host:</string></property></widget></item>
-             <item row="0" column="1"><widget class="QLineEdit" name="sftpHostLineEdit"/></item>
-             <item row="1" column="0"><widget class="QLabel" name="labelSftpPort"><property name="text"><string>SFTP Port:</string></property></widget></item>
-             <item row="1" column="1"><widget class="QLineEdit" name="sftpPortLineEdit"><property name="text"><string>22</string></property></widget></item>
-             <item row="2" column="0"><widget class="QLabel" name="labelSftpUser"><property name="text"><string>SFTP Username:</string></property></widget></item>
-             <item row="2" column="1"><widget class="QLineEdit" name="sftpUsernameLineEdit"/></item>
-             <item row="3" column="0"><widget class="QLabel" name="labelSftpPass"><property name="text"><string>SFTP Password:</string></property></widget></item>
-             <item row="3" column="1"><widget class="QLineEdit" name="sftpPasswordLineEdit"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
-             <item row="4" column="0"><widget class="QLabel" name="labelSftpRemote"><property name="text"><string>SFTP Remote Path:</string></property></widget></item>
-             <item row="4" column="1"><widget class="QLineEdit" name="sftpRemotePathLineEdit"/></item>
-             <item row="5" column="0" colspan="2"><widget class="QCheckBox" name="sftpSavePasswordCheckBox"><property name="text"><string>Save password securely</string></property></widget></item>
-             <item row="6" column="0" colspan="2"><widget class="QPushButton" name="sftpConnectToggleButton"><property name="text"><string>Connect</string></property></widget></item>
+          <widget class="QSplitter" name="splitBackups">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           <widget class="QWidget" name="backupListPanel">
+            <layout class="QVBoxLayout" name="layoutBackupList">
+             <property name="spacing"><number>8</number></property>
+             <property name="leftMargin"><number>9</number></property>
+             <property name="topMargin"><number>9</number></property>
+             <property name="rightMargin"><number>9</number></property>
+             <property name="bottomMargin"><number>9</number></property>
+             <item>
+              <widget class="QListWidget" name="backupCards"/>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnAddBackup">
+               <property name="text"><string>+ Add Backup</string></property>
+              </widget>
+             </item>
             </layout>
            </widget>
-           <widget class="QWidget" name="GCSBackupPage">
-            <layout class="QFormLayout" name="gcsFormLayout">
-             <item row="0" column="0"><widget class="QLabel" name="labelGcsBucket"><property name="text"><string>GCS Bucket Name:</string></property></widget></item>
-             <item row="0" column="1"><widget class="QLineEdit" name="gcsBucketNameLineEdit"/></item>
-             <item row="1" column="0"><widget class="QLabel" name="labelGcsAccount"><property name="text"><string>GCS Account Identifier:</string></property></widget></item>
-             <item row="1" column="1"><widget class="QLineEdit" name="gcsAccountIdentifierLineEdit"/></item>
-             <item row="2" column="0" colspan="2"><widget class="QPushButton" name="gcsConnectButton"><property name="text"><string>Log in to Google Drive</string></property></widget></item>
-             <item row="3" column="0" colspan="2"><widget class="QLabel" name="gcsAuthStatusLabel"><property name="text"><string>Status: Not Authenticated</string></property></widget></item>
-             <item row="4" column="0" colspan="2"><widget class="QPushButton" name="gcsTestConnectionButton"><property name="text"><string>Test Connection</string></property></widget></item>
-             <item row="5" column="0" colspan="2"><widget class="QPushButton" name="gcsConnectToggleButton"><property name="text"><string>Connect</string></property></widget></item>
+           <widget class="QWidget" name="backupDetailPanel">
+            <layout class="QVBoxLayout" name="layoutBackupDetail">
+             <property name="spacing"><number>8</number></property>
+             <property name="leftMargin"><number>9</number></property>
+             <property name="topMargin"><number>9</number></property>
+             <property name="rightMargin"><number>9</number></property>
+             <property name="bottomMargin"><number>9</number></property>
             </layout>
            </widget>
           </widget>
          </item>
         </layout>
        </widget>
-
-       <widget class="QWidget" name="pageDestination">
-        <layout class="QVBoxLayout" name="vlDest">
+       <widget class="QWidget" name="pageSettings">
+        <layout class="QVBoxLayout" name="layoutSettings">
+         <property name="spacing"><number>8</number></property>
+         <property name="leftMargin"><number>9</number></property>
+         <property name="topMargin"><number>9</number></property>
+         <property name="rightMargin"><number>9</number></property>
+         <property name="bottomMargin"><number>9</number></property>
          <item>
-          <widget class="QGroupBox" name="localDestinationGroupBox">
-           <property name="title"><string>Local Destination Configuration</string></property>
-           <layout class="QFormLayout" name="localDestLayout">
-            <item row="0" column="0"><widget class="QLabel" name="labelDestDir"><property name="text"><string>Destination Directory (Local):</string></property></widget></item>
-            <item row="0" column="1">
-             <layout class="QHBoxLayout" name="destPathLayout">
-              <item><widget class="QLineEdit" name="destinationDirEdit"><property name="readOnly"><bool>true</bool></property></widget></item>
-              <item><widget class="QPushButton" name="destinationDirButton"><property name="text"><string>📂 Browse</string></property></widget></item>
-             </layout>
-            </item>
-            <item row="1" column="0" colspan="2"><widget class="QLabel" name="destHint"><property name="text"><string>Select destination folder (local or remote)</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-           </layout>
+          <widget class="QLabel" name="labelSettings">
+           <property name="text"><string>(settings placeholder)</string></property>
           </widget>
          </item>
         </layout>
        </widget>
-
-       <widget class="QWidget" name="pageSchedule">
-        <layout class="QVBoxLayout" name="vlSchedule">
+       <widget class="QWidget" name="pageHelp">
+        <layout class="QVBoxLayout" name="layoutHelp">
+         <property name="spacing"><number>8</number></property>
+         <property name="leftMargin"><number>9</number></property>
+         <property name="topMargin"><number>9</number></property>
+         <property name="rightMargin"><number>9</number></property>
+         <property name="bottomMargin"><number>9</number></property>
          <item>
-          <widget class="QGroupBox" name="gbPlan">
-           <property name="title"><string>Backup Schedule</string></property>
-           <layout class="QGridLayout" name="scheduleLayout">
-            <item row="0" column="0" colspan="3">
-             <layout class="QHBoxLayout" name="scheduleRow">
-              <item><widget class="QToolButton" name="dayButton1"><property name="text"><string>M</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton2"><property name="text"><string>T</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton3"><property name="text"><string>W</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton4"><property name="text"><string>T</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton5"><property name="text"><string>F</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton6"><property name="text"><string>S</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QToolButton" name="dayButton7"><property name="text"><string>S</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-              <item><widget class="QTimeEdit" name="backupTimeEdit"><property name="displayFormat"><string>HH:mm</string></property></widget></item>
-              <item><widget class="QToolButton" name="btnAddSched"><property name="text"><string>+</string></property></widget></item>
-             </layout>
-            </item>
-            <item row="1" column="0" colspan="3"><widget class="QLabel" name="scheduleSummaryLabel"/></item>
-            <item row="2" column="0" colspan="3"><widget class="QProgressBar" name="backupProgressBar"><property name="visible"><bool>false</bool></property></widget></item>
-           </layout>
-          </widget>
-         </item>
-         <item><widget class="QTableView" name="tvJobs"/></item>
-         <item>
-          <layout class="QHBoxLayout" name="bottomButtons">
-           <item><spacer name="bottomSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-           <item><widget class="QPushButton" name="btnRunNow"><property name="text"><string>Run Now</string></property></widget></item>
-           <item><widget class="QPushButton" name="btnRemoveSelected"><property name="text"><string>Remove Selected</string></property></widget></item>
-          </layout>
-         </item>
-        </layout>
-       </widget>
-
-       <widget class="QWidget" name="pageWatch">
-        <layout class="QVBoxLayout" name="vlWatch">
-         <item>
-          <widget class="QGroupBox" name="gbWatch">
-           <property name="title"><string>Real-Time Folder Watch</string></property>
-           <layout class="QVBoxLayout" name="verticalLayout_watch">
-            <item>
-             <layout class="QHBoxLayout" name="hlWatch">
-              <item><widget class="QCheckBox" name="cbWatch"><property name="text"><string>Activate watch on source folder</string></property></widget></item>
-              <item><widget class="QLabel" name="lblWatchStatus"/></item>
-             </layout>
-            </item>
-            <item>
-             <layout class="QFormLayout" name="formLayoutWatch">
-              <item row="0" column="0"><widget class="QLabel" name="labelWatchInterval"><property name="text"><string>Interval (s)</string></property></widget></item>
-              <item row="0" column="1"><widget class="QSpinBox" name="sbWatchInterval"><property name="minimum"><number>5</number></property><property name="maximum"><number>3600</number></property><property name="value"><number>15</number></property><property name="enabled"><bool>false</bool></property></widget></item>
-             </layout>
-            </item>
-            <item><widget class="QLabel" name="lblLastEvent"><property name="text"><string>Last event: --/--/---- --:--:--</string></property></widget></item>
-           </layout>
+          <widget class="QLabel" name="labelHelp">
+           <property name="text"><string>(help placeholder)</string></property>
           </widget>
          </item>
         </layout>
        </widget>
-
-       <widget class="QWidget" name="pageLogs">
-        <layout class="QVBoxLayout" name="vlLogs">
-         <item><widget class="QPlainTextEdit" name="teLogs"><property name="readOnly"><bool>true</bool></property></widget></item>
-         <item><widget class="QPushButton" name="btnClearLogs"><property name="text"><string>Clear</string></property></widget></item>
-        </layout>
-       </widget>
-
-      </widget> <!-- end pages -->
+      </widget>
      </widget>
     </item>
    </layout>
   </widget>
-  <widget class="QDockWidget" name="fileViewerDockWidget">
-   <property name="windowTitle"><string>Remote File Browser</string></property>
-   <property name="visible"><bool>false</bool></property>
-   <attribute name="dockWidgetArea"><enum>Qt::RightDockWidgetArea</enum></attribute>
-   <widget class="QWidget" name="dockWidgetContents">
-    <layout class="QVBoxLayout" name="dockLayout">
-     <item><widget class="QWidget" name="fileViewerWidget"/></item>
-    </layout>
-   </widget>
-  </widget>
-  <action name="actionToggleFileViewer"><property name="text"><string>Remote File Browser</string></property></action>
-  <action name="actionRunBackup"><property name="text"><string>Run Backup Now</string></property><property name="shortcut"><string>Ctrl+R</string></property></action>
-  <widget class="QMenuBar" name="menubar">
-   <widget class="QMenu" name="menuView">
-    <property name="title"><string>&amp;View</string></property>
-    <addaction name="actionToggleFileViewer"/>
-   </widget>
-   <addaction name="menuView"/>
-  </widget>
   <widget class="QToolBar" name="mainToolBar">
-   <property name="windowTitle"><string>Tools</string></property>
-   <addaction name="actionRunBackup"/>
+   <addaction name="actionRunNow"/>
+   <addaction name="actionSave"/>
+   <addaction name="actionHelp"/>
   </widget>
-  <widget class="QStatusBar" name="statusBar"/>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionRunNow">
+   <property name="text">
+    <string>Run Now</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionHelp">
+   <property name="text">
+    <string>Help</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
+<!-- filler -->
 </ui>
