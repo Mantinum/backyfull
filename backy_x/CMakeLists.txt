@@ -12,7 +12,7 @@ set(CMAKE_AUTOUIC ON)
 
 # --------------------------------------------------------------------
 # ============== dépendances =========================================
-find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test Network)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test Network NetworkAuth)
 find_package(CURL    REQUIRED)
 find_package(LibSSH2)          # optionnel : SFTP
 
