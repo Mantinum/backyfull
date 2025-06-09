@@ -81,7 +81,7 @@ GcsTarget::GcsTarget(const std::map<std::string, std::string>& config, Credentia
     if (!m_credentialManager) {
         m_credentialManager = createPlatformCredentialManager();
     }
-    m_redirectUri = "http://127.0.0.1:8085";
+    m_redirectUri = "http://127.0.0.1:8765/oauth2callback";
 
     // --- Read OAuth credentials from local file -------------------------
     QFile credFile("./oauth_credentials.json");
@@ -428,7 +428,7 @@ bool GcsTarget::performInitialOAuthFlow() {
     m_oauthCallbackServer = new QTcpServer();
     // Connect signals for m_oauthCallbackServer... (condensed for brevity)
     QObject::connect(m_oauthCallbackServer, &QTcpServer::newConnection, [&]() { /* ... see original ... */ });
-    if (!m_oauthCallbackServer->listen(QHostAddress::LocalHost, QUrl(QString::fromStdString(m_redirectUri)).port(8085))) {
+    if (!m_oauthCallbackServer->listen(QHostAddress::LocalHost, QUrl(QString::fromStdString(m_redirectUri)).port(8765))) {
         m_lastError = "Failed to start callback server: " + m_oauthCallbackServer->errorString().toStdString(); delete m_oauthCallbackServer; m_oauthCallbackServer = nullptr; return false;
     }
     QUrl authUrl("https://accounts.google.com/o/oauth2/v2/auth");
