@@ -126,8 +126,7 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 void MainWindow::setupUI() {
   ui->setupUi(this);
 
-  if (auto spl = findChild<QSplitter*>("centralwidget"))
-    spl->setSizes({200, width() - 200});
+
 
   // Menu
   QMenu *viewMenu = ui->menuView;
