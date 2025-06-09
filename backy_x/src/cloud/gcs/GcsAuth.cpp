@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QSettings>
 #include <optional>
+#include <QMultiMap>
 #include <QtNetworkAuth/qoauthhttpserverreplyhandler.h>
 
 namespace {
@@ -70,13 +71,14 @@ GcsAuth::GcsAuth(QObject* parent)
     oauth_.setReplyHandler(handler);
 
     // Extra params for Google
-    oauth_.setModifyParametersFunction([](QAbstractOAuth::Stage stage,
-                                          QVariantMap *params) {
-        if (stage == QAbstractOAuth::Stage::RequestingAuthorization) {
-            params->insert("access_type", "offline");
-            params->insert("prompt", "consent");
-        }
-    });
+    oauth_.setModifyParametersFunction(
+        [](QAbstractOAuth::Stage stage,
+           QMultiMap<QString, QVariant>* params) {
+            if (stage == QAbstractOAuth::Stage::RequestingAuthorization) {
+                params->insert("access_type", "offline");
+                params->insert("prompt", "consent");
+            }
+        });
 
     connect(&oauth_, &QOAuth2AuthorizationCodeFlow::authorizeWithBrowser,
             [](const QUrl &url) { QDesktopServices::openUrl(url); });
