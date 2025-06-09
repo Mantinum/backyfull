@@ -27,3 +27,11 @@ QLineEdit, QComboBox, QSpinBox {
     border-radius: 3px;
     background-color: white;
 }
+
+QPushButton[primary="false"] {
+    background: #E1E8F8;
+    color: #1664ff;
+    border-radius: 4px;
+    min-width: 120px;
+    max-width: 160px;
+}

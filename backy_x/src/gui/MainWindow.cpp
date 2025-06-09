@@ -166,6 +166,7 @@ void MainWindow::setupUI() {
   sourceDirEdit_->setReadOnly(true);
   sourceLayout->addWidget(sourceDirEdit_, 0, 1);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
+  sourceDirButton_->setProperty("primary", false);
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addWidget(sourceDirButton_, 0, 2);
@@ -186,6 +187,7 @@ void MainWindow::setupUI() {
   destinationDirEdit_ = destinationStack_->lineEdit();
   destinationDirEdit_->setReadOnly(true);
   destinationDirButton_ = destinationStack_->browseButton();
+  destinationDirButton_->setProperty("primary", false);
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
 
@@ -285,6 +287,7 @@ void MainWindow::setupUI() {
   }
   scheduleLayout->addLayout(daysLayout, 1, 0, 1, 3);
   addTimeButton_ = new QPushButton(tr("Add"));
+  addTimeButton_->setProperty("primary", true);
   scheduleLayout->addWidget(addTimeButton_, 0, 2);
   connect(addTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onAddBackupTimeClicked);
@@ -293,11 +296,13 @@ void MainWindow::setupUI() {
   timeListWidget_ = new QListWidget();
   scheduleLayout->addWidget(timeListWidget_, 3, 0, 1, 3);
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
+  removeTimeButton_->setProperty("primary", false);
   scheduleLayout->addWidget(removeTimeButton_, 4, 0, 1, 3);
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
 
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
+  runBackupButton_->setProperty("primary", true);
   connect(runBackupButton_, &QPushButton::clicked, this,
           &MainWindow::runBackupNow);
   scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
