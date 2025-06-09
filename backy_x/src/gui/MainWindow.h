@@ -16,7 +16,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QSpinBox>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
 #include <QSet>
@@ -111,7 +111,7 @@ private:
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
-  QTextEdit *logDisplay_;
+  QPlainTextEdit *logDisplay_ = nullptr;
 
   QScrollArea *scrollArea_ = nullptr;
   QBoxLayout *sourceDestLayout_ = nullptr;

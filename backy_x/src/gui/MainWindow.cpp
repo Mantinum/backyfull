@@ -20,6 +20,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSpinBox>
+#include <QPlainTextEdit>
 #include <QScreen>
 #include <QMessageBox>
 #include <QSettings>
@@ -327,7 +328,7 @@ void MainWindow::setupUI() {
   mainLayout->addWidget(scheduleGroupBox);
 
   mainLayout->addWidget(new QLabel(tr("Logs:")));
-  logDisplay_ = new QTextEdit();
+  logDisplay_ = new QPlainTextEdit();
   logDisplay_->setReadOnly(true);
   mainLayout->addWidget(logDisplay_);
   mainLayout->setStretchFactor(logDisplay_, 1);
@@ -1301,13 +1302,9 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
               err_msg = sftpTarget->getLastError();
             } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
               err_msg = gcsTarget->getLastError();
-            } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
+            } else if (dynamic_cast<LocalTarget *>(target)) {
               // Assuming LocalTarget might also have getLastError() or a
-              // similar mechanism If LocalTarget does not have getLastError(),
-              // this will need adjustment For now, let's assume it might return
-              // a generic error if getLastError() isn't present. err_msg =
-              // localTarget->getLastError(); // Uncomment if LocalTarget has
-              // this
+              // similar mechanism. Adjust as needed if such method exists.
               if (err_msg.empty())
                 err_msg = "File operation failed with LocalTarget.";
             } else {
@@ -1350,10 +1347,8 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
       specificError = sftpTarget->getLastError();
     } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
       specificError = gcsTarget->getLastError();
-    } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
-      // Assuming LocalTarget might also have getLastError()
-      // specificError = localTarget->getLastError(); // Uncomment if
-      // LocalTarget has this
+    } else if (dynamic_cast<LocalTarget *>(target)) {
+      // Assuming LocalTarget might also have getLastError(). Adjust if needed.
       if (specificError.empty())
         specificError = "Failed to end session with LocalTarget.";
     } else {
@@ -1397,7 +1392,7 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
 
 void MainWindow::updateLog(const QString &message) {
   QString timestamp = QTime::currentTime().toString("HH:mm:ss");
-  logDisplay_->append(QString("[%1] %2").arg(timestamp, message));
+  logDisplay_->appendPlainText(QString("[%1] %2").arg(timestamp, message));
   qDebug() << "[GUI Log]" << message;
 }
 
@@ -1465,7 +1460,6 @@ void MainWindow::onTaskChanged() {
 
 void MainWindow::onBackupModeChanged(int index) {
   QString currentModeText = backupModeComboBox_->itemText(index);
-  bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
   bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 
