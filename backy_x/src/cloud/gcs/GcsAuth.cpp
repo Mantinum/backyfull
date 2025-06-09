@@ -7,6 +7,7 @@
 #include <QStandardPaths>
 #include <QDebug>
 #include <optional>
+#include <QtNetworkAuth/qoauthhttpserverreplyhandler.h>
 
 namespace {
 struct OAuthCredentials {

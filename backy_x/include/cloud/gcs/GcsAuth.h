@@ -1,9 +1,7 @@
-#ifndef GCSAUTH_H
-#define GCSAUTH_H
+#pragma once
 
-#include <QObject>
+#include <QtCore/QObject>
 #include <QtNetworkAuth/qoauth2authorizationcodeflow.h>
-#include <QtNetworkAuth/qoauthhttpserverreplyhandler.h>
 
 class GcsAuth : public QObject {
     Q_OBJECT
@@ -16,5 +14,3 @@ public:
 private:
     QOAuth2AuthorizationCodeFlow oauth_;
 };
-
-#endif // GCSAUTH_H
