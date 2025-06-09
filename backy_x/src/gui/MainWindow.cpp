@@ -160,36 +160,43 @@ void MainWindow::setupUI() {
   mainLayout->addLayout(modeLayout);
 
   QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
-  QGridLayout *sourceLayout = new QGridLayout(sourceGroupBox);
+  QFormLayout *sourceLayout = new QFormLayout(sourceGroupBox);
   sourceLayout->setSpacing(8);
   sourceGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
-  sourceLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
+  QWidget *sourceRow = new QWidget();
+  QHBoxLayout *sourceRowLayout = new QHBoxLayout(sourceRow);
+  sourceRowLayout->setContentsMargins(0, 0, 0, 0);
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
-  sourceLayout->addWidget(sourceDirEdit_, 0, 1);
+  sourceRowLayout->addWidget(sourceDirEdit_);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setProperty("primary", false);
   sourceDirButton_->setFixedWidth(120);
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
-  sourceLayout->addWidget(sourceDirButton_, 0, 2);
+  sourceRowLayout->addWidget(sourceDirButton_);
+  sourceLayout->addRow(tr("Source Directory:"), sourceRow);
 
-  watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
-  QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
-  watchLayout->setSpacing(8);
-  watchGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
-  addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"));
-  watchLayout->addWidget(addWatchButton_, 0, 0, 1, 3);
-  watchStatusLabel_ = new QLabel(tr("Aucune surveillance"));
-  watchLayout->addWidget(watchStatusLabel_, 1, 0, 1, 3);
+  QWidget *watchRow = new QWidget();
+  QHBoxLayout *watchLayout = new QHBoxLayout(watchRow);
+  watchLayout->setContentsMargins(0, 0, 0, 0);
+  QCheckBox *cbWatch = new QCheckBox(tr("Enable real-time watch"));
+  QSpinBox *sbInterval = new QSpinBox();
+  sbInterval->setSuffix(tr(" s"));
+  sbInterval->setRange(5, 3600);
+  watchLayout->addWidget(cbWatch);
+  watchLayout->addWidget(sbInterval);
+  sourceLayout->addRow(QString(), watchRow);
+
+  addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"),
+                                    sourceGroupBox);
+  watchStatusLabel_ = new QLabel(tr("Aucune surveillance"), sourceGroupBox);
   connect(addWatchButton_, &QPushButton::clicked, this,
           &MainWindow::onAddWatchEntry);
-  sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
 
-  destinationStack_ = new DestinationStack();
-  destinationDirEdit_ = destinationStack_->lineEdit();
+  destinationDirEdit_ = new QLineEdit();
   destinationDirEdit_->setReadOnly(true);
-  destinationDirButton_ = destinationStack_->browseButton();
+  destinationDirButton_ = new QPushButton(tr("Browse..."));
   destinationDirButton_->setProperty("primary", false);
   destinationDirButton_->setFixedWidth(120);
   connect(destinationDirButton_, &QPushButton::clicked, this,
@@ -197,11 +204,15 @@ void MainWindow::setupUI() {
 
   QGroupBox *destGroupBox =
       new QGroupBox(tr("Local Destination Configuration"));
-  QGridLayout *destLayout = new QGridLayout(destGroupBox);
+  QFormLayout *destLayout = new QFormLayout(destGroupBox);
   destLayout->setSpacing(8);
   destGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
-  destLayout->addWidget(new QLabel(tr("Destination Directory:")), 0, 0);
-  destLayout->addWidget(destinationStack_, 0, 1, 1, 2);
+  QWidget *destRow = new QWidget();
+  QHBoxLayout *destRowLayout = new QHBoxLayout(destRow);
+  destRowLayout->setContentsMargins(0, 0, 0, 0);
+  destRowLayout->addWidget(destinationDirEdit_);
+  destRowLayout->addWidget(destinationDirButton_);
+  destLayout->addRow(tr("Destination Directory:"), destRow);
 
   sourceDestLayout_ = new QBoxLayout(QBoxLayout::TopToBottom);
   sourceDestLayout_->addWidget(sourceGroupBox, 1);
@@ -210,8 +221,6 @@ void MainWindow::setupUI() {
   sourceDestLayout_->setDirection(width() >= 1000 ? QBoxLayout::LeftToRight
                                                 : QBoxLayout::TopToBottom);
 
-  connect(backupModeComboBox_, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          destinationStack_, &DestinationStack::setCurrentIndex);
 
   sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
   QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
