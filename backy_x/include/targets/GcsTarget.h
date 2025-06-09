@@ -9,8 +9,6 @@
 #include <memory> // For std::unique_ptr
 #include <curl/curl.h> // For CURL handle
 
-class QTcpServer; // Forward declaration
-
 class GcsTarget : public IStorageTarget {
 public:
     explicit GcsTarget(const std::map<std::string, std::string>& config, CredentialManager* credentialManager = nullptr);
@@ -24,8 +22,6 @@ public:
     bool downloadFile(const std::string& remoteObjectName, const std::string& localPath) override; // remoteObjectName is the path string
     bool endSession() override;
 
-    // Public OAuth method for UI
-    bool initiateOAuthAndStoreToken();
     std::string getLastError() const;
 
     // GCS Specific methods
@@ -35,8 +31,6 @@ private:
     // OAuth2 and GCS interaction helper methods
     std::string getAccessToken();
     bool refreshAccessToken();
-    bool performInitialOAuthFlow();
-    void stopLocalCallbackServer();
 
     // libcurl helper
     static size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* s);
@@ -65,9 +59,6 @@ private:
     std::string m_currentAccessToken;
     long long m_accessTokenExpiryTime;
 
-    QTcpServer* m_oauthCallbackServer;
-    std::string m_authorizationCode;
-    bool m_oauthFlowCompletedSuccessfully;
     std::string m_lastError;
 
     bool m_properlyConfigured;

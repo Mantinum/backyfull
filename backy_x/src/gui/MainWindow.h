@@ -15,15 +15,18 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QPushButton>
-#include <QTextEdit>
+#include <QSpinBox>
+#include <QPlainTextEdit>
 #include <QTimeEdit>
 #include <QTimer>
 #include <QSet>
 #include <QScrollArea>
+#include "DestinationStack.h"
 // Forward declarations for Qt UI elements related to File Viewer
 QT_BEGIN_NAMESPACE
 class QTableWidget;
 class QTableWidgetItem;
+class QBoxLayout;
 QT_END_NAMESPACE
 
 // Forward declaration for Scheduler
@@ -60,6 +63,7 @@ public:
 
 protected:
   void closeEvent(QCloseEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 
 private slots:
   void selectSourceDirectory();
@@ -86,6 +90,7 @@ private slots:
   void onAddWatchEntry();
   void onDirectoryChanged(const QString &path);
   void onWatchTimerTimeout();
+  void toggleWatch(bool checked);
 
 private:
   void setupUI();
@@ -99,21 +104,22 @@ private:
   QPushButton *sourceDirButton_;
   QLineEdit *destinationDirEdit_;
   QPushButton *destinationDirButton_;
+  DestinationStack *destinationStack_;
   QTimeEdit *backupTimeEdit_;
   QList<QCheckBox *> dayCheckBoxes_;
   QPushButton *addTimeButton_;
   QListWidget *timeListWidget_;
   QPushButton *removeTimeButton_;
   QPushButton *runBackupButton_;
-  QTextEdit *logDisplay_;
+  QPlainTextEdit *logDisplay_ = nullptr;
 
   QScrollArea *scrollArea_ = nullptr;
+  QBoxLayout *sourceDestLayout_ = nullptr;
 
   // Backup Mode Selection
   QComboBox *backupModeComboBox_;
 
   // Local Backup Settings
-  QGroupBox *m_localDestinationGroupBox;
 
   // SFTP Settings
   QGroupBox *sftpSettingsGroupBox_;
@@ -148,6 +154,8 @@ private:
   QGroupBox *watchGroupBox_ = nullptr;
   QPushButton *addWatchButton_ = nullptr;
   QLabel *watchStatusLabel_ = nullptr;
+  QCheckBox *realTimeWatchCheckBox_ = nullptr;
+  QSpinBox *watchIntervalSpinBox_ = nullptr;
 
   QFileSystemWatcher *dirWatcher_ = nullptr;
   QTimer *watchTriggerTimer_ = nullptr;
@@ -174,6 +182,9 @@ private:
 
   QString shortenPathForDisplay(const QString &path) const;
   QString currentDestinationForDisplay() const;
+
+  void startFolderWatch(int seconds);
+  void stopFolderWatch();
 
   void adjustHeightToScreen();
 };

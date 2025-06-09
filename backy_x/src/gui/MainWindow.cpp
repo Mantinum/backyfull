@@ -2,6 +2,7 @@
 #include "core/Scheduler.h"
 #include "targets/GcsTarget.h" // Added for GCS Target
 #include "targets/LocalTarget.h"
+#include "cloud/gcs/GcsAuth.h"
 #include "targets/SftpTarget.h"
 #include "util/CredentialManager.h"
 
@@ -19,6 +20,8 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QSpinBox>
+#include <QPlainTextEdit>
 #include <QScreen>
 #include <QMessageBox>
 #include <QSettings>
@@ -38,15 +41,17 @@
 #include <QMenuBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), sourceDirEdit_(nullptr), sourceDirButton_(nullptr),
       destinationDirEdit_(nullptr), destinationDirButton_(nullptr),
+      destinationStack_(nullptr),
       backupTimeEdit_(nullptr), addTimeButton_(nullptr),
       timeListWidget_(nullptr), removeTimeButton_(nullptr),
       runBackupButton_(nullptr),
       logDisplay_(nullptr), scrollArea_(nullptr), backupModeComboBox_(nullptr),
-      m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
+      sftpSettingsGroupBox_(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr), sftpSavePasswordCheckBox_(nullptr),
@@ -90,6 +95,8 @@ MainWindow::MainWindow(QWidget *parent)
           &MainWindow::onWatchTimerTimeout);
 
   setupUI();
+  resize(980, 680);
+  setMinimumSize(840, 600);
   loadSettings();
 
   connect(scheduler_, &Scheduler::backupTaskTriggered, this,
@@ -121,6 +128,14 @@ void MainWindow::closeEvent(QCloseEvent *event) {
   QMainWindow::closeEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent *event) {
+  QMainWindow::resizeEvent(event);
+  if (sourceDestLayout_) {
+    sourceDestLayout_->setDirection(
+        width() >= 1000 ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+  }
+}
+
 void MainWindow::setupUI() {
   setWindowTitle(tr("BackyFull - Backup Configuration"));
 
@@ -134,10 +149,8 @@ void MainWindow::setupUI() {
   scrollArea_->setWidget(centralWidget);
 
   QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
-  setMinimumSize(800, 600);
-  if (QScreen *scr = QApplication::primaryScreen()) {
-    setMaximumHeight(scr->availableGeometry().height());
-  }
+  mainLayout->setSpacing(8);
+  mainLayout->setContentsMargins(12, 12, 12, 12);
 
   QHBoxLayout *modeLayout = new QHBoxLayout();
   modeLayout->addWidget(new QLabel(tr("Backup Mode:")));
@@ -150,43 +163,74 @@ void MainWindow::setupUI() {
   mainLayout->addLayout(modeLayout);
 
   QGroupBox *sourceGroupBox = new QGroupBox(tr("Source Configuration"));
-  QGridLayout *sourceLayout = new QGridLayout(sourceGroupBox);
-  sourceLayout->addWidget(new QLabel(tr("Source Directory:")), 0, 0);
+  QFormLayout *sourceLayout = new QFormLayout(sourceGroupBox);
+  sourceLayout->setSpacing(8);
+  sourceGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
+  QWidget *sourceRow = new QWidget();
+  QHBoxLayout *sourceRowLayout = new QHBoxLayout(sourceRow);
+  sourceRowLayout->setContentsMargins(0, 0, 0, 0);
   sourceDirEdit_ = new QLineEdit();
   sourceDirEdit_->setReadOnly(true);
-  sourceLayout->addWidget(sourceDirEdit_, 0, 1);
+  sourceRowLayout->addWidget(sourceDirEdit_);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
+  sourceDirButton_->setProperty("primary", false);
+  sourceDirButton_->setFixedWidth(120);
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
-  sourceLayout->addWidget(sourceDirButton_, 0, 2);
+  sourceRowLayout->addWidget(sourceDirButton_);
+  sourceLayout->addRow(tr("Source Directory:"), sourceRow);
 
-  watchGroupBox_ = new QGroupBox(tr("Automatic Folder Monitoring"));
-  QGridLayout *watchLayout = new QGridLayout(watchGroupBox_);
-  addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"));
-  watchLayout->addWidget(addWatchButton_, 0, 0, 1, 3);
-  watchStatusLabel_ = new QLabel(tr("Aucune surveillance"));
-  watchLayout->addWidget(watchStatusLabel_, 1, 0, 1, 3);
+  QWidget *watchRow = new QWidget();
+  QHBoxLayout *watchLayout = new QHBoxLayout(watchRow);
+  watchLayout->setContentsMargins(0, 0, 0, 0);
+  realTimeWatchCheckBox_ = new QCheckBox(tr("Enable real-time watch"));
+  watchIntervalSpinBox_ = new QSpinBox();
+  watchIntervalSpinBox_->setSuffix(tr(" s"));
+  watchIntervalSpinBox_->setRange(5, 3600);
+  watchLayout->addWidget(realTimeWatchCheckBox_);
+  watchLayout->addWidget(watchIntervalSpinBox_);
+  connect(realTimeWatchCheckBox_, &QCheckBox::toggled, this,
+          &MainWindow::toggleWatch);
+  sourceLayout->addRow(QString(), watchRow);
+
+  addWatchButton_ = new QPushButton(tr("Activer la surveillance automatique"),
+                                    sourceGroupBox);
+  watchStatusLabel_ = new QLabel(tr("Aucune surveillance"), sourceGroupBox);
   connect(addWatchButton_, &QPushButton::clicked, this,
           &MainWindow::onAddWatchEntry);
-  sourceLayout->addWidget(watchGroupBox_, 1, 0, 1, 3);
-  mainLayout->addWidget(sourceGroupBox);
 
-  m_localDestinationGroupBox =
-      new QGroupBox(tr("Local Destination Configuration"));
-  QGridLayout *localDestLayout = new QGridLayout(m_localDestinationGroupBox);
-  localDestLayout->addWidget(new QLabel(tr("Destination Directory (Local):")),
-                             0, 0);
   destinationDirEdit_ = new QLineEdit();
   destinationDirEdit_->setReadOnly(true);
-  localDestLayout->addWidget(destinationDirEdit_, 0, 1);
   destinationDirButton_ = new QPushButton(tr("Browse..."));
+  destinationDirButton_->setProperty("primary", false);
+  destinationDirButton_->setFixedWidth(120);
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
-  localDestLayout->addWidget(destinationDirButton_, 0, 2);
-  mainLayout->addWidget(m_localDestinationGroupBox);
+
+  QGroupBox *destGroupBox =
+      new QGroupBox(tr("Local Destination Configuration"));
+  QFormLayout *destLayout = new QFormLayout(destGroupBox);
+  destLayout->setSpacing(8);
+  destGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
+  QWidget *destRow = new QWidget();
+  QHBoxLayout *destRowLayout = new QHBoxLayout(destRow);
+  destRowLayout->setContentsMargins(0, 0, 0, 0);
+  destRowLayout->addWidget(destinationDirEdit_);
+  destRowLayout->addWidget(destinationDirButton_);
+  destLayout->addRow(tr("Destination Directory:"), destRow);
+
+  sourceDestLayout_ = new QBoxLayout(QBoxLayout::TopToBottom);
+  sourceDestLayout_->addWidget(sourceGroupBox, 1);
+  sourceDestLayout_->addWidget(destGroupBox, 1);
+  mainLayout->addLayout(sourceDestLayout_);
+  sourceDestLayout_->setDirection(width() >= 1000 ? QBoxLayout::LeftToRight
+                                                : QBoxLayout::TopToBottom);
+
 
   sftpSettingsGroupBox_ = new QGroupBox(tr("SFTP Configuration"));
   QFormLayout *sftpFormLayout = new QFormLayout(sftpSettingsGroupBox_);
+  sftpFormLayout->setSpacing(8);
+  sftpSettingsGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
   sftpHostLineEdit_ = new QLineEdit();
   sftpFormLayout->addRow(new QLabel(tr("SFTP Host:")), sftpHostLineEdit_);
   sftpPortLineEdit_ = new QLineEdit();
@@ -214,6 +258,8 @@ void MainWindow::setupUI() {
   gcsSettingsGroupBox_ =
       new QGroupBox(tr("Google Cloud Storage Configuration"));
   QFormLayout *gcsFormLayout = new QFormLayout(gcsSettingsGroupBox_);
+  gcsFormLayout->setSpacing(8);
+  gcsSettingsGroupBox_->layout()->setContentsMargins(12, 12, 12, 12);
   gcsBucketNameLineEdit_ = new QLineEdit();
   gcsFormLayout->addRow(new QLabel(tr("GCS Bucket Name:")),
                         gcsBucketNameLineEdit_);
@@ -244,6 +290,8 @@ void MainWindow::setupUI() {
 
   QGroupBox *scheduleGroupBox = new QGroupBox(tr("Scheduling & Controls"));
   QGridLayout *scheduleLayout = new QGridLayout(scheduleGroupBox);
+  scheduleLayout->setSpacing(8);
+  scheduleGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
   scheduleLayout->addWidget(new QLabel(tr("Backup Time:")), 0, 0);
   backupTimeEdit_ = new QTimeEdit();
   backupTimeEdit_->setDisplayFormat("HH:mm");
@@ -258,6 +306,7 @@ void MainWindow::setupUI() {
   }
   scheduleLayout->addLayout(daysLayout, 1, 0, 1, 3);
   addTimeButton_ = new QPushButton(tr("Add"));
+  addTimeButton_->setProperty("primary", true);
   scheduleLayout->addWidget(addTimeButton_, 0, 2);
   connect(addTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onAddBackupTimeClicked);
@@ -266,18 +315,21 @@ void MainWindow::setupUI() {
   timeListWidget_ = new QListWidget();
   scheduleLayout->addWidget(timeListWidget_, 3, 0, 1, 3);
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
+  removeTimeButton_->setProperty("primary", false);
+  removeTimeButton_->setFixedWidth(120);
   scheduleLayout->addWidget(removeTimeButton_, 4, 0, 1, 3);
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
 
   runBackupButton_ = new QPushButton(tr("Run Backup Now"));
+  runBackupButton_->setProperty("primary", true);
   connect(runBackupButton_, &QPushButton::clicked, this,
           &MainWindow::runBackupNow);
   scheduleLayout->addWidget(runBackupButton_, 5, 0, 1, 3);
   mainLayout->addWidget(scheduleGroupBox);
 
   mainLayout->addWidget(new QLabel(tr("Logs:")));
-  logDisplay_ = new QTextEdit();
+  logDisplay_ = new QPlainTextEdit();
   logDisplay_->setReadOnly(true);
   mainLayout->addWidget(logDisplay_);
   mainLayout->setStretchFactor(logDisplay_, 1);
@@ -286,6 +338,8 @@ void MainWindow::setupUI() {
   fileViewerGroupBox_ = new QGroupBox(tr("Remote File Viewer"));
   QVBoxLayout *fileViewerLayout =
       new QVBoxLayout(); // No parent here, will be set on the group box
+  fileViewerLayout->setSpacing(8);
+  fileViewerLayout->setContentsMargins(12, 12, 12, 12);
 
   currentPathLabel_ =
       new QLabel(tr("Path: /"), fileViewerGroupBox_);       // Parented
@@ -309,6 +363,7 @@ void MainWindow::setupUI() {
       new QPushButton(tr("Delete"), fileViewerGroupBox_); // Parented
 
   QHBoxLayout *buttonLayout = new QHBoxLayout(); // No parent here
+  buttonLayout->setSpacing(8);
   buttonLayout->addWidget(refreshButton_);
   buttonLayout->addWidget(downloadButton_);
   buttonLayout->addWidget(deleteButton_);
@@ -549,6 +604,18 @@ void MainWindow::onWatchTimerTimeout() {
   pendingWatchPaths_.clear();
 }
 
+void MainWindow::toggleWatch(bool checked) {
+  if (checked) {
+    int s = watchIntervalSpinBox_->value();
+    startFolderWatch(s);
+    logDisplay_->appendPlainText(
+        tr("Real-time watch enabled (%1 s)").arg(s));
+  } else {
+    stopFolderWatch();
+    logDisplay_->appendPlainText(tr("Real-time watch disabled"));
+  }
+}
+
 void MainWindow::updateScheduleFromUI() {
   QString sourcePath = sourceDirEdit_->text();
   QList<ScheduleEntry> entries;
@@ -772,81 +839,9 @@ void MainWindow::runBackupNow() {
 }
 
 void MainWindow::onGcsConnectButtonClicked() {
-  updateLog(
-      tr("GCS 'Connect to Google Account' button clicked (OAuth process)."));
-  QString bucketName = gcsBucketNameLineEdit_->text();
-  QString accountId = gcsAccountIdentifierLineEdit_->text();
-
-  if (bucketName.isEmpty() || accountId.isEmpty()) {
-    QMessageBox::warning(this, tr("GCS Configuration Error"),
-                         tr("GCS Bucket Name and Account Identifier must be "
-                            "provided before connecting for OAuth."));
-    updateLog(tr("GCS OAuth: Bucket Name or Account Identifier missing."));
-    return;
-  }
-
-  std::map<std::string, std::string> gcsConfig;
-  gcsConfig["gcs_bucket_name"] = bucketName.toStdString();
-  gcsConfig["gcs_account_identifier"] = accountId.toStdString();
-
-  GcsTarget tempGcsTargetForOAuth(
-      gcsConfig,
-      m_credentialManager.get()); // Create a temporary target for OAuth
-
-  gcsAuthStatusLabel_->setText(tr("Status: Authenticating..."));
-  updateLog(QString("GCS OAuth: Attempting authentication for account '%1' "
-                    "(bucket '%2' context for token).")
-                .arg(accountId, bucketName));
-
-  if (tempGcsTargetForOAuth
-          .initiateOAuthAndStoreToken()) { // Use the temporary target
-    gcsAuthStatusLabel_->setText(
-        tr("Status: Authentication Successful for %1").arg(accountId));
-    updateLog(QString("GCS OAuth: Authentication successful for account '%1'.")
-                  .arg(accountId));
-
-    QSettings settings(QCoreApplication::organizationName(),
-                       QCoreApplication::applicationName());
-    settings.beginGroup("GCS");
-    settings.setValue("gcs_last_authenticated_account", accountId);
-    settings.endGroup();
-    updateLog(QString("GCS OAuth: Stored '%1' as last authenticated account.")
-                  .arg(accountId));
-
-    // IMPORTANT: DO NOT automatically connect for listing or browseRemotePath
-    // here. User must click the new gcsConnectToggleButton_ for that. Also, DO
-    // NOT change gcsConnectToggleButton_ text here.
-
-  } else {
-    gcsAuthStatusLabel_->setText(
-        tr("Status: Authentication Failed. Check logs."));
-    QString gcsError =
-        QString::fromStdString(tempGcsTargetForOAuth.getLastError());
-    updateLog(
-        QString("GCS OAuth: Authentication failed for account '%1'. Error: %2")
-            .arg(accountId, gcsError));
-    QMessageBox::critical(this, tr("GCS Authentication Failed"),
-                          tr("Could not authenticate with Google Cloud Storage "
-                             "for account '%1'. Error: %2")
-                              .arg(accountId, gcsError));
-
-    // Reset UI related to listing, as it cannot proceed if OAuth fails
-    if (gcsConnectToggleButton_) { // Ensure button exists
-      gcsConnectToggleButton_->setText(tr("Connect"));
-    }
-    if (fileTableWidget_) { // Ensure table exists
-      fileTableWidget_->setRowCount(0);
-    }
-    currentRemotePath_ = "/";
-    if (currentPathLabel_) { // Ensure label exists
-      currentPathLabel_->setText(tr("Path: /"));
-    }
-    // QSettings settings(QCoreApplication::organizationName(),
-    // QCoreApplication::applicationName());
-    // settings.remove("GCS/gcs_last_authenticated_account");
-  }
-  // tempGcsTargetForOAuth goes out of scope here.
-  // The main gcsTarget_ (for listing) is managed by onGcsConnectToggleClicked.
+  updateLog(tr("GCS 'Connect to Google Account' button clicked."));
+  static GcsAuth gcsAuth(this);
+  gcsAuth.startInteractiveAuth();
 }
 
 void MainWindow::onSftpConnectToggleClicked() {
@@ -1236,13 +1231,9 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
               err_msg = sftpTarget->getLastError();
             } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
               err_msg = gcsTarget->getLastError();
-            } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
+            } else if (dynamic_cast<LocalTarget *>(target)) {
               // Assuming LocalTarget might also have getLastError() or a
-              // similar mechanism If LocalTarget does not have getLastError(),
-              // this will need adjustment For now, let's assume it might return
-              // a generic error if getLastError() isn't present. err_msg =
-              // localTarget->getLastError(); // Uncomment if LocalTarget has
-              // this
+              // similar mechanism. Adjust as needed if such method exists.
               if (err_msg.empty())
                 err_msg = "File operation failed with LocalTarget.";
             } else {
@@ -1285,10 +1276,8 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
       specificError = sftpTarget->getLastError();
     } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
       specificError = gcsTarget->getLastError();
-    } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
-      // Assuming LocalTarget might also have getLastError()
-      // specificError = localTarget->getLastError(); // Uncomment if
-      // LocalTarget has this
+    } else if (dynamic_cast<LocalTarget *>(target)) {
+      // Assuming LocalTarget might also have getLastError(). Adjust if needed.
       if (specificError.empty())
         specificError = "Failed to end session with LocalTarget.";
     } else {
@@ -1332,7 +1321,7 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
 
 void MainWindow::updateLog(const QString &message) {
   QString timestamp = QTime::currentTime().toString("HH:mm:ss");
-  logDisplay_->append(QString("[%1] %2").arg(timestamp, message));
+  logDisplay_->appendPlainText(QString("[%1] %2").arg(timestamp, message));
   qDebug() << "[GUI Log]" << message;
 }
 
@@ -1400,7 +1389,6 @@ void MainWindow::onTaskChanged() {
 
 void MainWindow::onBackupModeChanged(int index) {
   QString currentModeText = backupModeComboBox_->itemText(index);
-  bool localSelected = (currentModeText == tr("Local Backup"));
   bool sftpSelected = (currentModeText == tr("SFTP Backup"));
   bool gcsSelected = (currentModeText == tr("Google Cloud Storage"));
 
@@ -1441,8 +1429,6 @@ void MainWindow::onBackupModeChanged(int index) {
   }
 
   // Show/hide relevant group boxes
-  if (m_localDestinationGroupBox)
-    m_localDestinationGroupBox->setVisible(localSelected);
   if (sftpSettingsGroupBox_)
     sftpSettingsGroupBox_->setVisible(sftpSelected);
   if (gcsSettingsGroupBox_)
@@ -1475,7 +1461,7 @@ void MainWindow::loadSettings() {
   if (!geometry.isEmpty()) {
     restoreGeometry(geometry);
   } else {
-    resize(800, 700);
+    resize(980, 680);
   }
 
   backupModeComboBox_->setCurrentIndex(
@@ -2217,6 +2203,20 @@ QString MainWindow::currentDestinationForDisplay() const {
     return QString("gcs://%1").arg(gcsBucketNameLineEdit_->text());
   }
   return destinationDirEdit_->text();
+}
+
+void MainWindow::startFolderWatch(int seconds) {
+  if (!dirWatcher_->directories().contains(sourceDirEdit_->text()))
+    dirWatcher_->addPath(sourceDirEdit_->text());
+  watchTriggerTimer_->setInterval(seconds * 1000);
+  if (!watchTriggerTimer_->isActive())
+    watchTriggerTimer_->start();
+}
+
+void MainWindow::stopFolderWatch() {
+  dirWatcher_->removePath(sourceDirEdit_->text());
+  watchTriggerTimer_->stop();
+  pendingWatchPaths_.clear();
 }
 
 void MainWindow::adjustHeightToScreen() {

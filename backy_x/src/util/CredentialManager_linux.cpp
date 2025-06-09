@@ -24,8 +24,16 @@ static const SecretSchema BACKYFULL_SECRET_SCHEMA = {
         { "service", SECRET_SCHEMA_ATTRIBUTE_STRING },
         { "username", SECRET_SCHEMA_ATTRIBUTE_STRING },
         // The schema must be NULL-terminated.
-        { nullptr, SECRET_SCHEMA_ATTRIBUTE_STRING } 
-    }
+        { nullptr, SECRET_SCHEMA_ATTRIBUTE_STRING }
+    },
+    0,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr
 };
 
 // Helper to convert GError* to QString for logging

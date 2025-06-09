@@ -12,7 +12,7 @@ set(CMAKE_AUTOUIC ON)
 
 # --------------------------------------------------------------------
 # ============== dépendances =========================================
-find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test Network)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Concurrent Core Gui Test Network NetworkAuth)
 find_package(CURL    REQUIRED)
 find_package(LibSSH2)          # optionnel : SFTP
 
@@ -106,10 +106,15 @@ target_compile_options(backy_x_cli PRIVATE -Wall -Wextra -pedantic)
 add_executable(backy_full_gui
     src/gui/main_gui.cpp
     src/gui/MainWindow.cpp
+    src/gui/DestinationStack.cpp
 )
+target_sources(backy_full_gui PRIVATE src/cloud/gcs/GcsAuth.cpp)
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/cloud/gcs/GcsAuth.cpp")
+    message(FATAL_ERROR "GcsAuth.cpp missing from target!")
+endif()
 target_include_directories(backy_full_gui PRIVATE src)
 target_link_libraries(backy_full_gui
-    PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network
+    PRIVATE Qt6::Widgets Qt6::Concurrent Qt6::Network Qt6::NetworkAuth
             LocalTarget_lib SftpTarget_lib GcsTarget_lib CredentialManager_lib)
 target_compile_options(backy_full_gui PRIVATE -Wall -Wextra -pedantic)
 if(WIN32)
