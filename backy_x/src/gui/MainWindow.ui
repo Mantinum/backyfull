@@ -38,7 +38,7 @@
          </item>
          <item>
           <layout class="QHBoxLayout" name="modeLayout">
-           <item><widget class="QLabel" name="modeLabel"><property name="text"><string>Backup Mode</string></property></widget></item>
+           <item><widget class="QLabel" name="modeLabel"><property name="text"><string>Backup Mode:</string></property></widget></item>
            <item>
             <widget class="QComboBox" name="backupModeComboBox">
              <item><property name="text"><string>Local Backup</string></property></item>
