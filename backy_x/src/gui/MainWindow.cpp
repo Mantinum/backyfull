@@ -92,6 +92,8 @@ MainWindow::MainWindow(QWidget *parent)
           &MainWindow::onWatchTimerTimeout);
 
   setupUI();
+  resize(980, 680);
+  setMinimumSize(840, 600);
   loadSettings();
 
   connect(scheduler_, &Scheduler::backupTaskTriggered, this,
@@ -167,6 +169,7 @@ void MainWindow::setupUI() {
   sourceLayout->addWidget(sourceDirEdit_, 0, 1);
   sourceDirButton_ = new QPushButton(tr("Browse..."));
   sourceDirButton_->setProperty("primary", false);
+  sourceDirButton_->setFixedWidth(120);
   connect(sourceDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectSourceDirectory);
   sourceLayout->addWidget(sourceDirButton_, 0, 2);
@@ -188,15 +191,17 @@ void MainWindow::setupUI() {
   destinationDirEdit_->setReadOnly(true);
   destinationDirButton_ = destinationStack_->browseButton();
   destinationDirButton_->setProperty("primary", false);
+  destinationDirButton_->setFixedWidth(120);
   connect(destinationDirButton_, &QPushButton::clicked, this,
           &MainWindow::selectDestinationDirectory);
 
   QGroupBox *destGroupBox =
       new QGroupBox(tr("Local Destination Configuration"));
-  QVBoxLayout *destLayout = new QVBoxLayout(destGroupBox);
+  QGridLayout *destLayout = new QGridLayout(destGroupBox);
   destLayout->setSpacing(8);
   destGroupBox->layout()->setContentsMargins(12, 12, 12, 12);
-  destLayout->addWidget(destinationStack_);
+  destLayout->addWidget(new QLabel(tr("Destination Directory:")), 0, 0);
+  destLayout->addWidget(destinationStack_, 0, 1, 1, 2);
 
   sourceDestLayout_ = new QBoxLayout(QBoxLayout::TopToBottom);
   sourceDestLayout_->addWidget(sourceGroupBox, 1);
@@ -297,6 +302,7 @@ void MainWindow::setupUI() {
   scheduleLayout->addWidget(timeListWidget_, 3, 0, 1, 3);
   removeTimeButton_ = new QPushButton(tr("Remove Selected"));
   removeTimeButton_->setProperty("primary", false);
+  removeTimeButton_->setFixedWidth(120);
   scheduleLayout->addWidget(removeTimeButton_, 4, 0, 1, 3);
   connect(removeTimeButton_, &QPushButton::clicked, this,
           &MainWindow::onRemoveBackupTimeClicked);
@@ -1508,7 +1514,7 @@ void MainWindow::loadSettings() {
   if (!geometry.isEmpty()) {
     restoreGeometry(geometry);
   } else {
-    resize(800, 700);
+    resize(980, 680);
   }
 
   backupModeComboBox_->setCurrentIndex(
