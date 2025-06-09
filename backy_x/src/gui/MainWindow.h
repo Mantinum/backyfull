@@ -21,7 +21,7 @@
 #include <QPushButton>
 #include <QTableView>
 #include <QVBoxLayout>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 #include <QTimeEdit>
 #include <QListWidget>
 
@@ -101,7 +101,7 @@ private:
   QPushButton *btnRemoveSelected_ = nullptr;
   JobsModel *jobsModel_ = nullptr;
   QLabel *scheduleSummaryLabel_{nullptr};
-  QTextEdit *logDisplay_;
+  QPlainTextEdit *logDisplay_;
 
   QListWidget *navSteps_ = nullptr;
   QStackedWidget *pages_ = nullptr;
@@ -116,7 +116,6 @@ private:
   QGroupBox *m_localDestinationGroupBox;
 
   // SFTP Settings
-  QGroupBox *sftpSettingsGroupBox_;
   QLineEdit *sftpHostLineEdit_;
   QLineEdit *sftpPortLineEdit_;
   QLineEdit *sftpUsernameLineEdit_;
@@ -126,7 +125,6 @@ private:
   QPushButton *sftpConnectToggleButton_{nullptr};
 
   // GCS Settings
-  QGroupBox *gcsSettingsGroupBox_;
   QLineEdit *gcsBucketNameLineEdit_;
   QLineEdit *gcsAccountIdentifierLineEdit_;
   QPushButton *gcsConnectButton_;

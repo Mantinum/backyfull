@@ -54,11 +54,11 @@ MainWindow::MainWindow(QWidget *parent)
       runBackupButton_(nullptr), scheduleSummaryLabel_(nullptr),
       logDisplay_(nullptr), navSteps_(nullptr), pages_(nullptr),
       backupModeComboBox_(nullptr), backupModeStackedWidget_(nullptr), backupProgressBar_(nullptr),
-      m_localDestinationGroupBox(nullptr), sftpSettingsGroupBox_(nullptr),
+      m_localDestinationGroupBox(nullptr),
       sftpHostLineEdit_(nullptr), sftpPortLineEdit_(nullptr),
       sftpUsernameLineEdit_(nullptr), sftpPasswordLineEdit_(nullptr),
       sftpRemotePathLineEdit_(nullptr), sftpSavePasswordCheckBox_(nullptr),
-      sftpConnectToggleButton_(nullptr), gcsSettingsGroupBox_(nullptr),
+      sftpConnectToggleButton_(nullptr),
       gcsBucketNameLineEdit_(nullptr), gcsAccountIdentifierLineEdit_(nullptr),
       gcsConnectButton_(nullptr),
       gcsTestConnectionButton_(
@@ -154,11 +154,9 @@ void MainWindow::setupUI() {
   btnRunNow_ = ui->btnRunNow;
   btnRemoveSelected_ = ui->btnRemoveSelected;
   scheduleSummaryLabel_ = ui->scheduleSummaryLabel;
-  logDisplay_ = ui->logDisplay;
+  logDisplay_ = ui->teLogs;
   backupProgressBar_ = ui->backupProgressBar;
-  QToolButton *logToggleButton = ui->logToggleButton;
   m_localDestinationGroupBox = ui->localDestinationGroupBox;
-  sftpSettingsGroupBox_ = ui->sftpSettingsGroupBox;
   sftpHostLineEdit_ = ui->sftpHostLineEdit;
   sftpPortLineEdit_ = ui->sftpPortLineEdit;
   sftpUsernameLineEdit_ = ui->sftpUsernameLineEdit;
@@ -166,7 +164,6 @@ void MainWindow::setupUI() {
   sftpRemotePathLineEdit_ = ui->sftpRemotePathLineEdit;
   sftpSavePasswordCheckBox_ = ui->sftpSavePasswordCheckBox;
   sftpConnectToggleButton_ = ui->sftpConnectToggleButton;
-  gcsSettingsGroupBox_ = ui->gcsSettingsGroupBox;
   gcsBucketNameLineEdit_ = ui->gcsBucketNameLineEdit;
   gcsAccountIdentifierLineEdit_ = ui->gcsAccountIdentifierLineEdit;
   gcsConnectButton_ = ui->gcsConnectButton;
@@ -194,8 +191,6 @@ void MainWindow::setupUI() {
 
   applyUnifiedStyle(ui->sourceGroupBox);
   applyUnifiedStyle(ui->localDestinationGroupBox);
-  applyUnifiedStyle(ui->sftpSettingsGroupBox);
-  applyUnifiedStyle(ui->gcsSettingsGroupBox);
   applyUnifiedStyle(ui->gbPlan);
 
   setMinimumSize(800, 600);
@@ -240,10 +235,6 @@ void MainWindow::setupUI() {
           &MainWindow::onGcsConnectToggleClicked);
   connect(sftpConnectToggleButton_, &QPushButton::clicked, this,
           &MainWindow::onSftpConnectToggleClicked);
-  connect(logToggleButton, &QToolButton::toggled, this, [this, logToggleButton](bool checked) {
-    logDisplay_->setVisible(checked);
-    logToggleButton->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
-  });
   connect(fileViewerWidget_, &FileViewerWidget::logMessage, this,
           &MainWindow::updateLog);
 
@@ -1060,13 +1051,7 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
               err_msg = sftpTarget->getLastError();
             } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
               err_msg = gcsTarget->getLastError();
-            } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
-              // Assuming LocalTarget might also have getLastError() or a
-              // similar mechanism If LocalTarget does not have getLastError(),
-              // this will need adjustment For now, let's assume it might return
-              // a generic error if getLastError() isn't present. err_msg =
-              // localTarget->getLastError(); // Uncomment if LocalTarget has
-              // this
+            } else if (dynamic_cast<LocalTarget *>(target)) {
               if (err_msg.empty())
                 err_msg = "File operation failed with LocalTarget.";
             } else {
@@ -1109,10 +1094,7 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
       specificError = sftpTarget->getLastError();
     } else if (auto gcsTarget = dynamic_cast<GcsTarget *>(target)) {
       specificError = gcsTarget->getLastError();
-    } else if (auto localTarget = dynamic_cast<LocalTarget *>(target)) {
-      // Assuming LocalTarget might also have getLastError()
-      // specificError = localTarget->getLastError(); // Uncomment if
-      // LocalTarget has this
+    } else if (dynamic_cast<LocalTarget *>(target)) {
       if (specificError.empty())
         specificError = "Failed to end session with LocalTarget.";
     } else {
@@ -1156,7 +1138,7 @@ void MainWindow::performBackupInternal(const QString &sourcePath,
 
 void MainWindow::updateLog(const QString &message) {
   QString timestamp = QTime::currentTime().toString("HH:mm:ss");
-  logDisplay_->append(QString("[%1] %2").arg(timestamp, message));
+  logDisplay_->appendPlainText(QString("[%1] %2").arg(timestamp, message));
   qDebug() << "[GUI Log]" << message;
 }
 
