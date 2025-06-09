@@ -1,5 +1,6 @@
 #include "gui/MainWindow.h" // Adjust path if necessary
 #include <QApplication>
+#include <QFile>
 #include <QCoreApplication> // For setting Org/App name
 #include <curl/curl.h>      // For libcurl global init/cleanup
 #include <iostream>         // For std::cout
@@ -14,6 +15,11 @@ int main(int argc, char *argv[]) {
     std::cout << "libcurl global init/cleanup managed in GUI." << std::endl;
 
     QApplication app(argc, argv);
+
+    QFile styleFile("assets/style/backyfull.qss");
+    if (styleFile.open(QFile::ReadOnly | QFile::Text)) {
+        app.setStyleSheet(QString::fromUtf8(styleFile.readAll()));
+    }
 
     // Set OrganizationName and ApplicationName for QSettings to work predictably
     // This is important for Scheduler and MainWindow settings.
